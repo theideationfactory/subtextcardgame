@@ -32,8 +32,8 @@ const COLLECTION_TYPES = [
 
 type CollectionType = typeof COLLECTION_TYPES[number]['id'];
 
-const getCardTypeColor = (type: string) => {
-  const types = {
+const getCardTypeColor = (type: string): readonly [string, string] => {
+  const types: Record<string, readonly [string, string]> = {
     'Creature': ['#ff9966', '#ff5e62'],
     'Spell': ['#4e54c8', '#8f94fb'],
     'Artifact': ['#c79081', '#dfa579'],
@@ -56,11 +56,31 @@ const getCardRoleIcon = (role: string) => {
 
 export default function CollectionScreen() {
   const { user } = useAuth();
-  const [cards, setCards] = useState([]);
+  // Define Card type to fix TypeScript errors
+  type Card = {
+    id: string;
+    name: string;
+    description: string;
+    type: string;
+    role?: string;
+    context?: string;
+    image_url: string;
+    frame_width?: number;
+    frame_color?: string;
+    name_color?: string;
+    type_color?: string;
+    description_color?: string;
+    context_color?: string;
+    user_id: string;
+    collection_id?: string;
+    collections?: any;
+  };
+
+  const [cards, setCards] = useState<Card[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
-  const [selectedCard, setSelectedCard] = useState(null);
+  const [selectedCard, setSelectedCard] = useState<Card | null>(null);
   const [showActions, setShowActions] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [deleteError, setDeleteError] = useState('');
@@ -95,7 +115,7 @@ export default function CollectionScreen() {
       switch (selectedType) {
         case 'personal':
           query = query
-            .eq('user_id', user.id)
+            .eq('user_id', user?.id || '')
             .contains('collections.visibility', ['personal']);
           break;
         case 'friends':
@@ -119,7 +139,7 @@ export default function CollectionScreen() {
             .contains('collections.visibility', ['friends'])
             .in('user_id', friendIds);
           
-          setCards(friendCards ?? []);
+          setCards(friendCards as Card[] ?? []);
           return;
         case 'public':
           query = query.contains('collections.visibility', ['public']);
@@ -134,9 +154,9 @@ export default function CollectionScreen() {
       }
 
       console.log(`Fetched ${data?.length ?? 0} cards`);
-      setCards(data ?? []);
+      setCards(data as Card[] ?? []);
     } catch (err) {
-      console.error('Error in fetchCards:', err);
+      console.error('Error in fetchCards:', err instanceof Error ? err.message : 'Unknown error');
       setError('Failed to load cards');
     } finally {
       setLoading(false);
@@ -155,7 +175,7 @@ export default function CollectionScreen() {
     fetchCards(true);
   }, [fetchCards]);
 
-  const handleDelete = async (cardId) => {
+  const handleDelete = async (cardId: string) => {
     if (!cardId) {
       setDeleteError('Invalid card selected');
       return;
@@ -169,7 +189,7 @@ export default function CollectionScreen() {
         .from('cards')
         .delete()
         .eq('id', cardId)
-        .eq('user_id', user.id);
+        .eq('user_id', user?.id || '');
 
       if (deleteError) {
         throw deleteError;
@@ -180,14 +200,14 @@ export default function CollectionScreen() {
       setSelectedCard(null);
       
     } catch (err) {
-      console.error('Delete error:', err);
-      setDeleteError(err.message || 'Failed to delete card');
+      console.error('Delete error:', err instanceof Error ? err.message : 'Unknown error');
+      setDeleteError(err instanceof Error ? err.message : 'Failed to delete card');
     } finally {
       setDeleteLoading(false);
     }
   };
 
-  const handleEdit = (card) => {
+  const handleEdit = (card: Card) => {
     router.push({
       pathname: '/create',
       params: {
@@ -219,7 +239,7 @@ export default function CollectionScreen() {
     return null;
   }
 
-  const renderCard = ({ item }) => {
+  const renderCard = ({ item }: { item: Card }) => {
     const cardColors = getCardTypeColor(item.type);
     
     return (
@@ -419,7 +439,7 @@ export default function CollectionScreen() {
               <>
                 <TouchableOpacity
                   style={styles.modalButton}
-                  onPress={() => handleEdit(selectedCard)}
+                  onPress={() => selectedCard && handleEdit(selectedCard)}
                 >
                   <Edit3 size={20} color="#fff" />
                   <Text style={styles.modalButtonText}>Edit Card</Text>
@@ -430,13 +450,7 @@ export default function CollectionScreen() {
                     styles.deleteButton,
                     deleteLoading && styles.buttonDisabled
                   ]}
-                  onPress={() => {
-                    if (!selectedCard?.id) {
-                      setDeleteError('No card selected');
-                      return;
-                    }
-                    handleDelete(selectedCard.id);
-                  }}
+                  onPress={() => selectedCard?.id && handleDelete(selectedCard.id)}
                   disabled={deleteLoading}
                 >
                   {deleteLoading ? (
