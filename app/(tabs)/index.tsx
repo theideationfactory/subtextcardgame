@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, FlatList, Pressable, Image, Modal, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, FlatList, Pressable, Image, Modal, TouchableOpacity, RefreshControl } from 'react-native';
 import { useCallback, useEffect, useState } from 'react';
 import { useFonts, Inter_400Regular, Inter_700Bold } from '@expo-google-fonts/inter';
 import * as SplashScreen from 'expo-splash-screen';
@@ -58,6 +58,7 @@ export default function CollectionScreen() {
   const { user } = useAuth();
   const [cards, setCards] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
   const [selectedCard, setSelectedCard] = useState(null);
   const [showActions, setShowActions] = useState(false);
@@ -71,7 +72,7 @@ export default function CollectionScreen() {
     'Inter-Bold': Inter_700Bold,
   });
 
-  const fetchCards = useCallback(async () => {
+  const fetchCards = useCallback(async (isRefreshing = false) => {
     if (!user) {
       console.log('No user found, skipping card fetch');
       return;
@@ -79,7 +80,9 @@ export default function CollectionScreen() {
 
     try {
       console.log('Fetching cards for user:', user.id);
-      setLoading(true);
+      if (!isRefreshing) {
+        setLoading(true);
+      }
       setError('');
 
       let query = supabase
@@ -137,14 +140,20 @@ export default function CollectionScreen() {
       setError('Failed to load cards');
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   }, [user, selectedType]);
 
   useEffect(() => {
     if (user) {
-      fetchCards();
+      fetchCards(false);
     }
   }, [user, fetchCards]);
+  
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    fetchCards(true);
+  }, [fetchCards]);
 
   const handleDelete = async (cardId) => {
     if (!cardId) {
@@ -354,6 +363,17 @@ export default function CollectionScreen() {
         renderItem={renderCard}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.listContainer}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor="#ffffff"
+            colors={['#6366f1', '#ec4899', '#10b981']}
+            progressBackgroundColor="#2a2a2a"
+            title="Pull to refresh"
+            titleColor="#ffffff"
+          />
+        }
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
             <Text style={styles.emptyText}>

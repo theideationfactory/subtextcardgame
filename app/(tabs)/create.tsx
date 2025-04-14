@@ -52,6 +52,7 @@ export default function CreateScreen() {
   const [isCreating, setIsCreating] = useState(false);
   const [error, setError] = useState('');
   const [errorDetails, setErrorDetails] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
   const [authChecking, setAuthChecking] = useState(false);
   
   // Collapsible section states
@@ -199,6 +200,35 @@ export default function CreateScreen() {
     }
   };
 
+  // Function to reset form to initial state
+  const resetForm = () => {
+    setName('');
+    setDescription('');
+    setImageDescription('');
+    setType('');
+    setRole('');
+    setContext('');
+    setCardImage('');
+    setFrameWidth(DEFAULT_FRAME_WIDTH);
+    setFrameColor(DEFAULT_FRAME_COLOR);
+    setNameColor(DEFAULT_NAME_COLOR);
+    setTypeColor(DEFAULT_TYPE_COLOR);
+    setDescriptionColor(DEFAULT_DESCRIPTION_COLOR);
+    setContextColor(DEFAULT_CONTEXT_COLOR);
+    setVisibility(['personal']);
+    setError('');
+    setErrorDetails('');
+    setSuccessMessage('');
+    
+    // Reset UI states
+    setShowCustomization(false);
+    setShowFrameOptions(false);
+    setShowTextColors(false);
+    setShowVisibility(false);
+    
+    console.log('Form has been reset for new card creation');
+  };
+
   const handleSave = async () => {
     if (!name) {
       setError('Please provide a card name');
@@ -219,9 +249,10 @@ export default function CreateScreen() {
     setError('');
 
     try {
-      const { data: { session } } = await supabase.auth.getSession();
+      // Use the refreshSession from auth context to ensure we have the latest session
+      const currentSession = await refreshSession();
       
-      if (!session) {
+      if (!currentSession) {
         throw new Error('You must be logged in to create cards');
       }
 
@@ -229,7 +260,7 @@ export default function CreateScreen() {
       const { data: existingCollections, error: collectionError } = await supabase
         .from('collections')
         .select('id')
-        .eq('user_id', session.user.id)
+        .eq('user_id', currentSession.user.id)
         .contains('visibility', visibility)
         .limit(1);
 
@@ -245,7 +276,7 @@ export default function CreateScreen() {
           .from('collections')
           .insert({
             name: 'My Collection',
-            user_id: session.user.id,
+            user_id: currentSession.user.id,
             visibility: visibility
           })
           .select('id')
@@ -268,7 +299,7 @@ export default function CreateScreen() {
         type_color: typeColor,
         description_color: descriptionColor,
         context_color: contextColor,
-        user_id: session.user.id,
+        user_id: currentSession.user.id,
         collection_id: collectionId
       };
 
@@ -277,18 +308,33 @@ export default function CreateScreen() {
           .from('cards')
           .update(cardData)
           .eq('id', params.id)
-          .eq('user_id', session.user.id);
+          .eq('user_id', currentSession.user.id);
 
         if (updateError) throw updateError;
+        
+        console.log('Card successfully updated');
+        router.replace('/');
       } else {
-        const { error: insertError } = await supabase
+        const { data: newCard, error: insertError } = await supabase
           .from('cards')
-          .insert(cardData);
+          .insert(cardData)
+          .select()
+          .single();
 
         if (insertError) throw insertError;
+        
+        console.log('Card successfully created with ID:', newCard?.id);
+        
+        // Reset the form for new card creation
+        resetForm();
+        
+        // Show success message briefly before redirecting
+        setSuccessMessage('Card created successfully!');
+        setTimeout(() => {
+          setSuccessMessage('');
+          router.replace('/');
+        }, 2000);
       }
-
-      router.replace('/');
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'An unknown error occurred');
       console.error('Card operation error:', err);
@@ -611,7 +657,11 @@ export default function CreateScreen() {
         </View>
       </CollapsibleSection>
 
-      {error ? (
+      {successMessage ? (
+        <View style={styles.successContainer}>
+          <Text style={styles.successText}>{successMessage}</Text>
+        </View>
+      ) : error ? (
         <View style={styles.errorContainer}>
           <Text style={styles.errorText}>{error}</Text>
           {errorDetails ? (
@@ -828,6 +878,18 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter-Bold',
     fontSize: 14,
     marginBottom: 8,
+  },
+  successContainer: {
+    backgroundColor: '#e6f7e6',
+    padding: 16,
+    borderRadius: 8,
+    marginBottom: 16,
+  },
+  successText: {
+    color: '#2e7d32',
+    fontFamily: 'Inter-Bold',
+    fontSize: 16,
+    textAlign: 'center',
   },
   errorDetails: {
     color: '#ff8888',
