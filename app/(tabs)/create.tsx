@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useContext } from 'react';
 import {
   View,
   Text,
@@ -13,15 +13,13 @@ import {
 import { useFonts, Inter_400Regular, Inter_700Bold } from '@expo-google-fonts/inter';
 import * as SplashScreen from 'expo-splash-screen';
 import { Wand as Wand2, ChevronDown, ChevronUp, Lock, Users, Globe as Globe2 } from 'lucide-react-native';
-import { createClient } from '@supabase/supabase-js';
+import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/contexts/AuthContext';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 
 SplashScreen.preventAutoHideAsync();
 
-const supabase = createClient(
-  process.env.EXPO_PUBLIC_SUPABASE_URL!,
-  process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY!
-);
+// Supabase client is already imported from @/lib/supabase
 
 const DEFAULT_IMAGE = 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=1000&auto=format&fit=crop';
 const DEFAULT_FRAME_COLOR = '#FFD700';
@@ -54,6 +52,7 @@ export default function CreateScreen() {
   const [isCreating, setIsCreating] = useState(false);
   const [error, setError] = useState('');
   const [errorDetails, setErrorDetails] = useState('');
+  const [authChecking, setAuthChecking] = useState(false);
   
   // Collapsible section states
   const [showCustomization, setShowCustomization] = useState(false);
@@ -66,6 +65,31 @@ export default function CreateScreen() {
     'Inter-Regular': Inter_400Regular,
     'Inter-Bold': Inter_700Bold,
   });
+
+  // Get auth context at component level
+  const { refreshSession } = useAuth();
+
+  // Check auth status on component mount
+  useEffect(() => {
+    const checkAuthStatus = async () => {
+      try {
+        setAuthChecking(true);
+        const { data } = await supabase.auth.getSession();
+        if (!data.session) {
+          console.log('No active session found on component mount');
+          // You could show a message or redirect here if needed
+        } else {
+          console.log('Active session found on component mount');
+        }
+      } catch (err: unknown) {
+        console.error('Error checking auth status:', err);
+      } finally {
+        setAuthChecking(false);
+      }
+    };
+    
+    checkAuthStatus();
+  }, []);
 
   // Load card data when editing
   useEffect(() => {
@@ -100,8 +124,13 @@ export default function CreateScreen() {
   }
 
   const generateImage = async () => {
-    if (!name || !imageDescription) {
-      setError('Please provide a name and image description');
+    if (!name) {
+      setError('Please provide a card name');
+      return;
+    }
+
+    if (!imageDescription) {
+      setError('Please provide an image description');
       return;
     }
 
@@ -110,46 +139,63 @@ export default function CreateScreen() {
     setErrorDetails('');
 
     try {
-      const { data: { session } } = await supabase.auth.getSession();
+      setAuthChecking(true);
       
-      if (!session) {
+      // First, try to refresh the session to ensure we have the latest token
+      const currentSession = await refreshSession();
+      
+      if (!currentSession || !currentSession.access_token) {
+        console.error('No valid session found after refresh attempt');
         throw new Error('You must be logged in to generate images');
       }
+      
+      console.log('Session verified, proceeding with image generation with token:', 
+        currentSession.access_token.substring(0, 10) + '...');
 
       const response = await fetch(
         `${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/generate-card-image`,
         {
           method: 'POST',
           headers: {
-            'Authorization': `Bearer ${session.access_token}`,
+            'Authorization': `Bearer ${currentSession.access_token}`,
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
             name,
             description: imageDescription,
-            userId: session.user.id
+            userId: currentSession.user.id
           }),
         }
       );
 
-      const data = await response.json();
-
       if (!response.ok) {
-        setError(data.error || 'Failed to generate image');
-        setErrorDetails(data.details || '');
-        throw new Error(data.error || 'Failed to generate image');
+        const errorData = await response.json();
+        console.error('Server error response:', errorData);
+        setError(errorData.error || `Failed to generate image: ${response.status}`);
+        setErrorDetails(errorData.details || `Server responded with status: ${response.status}`);
+        throw new Error(errorData.error || 'Failed to generate image');
       }
 
+      const data = await response.json();
+
       if (!data.imageUrl) {
+        console.error('No image URL in response:', data);
         throw new Error('No image URL received');
       }
 
+      console.log('Successfully received image URL');
       setCardImage(data.imageUrl);
       setImageDescription('');
     } catch (err) {
       console.error('Image generation error:', err);
+      if (err instanceof Error) {
+        setError(err.message);
+      } else {
+        setError('An unknown error occurred');
+      }
     } finally {
       setIsGenerating(false);
+      setAuthChecking(false);
     }
   };
 
@@ -243,15 +289,21 @@ export default function CreateScreen() {
       }
 
       router.replace('/');
-    } catch (err) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'An unknown error occurred');
       console.error('Card operation error:', err);
     } finally {
       setIsCreating(false);
     }
   };
 
-  const ColorPicker = ({ label, value, onChange }) => (
+  interface ColorPickerProps {
+    label: string;
+    value: string;
+    onChange: (color: string) => void;
+  }
+
+  const ColorPicker = ({ label, value, onChange }: ColorPickerProps) => (
     <View style={styles.colorPickerContainer}>
       <Text style={styles.colorPickerLabel}>{label}</Text>
       <View style={styles.colorGrid}>
@@ -280,7 +332,14 @@ export default function CreateScreen() {
     </View>
   );
 
-  const CollapsibleSection = ({ title, isOpen, onToggle, children }) => (
+  interface CollapsibleSectionProps {
+    title: string;
+    isOpen: boolean;
+    onToggle: () => void;
+    children: React.ReactNode;
+  }
+
+  const CollapsibleSection = ({ title, isOpen, onToggle, children }: CollapsibleSectionProps) => (
     <View style={styles.collapsibleSection}>
       <TouchableOpacity 
         style={styles.collapsibleHeader} 
@@ -300,6 +359,8 @@ export default function CreateScreen() {
       )}
     </View>
   );
+
+
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
@@ -561,22 +622,18 @@ export default function CreateScreen() {
 
       <View style={styles.imageSection}>
         <TouchableOpacity
-          style={[
-            styles.generateButton,
-            (isGenerating || !name || !imageDescription) && 
-            styles.generateButtonDisabled
-          ]}
+          style={[styles.generateButton, (isGenerating || authChecking || !name || !imageDescription) && styles.generateButtonDisabled]}
           onPress={generateImage}
-          disabled={isGenerating || !name || !imageDescription}
+          disabled={isGenerating || authChecking || !name || !imageDescription}
         >
-          {isGenerating ? (
-            <ActivityIndicator color="#fff" />
+          {isGenerating || authChecking ? (
+            <ActivityIndicator color="#fff" size="small" style={styles.buttonIcon} />
           ) : (
-            <>
-              <Wand2 size={20} color="#fff" style={styles.buttonIcon} />
-              <Text style={styles.generateButtonText}>Generate New Image</Text>
-            </>
+            <Wand2 color="#fff" size={20} style={styles.buttonIcon} />
           )}
+          <Text style={styles.generateButtonText}>
+            {isGenerating ? 'Generating...' : authChecking ? 'Checking auth...' : 'Generate Image'}
+          </Text>
         </TouchableOpacity>
 
         {cardImage ? (

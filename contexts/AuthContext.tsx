@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
-import type { User } from '@supabase/supabase-js';
+import type { User, Session } from '@supabase/supabase-js';
 
 type Card = {
   id: string;
@@ -24,7 +24,7 @@ type AuthContextType = {
   user: User | null;
   loading: boolean;
   cards: Card[];
-  refreshSession: () => Promise<void>;
+  refreshSession: () => Promise<Session | null | undefined>;
   fetchCards: () => Promise<void>;
 };
 
@@ -32,7 +32,7 @@ const AuthContext = createContext<AuthContextType>({
   user: null,
   loading: true,
   cards: [],
-  refreshSession: async () => {},
+  refreshSession: async () => null,
   fetchCards: async () => {},
 });
 
@@ -43,15 +43,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const refreshSession = async () => {
     try {
+      console.log('Attempting to refresh session...');
       const { data: { session }, error } = await supabase.auth.refreshSession();
       if (error) {
         console.error('Error refreshing session:', error);
         return;
       }
-      console.log('Session refreshed:', session?.user ?? null);
+      console.log('Session refreshed successfully:', session?.user?.id ?? 'no user');
       setUser(session?.user ?? null);
+      return session;
     } catch (error) {
       console.error('Error in refreshSession:', error);
+      return null;
     }
   };
 
@@ -81,12 +84,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Initial session check
     const initAuth = async () => {
       try {
+        console.log('Initializing auth state...');
         const { data: { session } } = await supabase.auth.getSession();
-        console.log('Initial session check:', session?.user ?? null);
-        setUser(session?.user ?? null);
         
-        if (session?.user) {
-          await fetchCards();
+        // If no session found or session appears invalid, try to refresh it
+        if (!session) {
+          console.log('No initial session found, attempting to refresh...');
+          const refreshedSession = await refreshSession();
+          if (!refreshedSession) {
+            console.log('No session available after refresh attempt');
+          }
+        } else {
+          console.log('Initial session found for user:', session?.user?.id ?? 'unknown');
+          setUser(session?.user ?? null);
+          
+          if (session?.user) {
+            await fetchCards();
+          }
         }
       } catch (error) {
         console.error('Error getting initial session:', error);
@@ -98,15 +112,36 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     initAuth();
 
     // Subscribe to auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      console.log('Auth state changed:', _event);
-      console.log('New session:', session?.user ?? null);
-      setUser(session?.user ?? null);
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log('Auth state changed:', event);
+      console.log('New session state:', session ? 'active' : 'none', 'for user:', session?.user?.id ?? 'none');
       
-      if (session?.user) {
-        await fetchCards();
-      } else {
+      // Handle different auth events
+      if (event === 'SIGNED_IN') {
+        console.log('User signed in');
+        setUser(session?.user ?? null);
+        if (session?.user) {
+          await fetchCards();
+        }
+      } else if (event === 'SIGNED_OUT') {
+        console.log('User signed out');
+        setUser(null);
         setCards([]);
+      } else if (event === 'TOKEN_REFRESHED') {
+        console.log('Token refreshed');
+        setUser(session?.user ?? null);
+      } else if (event === 'USER_UPDATED') {
+        console.log('User updated');
+        setUser(session?.user ?? null);
+      } else {
+        // For any other event, update the user state
+        setUser(session?.user ?? null);
+        
+        if (session?.user) {
+          await fetchCards();
+        } else {
+          setCards([]);
+        }
       }
     });
 
