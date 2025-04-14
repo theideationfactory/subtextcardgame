@@ -1,25 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TextInput,
-  TouchableOpacity,
-  FlatList,
-  Image,
-  ActivityIndicator,
-  Alert,
-} from 'react-native';
-import { useFonts, Inter_400Regular, Inter_700Bold } from '@expo-google-fonts/inter';
-import { createClient } from '@supabase/supabase-js';
-import { Search, UserPlus, UserCheck, UserX, Clock, Users } from 'lucide-react-native';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, Image, ActivityIndicator, FlatList } from 'react-native';
+import { useFonts, Inter_400Regular, Inter_600SemiBold, Inter_700Bold } from '@expo-google-fonts/inter';
+import { UserPlus, UserCheck, UserX, Search, Users, Clock, Check } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Spacer } from '@/components/Spacer';
-
-const supabase = createClient(
-  process.env.EXPO_PUBLIC_SUPABASE_URL!,
-  process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY!
-);
+import { supabase } from '@/lib/supabase';
 
 const SECTIONS = {
   SEARCH: 'search',
@@ -33,7 +18,7 @@ type User = {
   id: string;
   email: string;
   created_at: string;
-  friendship_status?: 'friend' | 'request_sent' | 'request_received' | 'none';
+  friendship_status: 'friend' | 'request_sent' | 'request_received' | 'none';
 };
 
 type FriendRequest = {
@@ -68,6 +53,7 @@ export default function FriendsScreen() {
 
   const [fontsLoaded] = useFonts({
     'Inter-Regular': Inter_400Regular,
+    'Inter-SemiBold': Inter_600SemiBold,
     'Inter-Bold': Inter_700Bold,
   });
 
@@ -190,14 +176,14 @@ export default function FriendsScreen() {
       }
 
       // Always add the test user for any search that contains 'test'
-      if (query.toLowerCase().includes('test')) {
+      if (query.toLowerCase() === 'test@example.com') {
         console.log('Adding test user for demonstration');
         setSearchResults([{
           id: 'test-user-id',
           email: 'test@example.com',
           created_at: new Date().toISOString(),
           friendship_status: 'none'
-        }]);
+        } as User]);
         return;
       }
       
@@ -238,22 +224,85 @@ export default function FriendsScreen() {
 
   const handleSendRequest = async (userId: string) => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
+      setLoading(true);
+      setError('');
+      
+      // Get current user
+      const { data: authData } = await supabase.auth.getUser();
+      const user = authData?.user;
+      
+      if (!user) {
+        setError('You need to be signed in to send friend requests');
+        return;
+      }
+      
+      console.log(`Sending friend request from ${user.id} to ${userId}`);
+      
+      // Check if a request already exists
+      const { data: existingRequests, error: checkError } = await supabase
+        .from('friend_requests')
+        .select('*')
+        .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`)
+        .or(`sender_id.eq.${userId},receiver_id.eq.${userId}`);
+        
+      if (checkError) {
+        console.error('Error checking existing requests:', checkError);
+        throw checkError;
+      }
+      
+      console.log('Existing requests:', existingRequests);
+      
+      // If there's already a pending request between these users
+      const existingRequest = existingRequests?.find(req => 
+        (req.sender_id === user.id && req.receiver_id === userId) || 
+        (req.sender_id === userId && req.receiver_id === user.id)
+      );
+      
+      if (existingRequest) {
+        if (existingRequest.status === 'pending') {
+          if (existingRequest.sender_id === user.id) {
+            setError('You already sent a friend request to this user');
+          } else {
+            setError('This user already sent you a friend request');
+          }
+          return;
+        } else if (existingRequest.status === 'accepted') {
+          setError('You are already friends with this user');
+          return;
+        }
+      }
+      
+      // Insert the new friend request
       const { error: insertError } = await supabase
         .from('friend_requests')
         .insert({
           sender_id: user.id,
           receiver_id: userId,
+          status: 'pending'
         });
 
-      if (insertError) throw insertError;
+      if (insertError) {
+        console.error('Error inserting friend request:', insertError);
+        throw insertError;
+      }
 
-      handleSearch(searchQuery);
+      // Show success message
+      setError('Friend request sent successfully!');
+      
+      // Update the search results to show the new status
+      const updatedResults = searchResults.map(result => {
+        if (result.id === userId) {
+          return { ...result, friendship_status: 'request_sent' } as User;
+        }
+        return result;
+      });
+      
+      setSearchResults(updatedResults as User[]);
     } catch (err) {
       console.error('Error sending friend request:', err);
-      setError('Failed to send friend request');
+      setError('Failed to send friend request: ' + (err instanceof Error ? err.message : 'Unknown error'));
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -389,23 +438,43 @@ export default function FriendsScreen() {
           <TouchableOpacity
             style={styles.actionButton}
             onPress={() => handleSendRequest(item.id)}
+            disabled={loading}
           >
-            <UserPlus size={20} color="#6366f1" />
+            {loading ? (
+              <ActivityIndicator size="small" color="#6366f1" />
+            ) : (
+              <UserPlus size={20} color="#6366f1" />
+            )}
           </TouchableOpacity>
         )}  
+        {isSearchUser(item) && item.friendship_status === 'request_sent' && (
+          <View style={[styles.actionButton, styles.sentIndicator]}>
+            <Check size={20} color="#4CAF50" />
+          </View>
+        )}
         {isRequest(item) && (
           <View style={styles.requestActions}>
             <TouchableOpacity
               style={[styles.actionButton, styles.acceptButton]}
               onPress={() => handleAcceptRequest(item.request_id)}
+              disabled={loading}
             >
-              <UserCheck size={20} color="#4CAF50" />
+              {loading ? (
+                <ActivityIndicator size="small" color="#4CAF50" />
+              ) : (
+                <UserCheck size={20} color="#4CAF50" />
+              )}
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.actionButton, styles.rejectButton]}
               onPress={() => handleRejectRequest(item.request_id)}
+              disabled={loading}
             >
-              <UserX size={20} color="#ff4444" />
+              {loading ? (
+                <ActivityIndicator size="small" color="#ff4444" />
+              ) : (
+                <UserX size={20} color="#ff4444" />
+              )}
             </TouchableOpacity>
           </View>
         )}  
@@ -608,7 +677,12 @@ const styles = StyleSheet.create({
     color: '#FFA726',
   },
   statusReceived: {
-    color: '#6366f1',
+    color: '#ff9800',
+  },
+  sentIndicator: {
+    backgroundColor: 'rgba(76, 175, 80, 0.1)',
+    borderColor: '#4CAF50',
+    borderWidth: 1,
   },
   actionButton: {
     padding: 8,
@@ -660,5 +734,15 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginVertical: 8,
     fontSize: 14,
+  },
+  successText: {
+    color: '#4CAF50',
+    fontSize: 14,
+    fontFamily: 'Inter-Regular',
+    textAlign: 'center',
+    padding: 12,
+    backgroundColor: 'rgba(76, 175, 80, 0.1)',
+    margin: 16,
+    borderRadius: 8,
   },
 });
