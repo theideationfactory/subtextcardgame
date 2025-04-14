@@ -70,6 +70,7 @@ BEGIN
     (fr.receiver_id = current_user_id AND fr.sender_id = u.id)
   WHERE 
     u.id != current_user_id AND
+    LENGTH(search_query) >= 3 AND
     u.email ILIKE '%' || search_query || '%'
   ORDER BY 
     u.email;
