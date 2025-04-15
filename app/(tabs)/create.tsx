@@ -35,19 +35,19 @@ export default function CreateScreen() {
   const isEditing = !!params.id;
 
   // Initialize state with params or defaults
-  const [name, setName] = useState('');
-  const [description, setDescription] = useState('');
+  const [name, setName] = useState(params.name?.toString() || '');
+  const [description, setDescription] = useState(params.description?.toString() || '');
   const [imageDescription, setImageDescription] = useState('');
-  const [type, setType] = useState('');
-  const [role, setRole] = useState('');
-  const [context, setContext] = useState('');
-  const [cardImage, setCardImage] = useState('');
-  const [frameWidth, setFrameWidth] = useState(DEFAULT_FRAME_WIDTH);
-  const [frameColor, setFrameColor] = useState(DEFAULT_FRAME_COLOR);
-  const [nameColor, setNameColor] = useState(DEFAULT_NAME_COLOR);
-  const [typeColor, setTypeColor] = useState(DEFAULT_TYPE_COLOR);
-  const [descriptionColor, setDescriptionColor] = useState(DEFAULT_DESCRIPTION_COLOR);
-  const [contextColor, setContextColor] = useState(DEFAULT_CONTEXT_COLOR);
+  const [type, setType] = useState(params.type?.toString() || '');
+  const [role, setRole] = useState(params.role?.toString() || '');
+  const [context, setContext] = useState(params.context?.toString() || '');
+  const [cardImage, setCardImage] = useState(params.image_url?.toString() || '');
+  const [frameWidth, setFrameWidth] = useState(params.frame_width ? parseInt(params.frame_width.toString()) : DEFAULT_FRAME_WIDTH);
+  const [frameColor, setFrameColor] = useState(params.frame_color?.toString() || DEFAULT_FRAME_COLOR);
+  const [nameColor, setNameColor] = useState(params.name_color?.toString() || DEFAULT_NAME_COLOR);
+  const [typeColor, setTypeColor] = useState(params.type_color?.toString() || DEFAULT_TYPE_COLOR);
+  const [descriptionColor, setDescriptionColor] = useState(params.description_color?.toString() || DEFAULT_DESCRIPTION_COLOR);
+  const [contextColor, setContextColor] = useState(params.context_color?.toString() || DEFAULT_CONTEXT_COLOR);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const [error, setError] = useState('');
@@ -92,33 +92,7 @@ export default function CreateScreen() {
     checkAuthStatus();
   }, []);
 
-  // Load card data when editing
-  useEffect(() => {
-    if (isEditing) {
-      setName(params.name?.toString() || '');
-      setDescription(params.description?.toString() || '');
-      setType(params.type?.toString() || '');
-      setRole(params.role?.toString() || '');
-      setContext(params.context?.toString() || '');
-      setCardImage(params.image_url?.toString() || '');
-      setFrameWidth(params.frame_width ? parseInt(params.frame_width.toString()) : DEFAULT_FRAME_WIDTH);
-      setFrameColor(params.frame_color?.toString() || DEFAULT_FRAME_COLOR);
-      setNameColor(params.name_color?.toString() || DEFAULT_NAME_COLOR);
-      setTypeColor(params.type_color?.toString() || DEFAULT_TYPE_COLOR);
-      setDescriptionColor(params.description_color?.toString() || DEFAULT_DESCRIPTION_COLOR);
-      setContextColor(params.context_color?.toString() || DEFAULT_CONTEXT_COLOR);
-      
-      if (params.visibility) {
-        try {
-          const visibilityArray = JSON.parse(params.visibility.toString());
-          setVisibility(Array.isArray(visibilityArray) ? visibilityArray : ['personal']);
-        } catch (e) {
-          console.error('Error parsing visibility:', e);
-          setVisibility(['personal']);
-        }
-      }
-    }
-  }, [params, isEditing]);
+  // Remove redundant useEffect for loading card data when editing, as state is now initialized from params above.
 
   if (!fontsLoaded) {
     return null;
@@ -313,7 +287,11 @@ export default function CreateScreen() {
         if (updateError) throw updateError;
         
         console.log('Card successfully updated');
-        router.replace('/');
+        setSuccessMessage('Card updated successfully!');
+        setTimeout(() => {
+          setSuccessMessage('');
+          router.replace('/');
+        }, 1500);
       } else {
         const { data: newCard, error: insertError } = await supabase
           .from('cards')
