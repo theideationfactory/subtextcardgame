@@ -23,11 +23,6 @@ SplashScreen.preventAutoHideAsync();
 
 const DEFAULT_IMAGE = 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=1000&auto=format&fit=crop';
 const DEFAULT_FRAME_COLOR = '#FFD700';
-const DEFAULT_FRAME_WIDTH = 8;
-const DEFAULT_NAME_COLOR = '#FFFFFF';
-const DEFAULT_TYPE_COLOR = '#FFFFFF';
-const DEFAULT_DESCRIPTION_COLOR = '#FFFFFF';
-const DEFAULT_CONTEXT_COLOR = '#CCCCCC';
 
 export default function CreateScreen() {
   const router = useRouter();
@@ -42,12 +37,7 @@ export default function CreateScreen() {
   const [role, setRole] = useState(params.role?.toString() || '');
   const [context, setContext] = useState(params.context?.toString() || '');
   const [cardImage, setCardImage] = useState(params.image_url?.toString() || '');
-  const [frameWidth, setFrameWidth] = useState(params.frame_width ? parseInt(params.frame_width.toString()) : DEFAULT_FRAME_WIDTH);
   const [frameColor, setFrameColor] = useState(params.frame_color?.toString() || DEFAULT_FRAME_COLOR);
-  const [nameColor, setNameColor] = useState(params.name_color?.toString() || DEFAULT_NAME_COLOR);
-  const [typeColor, setTypeColor] = useState(params.type_color?.toString() || DEFAULT_TYPE_COLOR);
-  const [descriptionColor, setDescriptionColor] = useState(params.description_color?.toString() || DEFAULT_DESCRIPTION_COLOR);
-  const [contextColor, setContextColor] = useState(params.context_color?.toString() || DEFAULT_CONTEXT_COLOR);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const [error, setError] = useState('');
@@ -56,9 +46,7 @@ export default function CreateScreen() {
   const [authChecking, setAuthChecking] = useState(false);
   
   // Collapsible section states
-  const [showCustomization, setShowCustomization] = useState(false);
-  const [showFrameOptions, setShowFrameOptions] = useState(false);
-  const [showTextColors, setShowTextColors] = useState(false);
+  const [showFrameColor, setShowFrameColor] = useState(false);
   const [showVisibility, setShowVisibility] = useState(false);
   const [visibility, setVisibility] = useState<string[]>(['personal']);
 
@@ -69,6 +57,25 @@ export default function CreateScreen() {
 
   // Get auth context at component level
   const { refreshSession } = useAuth();
+
+  // Define color options as a constant to avoid recreating on each render
+  const COLOR_OPTIONS = [
+    { color: '#FFD700', name: 'Gold' },
+    { color: '#C0C0C0', name: 'Silver' },
+    { color: '#CD7F32', name: 'Bronze' },
+    { color: '#FF4444', name: 'Red' },
+    { color: '#4CAF50', name: 'Green' },
+    { color: '#2196F3', name: 'Blue' },
+    { color: '#9C27B0', name: 'Purple' },
+    { color: '#FFFFFF', name: 'White' },
+    { color: '#000000', name: 'Black' },
+  ];
+  
+  // Helper function to get color name from hex value
+  const getColorName = (hexColor: string): string => {
+    const colorOption = COLOR_OPTIONS.find(option => option.color === hexColor);
+    return colorOption ? colorOption.name : hexColor;
+  };
 
   // Check auth status on component mount
   useEffect(() => {
@@ -183,21 +190,14 @@ export default function CreateScreen() {
     setRole('');
     setContext('');
     setCardImage('');
-    setFrameWidth(DEFAULT_FRAME_WIDTH);
     setFrameColor(DEFAULT_FRAME_COLOR);
-    setNameColor(DEFAULT_NAME_COLOR);
-    setTypeColor(DEFAULT_TYPE_COLOR);
-    setDescriptionColor(DEFAULT_DESCRIPTION_COLOR);
-    setContextColor(DEFAULT_CONTEXT_COLOR);
     setVisibility(['personal']);
     setError('');
     setErrorDetails('');
     setSuccessMessage('');
     
     // Reset UI states
-    setShowCustomization(false);
-    setShowFrameOptions(false);
-    setShowTextColors(false);
+    setShowFrameColor(false);
     setShowVisibility(false);
     
     console.log('Form has been reset for new card creation');
@@ -267,12 +267,7 @@ export default function CreateScreen() {
         role: role || 'General',
         context: context || 'Fantasy',
         image_url: cardImage,
-        frame_width: frameWidth,
         frame_color: frameColor,
-        name_color: nameColor,
-        type_color: typeColor,
-        description_color: descriptionColor,
-        context_color: contextColor,
         user_id: currentSession.user.id,
         collection_id: collectionId
       };
@@ -321,41 +316,6 @@ export default function CreateScreen() {
     }
   };
 
-  interface ColorPickerProps {
-    label: string;
-    value: string;
-    onChange: (color: string) => void;
-  }
-
-  const ColorPicker = ({ label, value, onChange }: ColorPickerProps) => (
-    <View style={styles.colorPickerContainer}>
-      <Text style={styles.colorPickerLabel}>{label}</Text>
-      <View style={styles.colorGrid}>
-        {[
-          '#FFFFFF', // White
-          '#CCCCCC', // Light Gray
-          '#FFD700', // Gold
-          '#FFA500', // Orange
-          '#FF4444', // Red
-          '#4CAF50', // Green
-          '#2196F3', // Blue
-          '#9C27B0', // Purple
-          '#000000', // Black
-        ].map((color) => (
-          <TouchableOpacity
-            key={color}
-            style={[
-              styles.colorOption,
-              { backgroundColor: color },
-              value === color && styles.colorOptionSelected,
-            ]}
-            onPress={() => onChange(color)}
-          />
-        ))}
-      </View>
-    </View>
-  );
-
   interface CollapsibleSectionProps {
     title: string;
     isOpen: boolean;
@@ -383,8 +343,6 @@ export default function CreateScreen() {
       )}
     </View>
   );
-
-
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
@@ -465,104 +423,45 @@ export default function CreateScreen() {
       </View>
 
       <CollapsibleSection
-        title="Card Customization"
-        isOpen={showCustomization}
-        onToggle={() => setShowCustomization(!showCustomization)}
+        title="Frame Color"
+        isOpen={showFrameColor}
+        onToggle={() => setShowFrameColor(!showFrameColor)}
       >
-        <CollapsibleSection
-          title="Frame Options"
-          isOpen={showFrameOptions}
-          onToggle={() => setShowFrameOptions(!showFrameOptions)}
-        >
-          <View style={styles.frameWidthContainer}>
-            <Text style={styles.label}>Frame Width</Text>
-            <View style={styles.frameWidthControls}>
-              <TouchableOpacity
-                style={styles.frameWidthButton}
-                onPress={() => setFrameWidth(Math.max(4, frameWidth - 2))}
-              >
-                <Text style={styles.frameWidthButtonText}>-</Text>
-              </TouchableOpacity>
-              <View style={styles.frameWidthPreview}>
-                <Text style={styles.frameWidthText}>{frameWidth}px</Text>
-              </View>
-              <TouchableOpacity
-                style={styles.frameWidthButton}
-                onPress={() => setFrameWidth(Math.min(16, frameWidth + 2))}
-              >
-                <Text style={styles.frameWidthButtonText}>+</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-
-          <View style={styles.frameColorContainer}>
-            <Text style={styles.label}>Frame Color</Text>
-            <View style={styles.colorGrid}>
-              {[
-                '#FFD700', // Gold
-                '#C0C0C0', // Silver
-                '#CD7F32', // Bronze
-                '#FF4444', // Red
-                '#4CAF50', // Green
-                '#2196F3', // Blue
-                '#9C27B0', // Purple
-                '#FFFFFF', // White
-                '#000000', // Black
-              ].map((color) => (
+        <View style={styles.frameColorContainer}>
+          <Text style={styles.colorSelectedText}>Selected: {getColorName(frameColor)}</Text>
+          <View style={styles.colorGrid}>
+            {COLOR_OPTIONS.map(({ color, name }) => {
+              const isSelected = frameColor === color;
+              return (
                 <TouchableOpacity
                   key={color}
+                  activeOpacity={0.5}
+                  accessible={true}
+                  accessibilityLabel={`${name} color`}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: isSelected }}
                   style={[
                     styles.colorOption,
                     { backgroundColor: color },
-                    frameColor === color && styles.colorOptionSelected,
+                    isSelected && styles.colorOptionSelected,
                   ]}
-                  onPress={() => setFrameColor(color)}
-                />
-              ))}
-            </View>
-          </View>
-        </CollapsibleSection>
-
-        <CollapsibleSection
-          title="Text Colors"
-          isOpen={showTextColors}
-          onToggle={() => setShowTextColors(!showTextColors)}
-        >
-          <ColorPicker
-            label="Card Name"
-            value={nameColor}
-            onChange={setNameColor}
-          />
-          <ColorPicker
-            label="Type Text"
-            value={typeColor}
-            onChange={setTypeColor}
-          />
-          <ColorPicker
-            label="Description"
-            value={descriptionColor}
-            onChange={setDescriptionColor}
-          />
-          <ColorPicker
-            label="Context Text"
-            value={contextColor}
-            onChange={setContextColor}
-          />
-        </CollapsibleSection>
-
-        <View style={styles.previewSection}>
-          <Text style={styles.previewTitle}>Preview</Text>
-          <View style={[
-            styles.previewCard,
-            {
-              borderWidth: frameWidth,
-              borderColor: frameColor,
-            }
-          ]}>
-            <Text style={[styles.previewText, { color: nameColor }]}>Card Name</Text>
-            <Text style={[styles.previewText, { color: typeColor }]}>Card Type</Text>
-            <Text style={[styles.previewText, { color: descriptionColor }]}>Description</Text>
-            <Text style={[styles.previewText, { color: contextColor }]}>Context</Text>
+                  onPress={() => {
+                    if (frameColor !== color) {
+                      setFrameColor(color);
+                      console.log(`Selected frame color: ${color} (${name})`);
+                    }
+                  }}
+                  delayPressIn={0}
+                >
+                  {isSelected && (
+                    <View style={styles.colorSelectedIndicator} />
+                  )}
+                  {isSelected && (
+                    <Text style={styles.colorName}>{name}</Text>
+                  )}
+                </TouchableOpacity>
+              );
+            })}
           </View>
         </View>
       </CollapsibleSection>
@@ -800,21 +699,59 @@ const styles = StyleSheet.create({
   colorGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 12,
-    padding: 12,
+    gap: 20,
+    padding: 16,
     backgroundColor: '#2a2a2a',
     borderRadius: 8,
+    justifyContent: 'center',
+    marginBottom: 8,
   },
   colorOption: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    borderWidth: 2,
-    borderColor: 'rgba(255,255,255,0.1)',
+    width: 70,
+    height: 70,
+    borderRadius: 35,
+    borderWidth: 3,
+    borderColor: 'rgba(255,255,255,0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    margin: 6,
+    position: 'relative',
+    overflow: 'visible',
   },
   colorOptionSelected: {
     borderColor: '#fff',
-    borderWidth: 3,
+    borderWidth: 5,
+    transform: [{ scale: 1.15 }],
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 5,
+    elevation: 6,
+  },
+  colorSelectedIndicator: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.5)',
+  },
+  colorSelectedText: {
+    fontFamily: 'Inter-Bold',
+    fontSize: 18,
+    color: '#fff',
+    marginBottom: 16,
+    textAlign: 'center',
+    paddingVertical: 8,
+  },
+  colorName: {
+    position: 'absolute',
+    bottom: -24,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    color: '#fff',
+    fontSize: 12,
+    fontFamily: 'Inter-Bold',
   },
   colorPickerContainer: {
     marginBottom: 16,
