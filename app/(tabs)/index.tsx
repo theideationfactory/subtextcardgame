@@ -94,12 +94,12 @@ export default function CollectionScreen() {
 
   const fetchCards = useCallback(async (isRefreshing = false) => {
     if (!user) {
-      console.log('No user found, skipping card fetch');
+      // console.log('No user found, skipping card fetch');
       return;
     }
 
     try {
-      console.log('Fetching cards for user:', user.id);
+      // console.log('Fetching cards for user:', user.id);
       if (!isRefreshing) {
         setLoading(true);
       }
@@ -153,7 +153,7 @@ export default function CollectionScreen() {
         throw fetchError;
       }
 
-      console.log(`Fetched ${data?.length ?? 0} cards`);
+      // console.log(`Fetched ${data?.length ?? 0} cards`);
       setCards(data as Card[] ?? []);
     } catch (err) {
       console.error('Error in fetchCards:', err instanceof Error ? err.message : 'Unknown error');
@@ -208,7 +208,8 @@ export default function CollectionScreen() {
   };
 
   const handleEdit = (card: Card) => {
-    router.push({
+    // Reset navigation stack to ensure fresh state
+    router.replace({
       pathname: '/create',
       params: {
         id: card.id,

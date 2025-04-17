@@ -119,7 +119,6 @@ export default function FriendsScreen() {
   };
 
   const handleSearch = useCallback(async (query: string) => {
-    console.log('Search function called with query:', query);
     if (!query || query.length < 3) {
       if (query.length > 0) {
         setError('Please enter at least 3 characters to search');
@@ -134,14 +133,12 @@ export default function FriendsScreen() {
     // Get current user to check if searching for self
     try {
       const { data } = await supabase.auth.getUser();
-      console.log('Auth check response:', JSON.stringify(data, null, 2));
       
       // Skip the authentication check for now - assume user is authenticated
       // We'll just check if they're searching for their own email if we have it
       const currentUser = data?.user;
       
       if (currentUser?.email && currentUser.email.toLowerCase().includes(query.toLowerCase())) {
-        console.log('User is searching for themselves');
         setError('You cannot search for your own email');
         setLoading(false);
         return;
@@ -158,18 +155,13 @@ export default function FriendsScreen() {
       
       // For testing purposes, use a hardcoded ID if user is not found
       const userId = user?.id || 'a0b60b23-9678-46cd-8a20-10370bfdf411'; // Use your actual user ID here
-      console.log('Using user ID for search:', userId);
 
-      console.log('Searching for users with query:', query);
-      console.log('Current user ID:', userId);
-    
       const { data, error: searchError } = await supabase
         .rpc('search_users', { 
           search_query: query,
           current_user_id: userId
         });
     
-      console.log('Search results from Supabase:', JSON.stringify(data, null, 2));
       if (searchError) {
         console.error('Search error from Supabase:', searchError);
         throw searchError;
@@ -177,7 +169,6 @@ export default function FriendsScreen() {
 
       // Always add the test user for any search that contains 'test'
       if (query.toLowerCase() === 'test@example.com') {
-        console.log('Adding test user for demonstration');
         setSearchResults([{
           id: 'test-user-id',
           email: 'test@example.com',
@@ -188,37 +179,29 @@ export default function FriendsScreen() {
       }
       
       if (!data || !Array.isArray(data) || data.length === 0) {
-        console.log('No results returned from Supabase');
         setSearchResults([]);
         return;
       }
 
-      // Ensure data is an array before filtering
       const dataArray = Array.isArray(data) ? data : [];
       
       const filteredResults = dataArray.filter((user: User) => {
         if (!user.email) {
-          console.log('User missing email:', user);
           return false;
         }
         const match = user.email.toLowerCase().includes(query.toLowerCase());
-        console.log(`User ${user.email}: match = ${match}`);
         return match;
       });
     
-      console.log('Final filtered results:', JSON.stringify(filteredResults, null, 2));
       setSearchResults(filteredResults);
       
       // Force a re-render by setting activeSection
       setActiveSection(prev => prev);
     } catch (err) {
       console.error('Search error:', err);
-      console.error('Error details:', JSON.stringify(err, null, 2));
       setError('Search failed: ' + (err instanceof Error ? err.message : 'Unknown error'));
     } finally {
       setLoading(false);
-      console.log('Search complete, loading set to false');
-      console.log('Current search results state:', searchResults.length);
     }
   }, []);
 
@@ -236,8 +219,6 @@ export default function FriendsScreen() {
         return;
       }
       
-      console.log(`Sending friend request from ${user.id} to ${userId}`);
-      
       // Check if a request already exists
       const { data: existingRequests, error: checkError } = await supabase
         .from('friend_requests')
@@ -250,9 +231,6 @@ export default function FriendsScreen() {
         throw checkError;
       }
       
-      console.log('Existing requests:', existingRequests);
-      
-      // If there's already a pending request between these users
       const existingRequest = existingRequests?.find(req => 
         (req.sender_id === user.id && req.receiver_id === userId) || 
         (req.sender_id === userId && req.receiver_id === user.id)
@@ -483,9 +461,6 @@ export default function FriendsScreen() {
   };
 
   const renderContent = () => {
-    console.log('Rendering content for section:', activeSection);
-    console.log('Current search results:', searchResults.length, 'items');
-    
     switch (activeSection) {
       case SECTIONS.SEARCH:
         return (
@@ -495,10 +470,7 @@ export default function FriendsScreen() {
             {loading && <Text style={styles.statusText}>Searching...</Text>}
             <FlatList
               data={searchResults}
-              renderItem={({ item }) => {
-                console.log('Rendering item:', item.email);
-                return renderUserItem({ item, type: 'search' });
-              }}
+              renderItem={({ item }) => renderUserItem({ item, type: 'search' })}
               keyExtractor={item => item.id}
               contentContainerStyle={styles.listContent}
               ListEmptyComponent={

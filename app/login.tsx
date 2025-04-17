@@ -38,7 +38,7 @@ export default function LoginScreen() {
     setError('');
 
     try {
-      console.log('Attempting login...');
+      // console.log('Attempting login...');
       const { data, error: signInError } = await supabase.auth.signInWithPassword({
         email: email.trim().toLowerCase(),
         password,
@@ -49,10 +49,10 @@ export default function LoginScreen() {
         throw signInError;
       }
 
-      console.log('Sign in response:', data);
+      // console.log('Sign in response:', data);
 
       if (data?.session) {
-        console.log('Session obtained, refreshing...');
+        // console.log('Session obtained, refreshing...');
         await refreshSession();
         
         if (Platform.OS !== 'web') {
@@ -83,7 +83,7 @@ export default function LoginScreen() {
     setError('');
 
     try {
-      console.log('Attempting signup...');
+      // console.log('Attempting signup...');
       const { data, error: signUpError } = await supabase.auth.signUp({
         email: email.trim().toLowerCase(),
         password,
@@ -99,7 +99,7 @@ export default function LoginScreen() {
         throw signUpError;
       }
 
-      console.log('Sign up response:', data);
+      // console.log('Sign up response:', data);
 
       if (data?.user) {
         setError('Check your email for the confirmation link');

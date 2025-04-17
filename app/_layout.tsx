@@ -24,10 +24,10 @@ function useProtectedRoute() {
       setIsNavigating(true);
       try {
         if (!user && inAuthGroup) {
-          console.log('No user, redirecting to login');
+          // console.log('No user, redirecting to login');
           await router.replace('/login');
         } else if (user && !inAuthGroup && !inPublicGroup) {
-          console.log('User authenticated, redirecting to tabs');
+          // console.log('User authenticated, redirecting to tabs');
           await router.replace('/(tabs)');
         }
       } finally {
@@ -77,7 +77,7 @@ export default function RootLayout() {
       const subscription = Linking.addEventListener('url', ({ url }) => {
         if (url) {
           // Handle the deep link URL
-          console.log('Deep link URL:', url);
+          // console.log('Deep link URL:', url);
         }
       });
 

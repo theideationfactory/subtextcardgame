@@ -50,7 +50,9 @@ Deno.serve(async (req) => {
     }
 
     const body = await req.json().catch(() => ({}));
-    const { name, description } = body;
+    const { name, description, style = 'fantasy' } = body;
+    
+    console.log('Received style parameter:', style);
 
     if (!name || !description) {
       return new Response(
@@ -71,30 +73,53 @@ Deno.serve(async (req) => {
     // Clean and format the description
     const sanitizedDesc = description.trim().replace(/[^\w\s.,!?-]/g, '');
 
-    const prompt = `Create a high-quality digital illustration for a fantasy trading card game, inspired by Magic: The Gathering art style. The image should depict: ${sanitizedDesc}
-
-    Key artistic elements:
-    - Epic fantasy art style
-    - Rich, vibrant colors
-    - Dramatic lighting and shadows
-    - Detailed character or scene design
-    - Mystical/magical atmosphere
-    - No text or card frames
-    - Clean, professional composition
-    - Focus on the main subject
-
-    The artwork should be suitable for a premium trading card game.`;
+    // Create a more direct and effective prompt for DALL-E 3
+    let prompt = '';
+    let openaiStyleParam = 'vivid'; // Default OpenAI style parameter
+    
+    console.log('Using art style:', style);
+    
+    // Simplified style approach
+    switch(style) {
+      case 'fantasy':
+        prompt = `A high-quality fantasy illustration for a trading card game showing ${sanitizedDesc}. The image should have rich colors, dramatic lighting, and a magical atmosphere. No text or card frames.`;
+        break;
+      case 'photorealistic':
+        prompt = `A photorealistic image for a trading card game showing ${sanitizedDesc}. The image should look like a professional photograph with natural lighting, realistic details, and cinematic composition. No text or card frames.`;
+        openaiStyleParam = 'natural'; // Use natural for photorealistic
+        break;
+      case 'anime':
+        prompt = `A high-quality anime-style illustration for a trading card game showing ${sanitizedDesc}. Use bold lines, vibrant colors, and stylized anime aesthetics. No text or card frames.`;
+        break;
+      case 'digital':
+        prompt = `A modern digital art illustration for a trading card game showing ${sanitizedDesc}. Use contemporary digital art techniques with bold colors, creative effects, and a polished finish. No text or card frames.`;
+        break;
+      default:
+        prompt = `A high-quality fantasy illustration for a trading card game showing ${sanitizedDesc}. The image should have rich colors, dramatic lighting, and a magical atmosphere. No text or card frames.`;
+    }
+    
+    // Add a universal suffix to ensure quality and card-appropriate composition
+    prompt += ' The artwork should be centered, well-composed, and suitable for a premium trading card game with a single clear subject.';
+    
+    console.log('Art style selected:', style);
+    console.log('Using prompt approach:', style || 'fantasy (fallback)');
 
     try {
+      // Note: 'style' here is OpenAI's parameter (vivid or natural), not our custom art style
+      // Our custom art style is implemented through different prompt templates above
+      console.log('Full prompt being sent to OpenAI:', prompt.substring(0, 100) + '...');  
+      
       const response = await openai.images.generate({
         model: "dall-e-3",
         prompt: prompt,
         n: 1,
         size: "1024x1024",
         quality: "standard",
-        style: "vivid",
+        style: openaiStyleParam, // Now dynamically set based on the selected style
         response_format: "url"
       });
+      
+      console.log(`OpenAI request sent with style parameter: ${openaiStyleParam}`);
 
       if (!response.data?.[0]?.url) {
         throw new Error('No image URL in OpenAI response');

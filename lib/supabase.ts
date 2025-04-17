@@ -36,7 +36,7 @@ export const supabase = createClient(
       autoRefreshToken: true,
       persistSession: true,
       flowType: 'pkce',
-      debug: __DEV__,
+      debug: false, // Disabled logging to reduce console noise
     },
   }
 );

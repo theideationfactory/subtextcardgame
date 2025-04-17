@@ -1,21 +1,24 @@
-import { useState, useEffect, useContext } from 'react';
+import { useState, useEffect, useContext, useCallback, useMemo, useRef } from 'react';
 import {
   View,
   Text,
+  TouchableOpacity,
+  ScrollView,
   StyleSheet,
   TextInput,
-  ScrollView,
-  TouchableOpacity,
+  Switch,
   Platform,
   Image,
   ActivityIndicator,
 } from 'react-native';
+import * as Haptics from 'expo-haptics';
 import { useFonts, Inter_400Regular, Inter_700Bold } from '@expo-google-fonts/inter';
 import * as SplashScreen from 'expo-splash-screen';
 import { Wand as Wand2, ChevronDown, ChevronUp, Lock, Users, Globe as Globe2 } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter, useLocalSearchParams } from 'expo-router';
+import debounce from 'lodash/debounce';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -37,7 +40,9 @@ export default function CreateScreen() {
   const [role, setRole] = useState(params.role?.toString() || '');
   const [context, setContext] = useState(params.context?.toString() || '');
   const [cardImage, setCardImage] = useState(params.image_url?.toString() || '');
-  const [frameColor, setFrameColor] = useState(params.frame_color?.toString() || DEFAULT_FRAME_COLOR);
+  // Initialize with default, will be updated in useEffect if editing
+  const [frameColor, setFrameColor] = useState(DEFAULT_FRAME_COLOR);
+  const [imageStyle, setImageStyle] = useState('fantasy'); // Default style is fantasy (MTG-inspired)
   const [isGenerating, setIsGenerating] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const [error, setError] = useState('');
@@ -71,11 +76,65 @@ export default function CreateScreen() {
     { color: '#000000', name: 'Black' },
   ];
   
-  // Helper function to get color name from hex value
+  // Helper function to get color name from hex value with improved validation
   const getColorName = (hexColor: string): string => {
-    const colorOption = COLOR_OPTIONS.find(option => option.color === hexColor);
-    return colorOption ? colorOption.name : hexColor;
+    if (!hexColor) return 'Default Gold';
+    
+    // Normalize the input color for reliable comparison
+    const normalizedColor = hexColor.trim().toLowerCase();
+    
+    const colorOption = COLOR_OPTIONS.find(option => 
+      option.color.toLowerCase() === normalizedColor);
+    
+    if (colorOption) {
+      return colorOption.name;
+    }
+    
+    // If we couldn't find a matching name, return the hex code but make sure it's formatted
+    return hexColor.startsWith('#') ? hexColor : `#${hexColor}`;
   };
+
+  const handleSelectColor = useCallback((color: string) => {
+    // Always set the color directly
+    setFrameColor(color);
+    
+    // Provide haptic feedback for tactile response
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    } catch (error) {
+      // console.log('Haptic feedback not available');
+    }
+    
+    // Always log color selection to help with debugging
+    console.log(`DEBUG_COLOR: User selected frame color: ${color}`);
+  }, []);
+
+  // Initialize frame color from params for edited cards
+  useEffect(() => {
+    if (isEditing) {
+      // Force frame color section to be visible when editing
+      setShowFrameColor(true);
+      
+      if (params.frame_color) {
+        // Extract the frame color from params and clean it
+        const editingColor = params.frame_color.toString().trim();
+        console.log(`DEBUG_COLOR: Initializing edited card with frame color: ${editingColor}`);
+        
+        // Validate it's a proper color before setting
+        if (editingColor.startsWith('#') || COLOR_OPTIONS.some(opt => 
+            opt.color.toLowerCase() === editingColor.toLowerCase())) {
+          setFrameColor(editingColor);
+          console.log(`DEBUG_COLOR: Valid color format - set successfully to ${editingColor}`);
+        } else {
+          console.log(`DEBUG_COLOR: Invalid color format: ${editingColor}, using default ${DEFAULT_FRAME_COLOR}`);
+          setFrameColor(DEFAULT_FRAME_COLOR);
+        }
+      } else {
+        console.log(`DEBUG_COLOR: No frame color in params, using default ${DEFAULT_FRAME_COLOR}`);
+        setFrameColor(DEFAULT_FRAME_COLOR);
+      }
+    }
+  }, [isEditing, params.frame_color]);
 
   // Check auth status on component mount
   useEffect(() => {
@@ -84,10 +143,10 @@ export default function CreateScreen() {
         setAuthChecking(true);
         const { data } = await supabase.auth.getSession();
         if (!data.session) {
-          console.log('No active session found on component mount');
+          // console.log('No active session found on component mount');
           // You could show a message or redirect here if needed
         } else {
-          console.log('Active session found on component mount');
+          // console.log('Active session found on component mount');
         }
       } catch (err: unknown) {
         console.error('Error checking auth status:', err);
@@ -115,6 +174,8 @@ export default function CreateScreen() {
       setError('Please provide an image description');
       return;
     }
+    
+    // console.log('Generating image with style:', imageStyle);
 
     setIsGenerating(true);
     setError('');
@@ -131,8 +192,8 @@ export default function CreateScreen() {
         throw new Error('You must be logged in to generate images');
       }
       
-      console.log('Session verified, proceeding with image generation with token:', 
-        currentSession.access_token.substring(0, 10) + '...');
+      // console.log('Session verified, proceeding with image generation with token:', 
+      //   currentSession.access_token.substring(0, 10) + '...');
 
       const response = await fetch(
         `${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/generate-card-image`,
@@ -145,6 +206,7 @@ export default function CreateScreen() {
           body: JSON.stringify({
             name,
             description: imageDescription,
+            style: imageStyle,
             userId: currentSession.user.id
           }),
         }
@@ -165,7 +227,7 @@ export default function CreateScreen() {
         throw new Error('No image URL received');
       }
 
-      console.log('Successfully received image URL');
+      // console.log('Successfully received image URL');
       setCardImage(data.imageUrl);
       setImageDescription('');
     } catch (err) {
@@ -200,7 +262,7 @@ export default function CreateScreen() {
     setShowFrameColor(false);
     setShowVisibility(false);
     
-    console.log('Form has been reset for new card creation');
+    // console.log('Form has been reset for new card creation');
   };
 
   const handleSave = async () => {
@@ -281,7 +343,7 @@ export default function CreateScreen() {
 
         if (updateError) throw updateError;
         
-        console.log('Card successfully updated');
+        console.log(`DEBUG_COLOR: Card updated with frame color: ${frameColor}`);
         setSuccessMessage('Card updated successfully!');
         setTimeout(() => {
           setSuccessMessage('');
@@ -296,7 +358,7 @@ export default function CreateScreen() {
 
         if (insertError) throw insertError;
         
-        console.log('Card successfully created with ID:', newCard?.id);
+        console.log(`DEBUG_COLOR: New card created with frame color: ${frameColor}, ID: ${newCard?.id}`);
         
         // Reset the form for new card creation
         resetForm();
@@ -362,31 +424,62 @@ export default function CreateScreen() {
       </View>
 
       <View style={styles.inputGroup}>
-        <Text style={styles.label}>Card Description</Text>
+        <Text style={styles.label}>Card Description <Text style={styles.required}>*</Text></Text>
         <TextInput
           style={[styles.input, styles.textArea]}
           value={description}
           onChangeText={setDescription}
-          placeholder="Enter card description (optional)"
+          placeholder="Enter card description"
           placeholderTextColor="#666"
           multiline
           numberOfLines={4}
           textAlignVertical="top"
         />
       </View>
-
+      
       <View style={styles.inputGroup}>
         <Text style={styles.label}>Image Description <Text style={styles.required}>*</Text></Text>
         <TextInput
           style={[styles.input, styles.textArea]}
+          placeholder="Describe the image you want to generate"
+          placeholderTextColor="#666"
           value={imageDescription}
           onChangeText={setImageDescription}
-          placeholder="Describe how you want the card image to look"
-          placeholderTextColor="#666"
           multiline
           numberOfLines={4}
           textAlignVertical="top"
         />
+        
+        <Text style={styles.label}>Art Style</Text>
+        <View style={styles.styleDropdownContainer}>
+          <TouchableOpacity 
+            style={[styles.styleOption, imageStyle === 'fantasy' && styles.styleOptionSelected]} 
+            onPress={() => setImageStyle('fantasy')}
+          >
+            <Text style={[styles.styleText, imageStyle === 'fantasy' && styles.styleTextSelected]}>Fantasy (MTG-inspired)</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
+            style={[styles.styleOption, imageStyle === 'photorealistic' && styles.styleOptionSelected]} 
+            onPress={() => setImageStyle('photorealistic')}
+          >
+            <Text style={[styles.styleText, imageStyle === 'photorealistic' && styles.styleTextSelected]}>Photorealistic</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
+            style={[styles.styleOption, imageStyle === 'anime' && styles.styleOptionSelected]} 
+            onPress={() => setImageStyle('anime')}
+          >
+            <Text style={[styles.styleText, imageStyle === 'anime' && styles.styleTextSelected]}>Anime</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
+            style={[styles.styleOption, imageStyle === 'digital' && styles.styleOptionSelected]} 
+            onPress={() => setImageStyle('digital')}
+          >
+            <Text style={[styles.styleText, imageStyle === 'digital' && styles.styleTextSelected]}>Digital Art</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       <View style={styles.inputGroup}>
@@ -423,7 +516,7 @@ export default function CreateScreen() {
       </View>
 
       <CollapsibleSection
-        title="Frame Color"
+        title={`Frame Color (${getColorName(frameColor)})`}
         isOpen={showFrameColor}
         onToggle={() => setShowFrameColor(!showFrameColor)}
       >
@@ -431,11 +524,12 @@ export default function CreateScreen() {
           <Text style={styles.colorSelectedText}>Selected: {getColorName(frameColor)}</Text>
           <View style={styles.colorGrid}>
             {COLOR_OPTIONS.map(({ color, name }) => {
-              const isSelected = frameColor === color;
+              // Compare colors in a case-insensitive way to ensure reliable matching
+              const isSelected = frameColor.toLowerCase() === color.toLowerCase();
+              // No logging during rendering to prevent excessive logs
               return (
                 <TouchableOpacity
                   key={color}
-                  activeOpacity={0.5}
                   accessible={true}
                   accessibilityLabel={`${name} color`}
                   accessibilityRole="button"
@@ -445,12 +539,9 @@ export default function CreateScreen() {
                     { backgroundColor: color },
                     isSelected && styles.colorOptionSelected,
                   ]}
-                  onPress={() => {
-                    if (frameColor !== color) {
-                      setFrameColor(color);
-                      console.log(`Selected frame color: ${color} (${name})`);
-                    }
-                  }}
+                  onPress={() => handleSelectColor(color)}
+                  activeOpacity={0.6}
+                  hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
                   delayPressIn={0}
                 >
                   {isSelected && (
@@ -699,12 +790,12 @@ const styles = StyleSheet.create({
   colorGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 20,
+    gap: 16,
     padding: 16,
     backgroundColor: '#2a2a2a',
     borderRadius: 8,
     justifyContent: 'center',
-    marginBottom: 8,
+    marginBottom: 16,
   },
   colorOption: {
     width: 70,
@@ -714,19 +805,19 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255,255,255,0.2)',
     alignItems: 'center',
     justifyContent: 'center',
-    margin: 6,
+    margin: 8, // Increased margin for better spacing between options
     position: 'relative',
     overflow: 'visible',
   },
   colorOptionSelected: {
-    borderColor: '#fff',
+    borderColor: '#ffffff',
     borderWidth: 5,
     transform: [{ scale: 1.15 }],
-    shadowColor: '#000',
+    shadowColor: '#000000',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 5,
-    elevation: 6,
+    shadowOpacity: 0.5,
+    shadowRadius: 6,
+    elevation: 8,
   },
   colorSelectedIndicator: {
     width: 24,
@@ -885,6 +976,30 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter-Regular',
   },
   visibilityTextSelected: {
+    color: '#fff',
+    fontFamily: 'Inter-Bold',
+  },
+  styleDropdownContainer: {
+    marginBottom: 16,
+    flexDirection: 'column',
+    gap: 8,
+  },
+  styleOption: {
+    padding: 12,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderRadius: 8,
+  },
+  styleOptionSelected: {
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    borderLeftWidth: 4,
+    borderLeftColor: '#6366f1',
+  },
+  styleText: {
+    color: '#aaa',
+    fontSize: 16,
+    fontFamily: 'Inter-Regular',
+  },
+  styleTextSelected: {
     color: '#fff',
     fontFamily: 'Inter-Bold',
   },

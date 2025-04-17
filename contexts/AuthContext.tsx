@@ -43,13 +43,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const refreshSession = async () => {
     try {
-      console.log('Attempting to refresh session...');
+      // Removed verbose logging
       const { data: { session }, error } = await supabase.auth.refreshSession();
       if (error) {
         console.error('Error refreshing session:', error);
         return;
       }
-      console.log('Session refreshed successfully:', session?.user?.id ?? 'no user');
+      // Session refresh successful
       setUser(session?.user ?? null);
       return session;
     } catch (error) {
@@ -62,7 +62,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       if (!user) return;
 
-      console.log('Fetching cards for user:', user.id);
+      // Fetching user cards
       const { data, error: fetchError } = await supabase
         .from('cards')
         .select('*')
@@ -73,7 +73,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         throw fetchError;
       }
 
-      console.log(`Fetched ${data?.length ?? 0} cards`);
+      // Card fetch complete
       setCards(data || []);
     } catch (err) {
       console.error('Error in fetchCards:', err);
@@ -84,18 +84,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Initial session check
     const initAuth = async () => {
       try {
-        console.log('Initializing auth state...');
+        // Auth init
         const { data: { session } } = await supabase.auth.getSession();
         
         // If no session found or session appears invalid, try to refresh it
         if (!session) {
-          console.log('No initial session found, attempting to refresh...');
+          // No initial session
           const refreshedSession = await refreshSession();
           if (!refreshedSession) {
-            console.log('No session available after refresh attempt');
+            // No session after refresh
           }
         } else {
-          console.log('Initial session found for user:', session?.user?.id ?? 'unknown');
+          // Session found
           setUser(session?.user ?? null);
           
           if (session?.user) {
@@ -113,8 +113,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     // Subscribe to auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log('Auth state changed:', event);
-      console.log('New session state:', session ? 'active' : 'none', 'for user:', session?.user?.id ?? 'none');
+      // Auth state change
+      // Session update
       
       // Handle different auth events
       if (event === 'SIGNED_IN') {
