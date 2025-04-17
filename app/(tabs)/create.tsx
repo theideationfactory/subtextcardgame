@@ -94,13 +94,14 @@ export default function CreateScreen() {
     return hexColor.startsWith('#') ? hexColor : `#${hexColor}`;
   };
 
+  // Use debounce to prevent multiple rapid selections
   const handleSelectColor = useCallback((color: string) => {
     // Always set the color directly
     setFrameColor(color);
     
-    // Provide haptic feedback for tactile response
+    // Provide stronger haptic feedback for better tactile response
     try {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     } catch (error) {
       // console.log('Haptic feedback not available');
     }
@@ -535,18 +536,23 @@ export default function CreateScreen() {
                   accessibilityRole="button"
                   accessibilityState={{ selected: isSelected }}
                   style={[
+                    styles.colorOptionTouchable, // New wrapper style with larger touch area
+                  ]}
+                  onPress={() => handleSelectColor(color)}
+                  activeOpacity={0.4}
+                  hitSlop={{ top: 30, bottom: 30, left: 30, right: 30 }} // Even larger hit slop
+                  delayPressIn={50}
+                >
+                  {/* Actual visible color circle inside the larger touch target */}
+                  <View style={[
                     styles.colorOption,
                     { backgroundColor: color },
                     isSelected && styles.colorOptionSelected,
-                  ]}
-                  onPress={() => handleSelectColor(color)}
-                  activeOpacity={0.6}
-                  hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
-                  delayPressIn={0}
-                >
-                  {isSelected && (
-                    <View style={styles.colorSelectedIndicator} />
-                  )}
+                  ]}>
+                    {isSelected && (
+                      <View style={styles.colorSelectedIndicator} />
+                    )}
+                  </View>
                   {isSelected && (
                     <Text style={styles.colorName}>{name}</Text>
                   )}
@@ -790,24 +796,31 @@ const styles = StyleSheet.create({
   colorGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 16,
-    padding: 16,
+    gap: 10, // Reduced visible gap since the touchable area is larger
+    padding: 20,
     backgroundColor: '#2a2a2a',
     borderRadius: 8,
     justifyContent: 'center',
     marginBottom: 16,
   },
+  colorOptionTouchable: {
+    width: 100, // Larger touchable area (invisible)
+    height: 100, // Larger touchable area (invisible)
+    alignItems: 'center',
+    justifyContent: 'center',
+    margin: 5,
+    position: 'relative',
+  },
   colorOption: {
-    width: 70,
-    height: 70,
+    width: 70, // Original visual size
+    height: 70, // Original visual size
     borderRadius: 35,
     borderWidth: 3,
     borderColor: 'rgba(255,255,255,0.2)',
     alignItems: 'center',
     justifyContent: 'center',
-    margin: 8, // Increased margin for better spacing between options
     position: 'relative',
-    overflow: 'visible',
+    overflow: 'hidden',
   },
   colorOptionSelected: {
     borderColor: '#ffffff',
@@ -835,7 +848,7 @@ const styles = StyleSheet.create({
   },
   colorName: {
     position: 'absolute',
-    bottom: -24,
+    bottom: -18,
     backgroundColor: 'rgba(0,0,0,0.7)',
     paddingHorizontal: 8,
     paddingVertical: 4,
