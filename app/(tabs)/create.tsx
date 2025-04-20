@@ -14,18 +14,18 @@ import {
 import * as Haptics from 'expo-haptics';
 import { useFonts, Inter_400Regular, Inter_700Bold } from '@expo-google-fonts/inter';
 import * as SplashScreen from 'expo-splash-screen';
-import { Wand as Wand2, ChevronDown, ChevronUp, Lock, Users, Globe as Globe2 } from 'lucide-react-native';
-import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/lib/supabase';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import debounce from 'lodash/debounce';
+import { Wand2, ChevronDown, ChevronUp, Lock, Users, Globe2 } from 'lucide-react-native';
 
 SplashScreen.preventAutoHideAsync();
 
 // Supabase client is already imported from @/lib/supabase
 
 const DEFAULT_IMAGE = 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=1000&auto=format&fit=crop';
-const DEFAULT_FRAME_COLOR = '#FFD700';
+const DEFAULT_FRAME_COLOR = '#808080'; // Medium gray
 
 export default function CreateScreen() {
   const router = useRouter();
@@ -33,16 +33,46 @@ export default function CreateScreen() {
   const isEditing = !!params.id;
 
   // Initialize state with params or defaults
-  const [name, setName] = useState(params.name?.toString() || '');
-  const [description, setDescription] = useState(params.description?.toString() || '');
+  const [name, setName] = useState('');
+  const [description, setDescription] = useState('');
   const [imageDescription, setImageDescription] = useState('');
-  const [type, setType] = useState(params.type?.toString() || '');
-  const [role, setRole] = useState(params.role?.toString() || '');
-  const [context, setContext] = useState(params.context?.toString() || '');
-  const [cardImage, setCardImage] = useState(params.image_url?.toString() || '');
-  // Initialize with default, will be updated in useEffect if editing
-  const [frameColor, setFrameColor] = useState(DEFAULT_FRAME_COLOR);
-  const [imageStyle, setImageStyle] = useState('fantasy'); // Default style is fantasy (MTG-inspired)
+  const [type, setType] = useState('');
+  const [role, setRole] = useState('');
+  const [context, setContext] = useState('');
+  const [cardImage, setCardImage] = useState('');
+  
+  // Use useEffect to properly set the state values from params
+  useEffect(() => {
+    if (params.id) {
+      console.log('Loading edit data for card:', params.id);
+      setName(params.name?.toString() || '');
+      setDescription(params.description?.toString() || '');
+      setType(params.type?.toString() || '');
+      setRole(params.role?.toString() || '');
+      setContext(params.context?.toString() || '');
+      setCardImage(params.image_url?.toString() || '');
+      
+      // Handle color parameters
+      if (params.frame_color) {
+        // Frame color is now fixed to blue in your app, but handle it anyway
+      }
+      if (params.name_color) {
+        // Handle name color if needed
+      }
+      if (params.type_color) {
+        // Handle type color if needed
+      }
+      if (params.description_color) {
+        // Handle description color if needed
+      }
+      if (params.context_color) {
+        // Handle context color if needed
+      }
+      
+      // Log the loaded data for debugging
+      console.log('Card data loaded successfully for editing');
+    }
+  }, [params.id, params.name, params.description, params.type, params.role, params.context, params.image_url]);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const [error, setError] = useState('');
@@ -51,9 +81,10 @@ export default function CreateScreen() {
   const [authChecking, setAuthChecking] = useState(false);
   
   // Collapsible section states
-  const [showFrameColor, setShowFrameColor] = useState(false);
-  const [showVisibility, setShowVisibility] = useState(false);
   const [visibility, setVisibility] = useState<string[]>(['personal']);
+  const [showVisibility, setShowVisibility] = useState(false);
+
+  const [imageStyle, setImageStyle] = useState('fantasy'); // Ensure this state exists
 
   const [fontsLoaded] = useFonts({
     'Inter-Regular': Inter_400Regular,
@@ -62,80 +93,6 @@ export default function CreateScreen() {
 
   // Get auth context at component level
   const { refreshSession } = useAuth();
-
-  // Define color options as a constant to avoid recreating on each render
-  const COLOR_OPTIONS = [
-    { color: '#FFD700', name: 'Gold' },
-    { color: '#C0C0C0', name: 'Silver' },
-    { color: '#CD7F32', name: 'Bronze' },
-    { color: '#FF4444', name: 'Red' },
-    { color: '#4CAF50', name: 'Green' },
-    { color: '#2196F3', name: 'Blue' },
-    { color: '#9C27B0', name: 'Purple' },
-    { color: '#FFFFFF', name: 'White' },
-    { color: '#000000', name: 'Black' },
-  ];
-  
-  // Helper function to get color name from hex value with improved validation
-  const getColorName = (hexColor: string): string => {
-    if (!hexColor) return 'Default Gold';
-    
-    // Normalize the input color for reliable comparison
-    const normalizedColor = hexColor.trim().toLowerCase();
-    
-    const colorOption = COLOR_OPTIONS.find(option => 
-      option.color.toLowerCase() === normalizedColor);
-    
-    if (colorOption) {
-      return colorOption.name;
-    }
-    
-    // If we couldn't find a matching name, return the hex code but make sure it's formatted
-    return hexColor.startsWith('#') ? hexColor : `#${hexColor}`;
-  };
-
-  // Use debounce to prevent multiple rapid selections
-  const handleSelectColor = useCallback((color: string) => {
-    // Always set the color directly
-    setFrameColor(color);
-    
-    // Provide stronger haptic feedback for better tactile response
-    try {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    } catch (error) {
-      // console.log('Haptic feedback not available');
-    }
-    
-    // Always log color selection to help with debugging
-    console.log(`DEBUG_COLOR: User selected frame color: ${color}`);
-  }, []);
-
-  // Initialize frame color from params for edited cards
-  useEffect(() => {
-    if (isEditing) {
-      // Force frame color section to be visible when editing
-      setShowFrameColor(true);
-      
-      if (params.frame_color) {
-        // Extract the frame color from params and clean it
-        const editingColor = params.frame_color.toString().trim();
-        console.log(`DEBUG_COLOR: Initializing edited card with frame color: ${editingColor}`);
-        
-        // Validate it's a proper color before setting
-        if (editingColor.startsWith('#') || COLOR_OPTIONS.some(opt => 
-            opt.color.toLowerCase() === editingColor.toLowerCase())) {
-          setFrameColor(editingColor);
-          console.log(`DEBUG_COLOR: Valid color format - set successfully to ${editingColor}`);
-        } else {
-          console.log(`DEBUG_COLOR: Invalid color format: ${editingColor}, using default ${DEFAULT_FRAME_COLOR}`);
-          setFrameColor(DEFAULT_FRAME_COLOR);
-        }
-      } else {
-        console.log(`DEBUG_COLOR: No frame color in params, using default ${DEFAULT_FRAME_COLOR}`);
-        setFrameColor(DEFAULT_FRAME_COLOR);
-      }
-    }
-  }, [isEditing, params.frame_color]);
 
   // Check auth status on component mount
   useEffect(() => {
@@ -158,8 +115,6 @@ export default function CreateScreen() {
     
     checkAuthStatus();
   }, []);
-
-  // Remove redundant useEffect for loading card data when editing, as state is now initialized from params above.
 
   if (!fontsLoaded) {
     return null;
@@ -207,7 +162,7 @@ export default function CreateScreen() {
           body: JSON.stringify({
             name,
             description: imageDescription,
-            style: imageStyle,
+            style: imageStyle, // Use the state variable here
             userId: currentSession.user.id
           }),
         }
@@ -253,16 +208,12 @@ export default function CreateScreen() {
     setRole('');
     setContext('');
     setCardImage('');
-    setFrameColor(DEFAULT_FRAME_COLOR);
     setVisibility(['personal']);
     setError('');
     setErrorDetails('');
     setSuccessMessage('');
     
     // Reset UI states
-    setShowFrameColor(false);
-    setShowVisibility(false);
-    
     // console.log('Form has been reset for new card creation');
   };
 
@@ -330,7 +281,7 @@ export default function CreateScreen() {
         role: role || 'General',
         context: context || 'Fantasy',
         image_url: cardImage,
-        frame_color: frameColor,
+        frame_color: DEFAULT_FRAME_COLOR,
         user_id: currentSession.user.id,
         collection_id: collectionId
       };
@@ -344,7 +295,7 @@ export default function CreateScreen() {
 
         if (updateError) throw updateError;
         
-        console.log(`DEBUG_COLOR: Card updated with frame color: ${frameColor}`);
+        console.log(`Card updated with frame color: ${DEFAULT_FRAME_COLOR}`);
         setSuccessMessage('Card updated successfully!');
         setTimeout(() => {
           setSuccessMessage('');
@@ -359,7 +310,7 @@ export default function CreateScreen() {
 
         if (insertError) throw insertError;
         
-        console.log(`DEBUG_COLOR: New card created with frame color: ${frameColor}, ID: ${newCard?.id}`);
+        console.log(`New card created with frame color: ${DEFAULT_FRAME_COLOR}, ID: ${newCard?.id}`);
         
         // Reset the form for new card creation
         resetForm();
@@ -378,34 +329,6 @@ export default function CreateScreen() {
       setIsCreating(false);
     }
   };
-
-  interface CollapsibleSectionProps {
-    title: string;
-    isOpen: boolean;
-    onToggle: () => void;
-    children: React.ReactNode;
-  }
-
-  const CollapsibleSection = ({ title, isOpen, onToggle, children }: CollapsibleSectionProps) => (
-    <View style={styles.collapsibleSection}>
-      <TouchableOpacity 
-        style={styles.collapsibleHeader} 
-        onPress={onToggle}
-      >
-        <Text style={styles.collapsibleTitle}>{title}</Text>
-        {isOpen ? (
-          <ChevronUp size={24} color="#fff" />
-        ) : (
-          <ChevronDown size={24} color="#fff" />
-        )}
-      </TouchableOpacity>
-      {isOpen && (
-        <View style={styles.collapsibleContent}>
-          {children}
-        </View>
-      )}
-    </View>
-  );
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
@@ -454,28 +377,28 @@ export default function CreateScreen() {
         <Text style={styles.label}>Art Style</Text>
         <View style={styles.styleDropdownContainer}>
           <TouchableOpacity 
-            style={[styles.styleOption, imageStyle === 'fantasy' && styles.styleOptionSelected]} 
+            style={[styles.styleOption, imageStyle === 'fantasy' && styles.styleOptionSelected]}
             onPress={() => setImageStyle('fantasy')}
           >
             <Text style={[styles.styleText, imageStyle === 'fantasy' && styles.styleTextSelected]}>Fantasy (MTG-inspired)</Text>
           </TouchableOpacity>
           
           <TouchableOpacity 
-            style={[styles.styleOption, imageStyle === 'photorealistic' && styles.styleOptionSelected]} 
+            style={[styles.styleOption, imageStyle === 'photorealistic' && styles.styleOptionSelected]}
             onPress={() => setImageStyle('photorealistic')}
           >
             <Text style={[styles.styleText, imageStyle === 'photorealistic' && styles.styleTextSelected]}>Photorealistic</Text>
           </TouchableOpacity>
           
           <TouchableOpacity 
-            style={[styles.styleOption, imageStyle === 'anime' && styles.styleOptionSelected]} 
+            style={[styles.styleOption, imageStyle === 'anime' && styles.styleOptionSelected]}
             onPress={() => setImageStyle('anime')}
           >
             <Text style={[styles.styleText, imageStyle === 'anime' && styles.styleTextSelected]}>Anime</Text>
           </TouchableOpacity>
           
           <TouchableOpacity 
-            style={[styles.styleOption, imageStyle === 'digital' && styles.styleOptionSelected]} 
+            style={[styles.styleOption, imageStyle === 'digital' && styles.styleOptionSelected]}
             onPress={() => setImageStyle('digital')}
           >
             <Text style={[styles.styleText, imageStyle === 'digital' && styles.styleTextSelected]}>Digital Art</Text>
@@ -516,58 +439,9 @@ export default function CreateScreen() {
         />
       </View>
 
-      <CollapsibleSection
-        title={`Frame Color (${getColorName(frameColor)})`}
-        isOpen={showFrameColor}
-        onToggle={() => setShowFrameColor(!showFrameColor)}
-      >
-        <View style={styles.frameColorContainer}>
-          <Text style={styles.colorSelectedText}>Selected: {getColorName(frameColor)}</Text>
-          <View style={styles.colorGrid}>
-            {COLOR_OPTIONS.map(({ color, name }) => {
-              // Compare colors in a case-insensitive way to ensure reliable matching
-              const isSelected = frameColor.toLowerCase() === color.toLowerCase();
-              // No logging during rendering to prevent excessive logs
-              return (
-                <TouchableOpacity
-                  key={color}
-                  accessible={true}
-                  accessibilityLabel={`${name} color`}
-                  accessibilityRole="button"
-                  accessibilityState={{ selected: isSelected }}
-                  style={[
-                    styles.colorOptionTouchable, // New wrapper style with larger touch area
-                  ]}
-                  onPress={() => handleSelectColor(color)}
-                  activeOpacity={0.4}
-                  hitSlop={{ top: 30, bottom: 30, left: 30, right: 30 }} // Even larger hit slop
-                  delayPressIn={50}
-                >
-                  {/* Actual visible color circle inside the larger touch target */}
-                  <View style={[
-                    styles.colorOption,
-                    { backgroundColor: color },
-                    isSelected && styles.colorOptionSelected,
-                  ]}>
-                    {isSelected && (
-                      <View style={styles.colorSelectedIndicator} />
-                    )}
-                  </View>
-                  {isSelected && (
-                    <Text style={styles.colorName}>{name}</Text>
-                  )}
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-        </View>
-      </CollapsibleSection>
-
-      <CollapsibleSection
-        title="Visibility Settings"
-        isOpen={showVisibility}
-        onToggle={() => setShowVisibility(!showVisibility)}
-      >
+      {/* Visibility Settings - Replaced dropdown with static section */}
+      <View style={styles.inputGroup}>
+        <Text style={styles.label}>Visibility Settings</Text>
         <View style={styles.visibilityOptions}>
           <TouchableOpacity
             style={[
@@ -629,7 +503,7 @@ export default function CreateScreen() {
             ]}>Public</Text>
           </TouchableOpacity>
         </View>
-      </CollapsibleSection>
+      </View>
 
       {successMessage ? (
         <View style={styles.successContainer}>
@@ -736,155 +610,56 @@ const styles = StyleSheet.create({
     height: 100,
     textAlignVertical: 'top',
   },
-  collapsibleSection: {
-    marginBottom: 16,
-    backgroundColor: '#1a1a1a',
-    borderRadius: 12,
-    overflow: 'hidden',
-  },
-  collapsibleHeader: {
+  visibilityOptions: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 16,
-    backgroundColor: '#2a2a2a',
+    gap: 8,
+    marginTop: 8,
   },
-  collapsibleTitle: {
-    fontFamily: 'Inter-Bold',
-    fontSize: 18,
-    color: '#fff',
-  },
-  collapsibleContent: {
-    padding: 16,
-  },
-  frameWidthContainer: {
-    marginBottom: 16,
-  },
-  frameWidthControls: {
+  visibilityOption: {
+    flex: 1,
     flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: '#2a2a2a',
-    borderRadius: 8,
-    padding: 8,
-  },
-  frameWidthButton: {
-    backgroundColor: '#3a3a3a',
-    width: 40,
-    height: 40,
-    borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
+    gap: 8,
+    padding: 12,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderRadius: 12,
   },
-  frameWidthButtonText: {
-    color: '#fff',
-    fontSize: 24,
-    fontFamily: 'Inter-Bold',
+  visibilityOptionSelected: {
+    backgroundColor: 'rgba(255,255,255,0.1)',
   },
-  frameWidthPreview: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  frameWidthText: {
-    color: '#fff',
-    fontSize: 18,
+  visibilityText: {
+    color: '#666',
+    fontSize: 14,
     fontFamily: 'Inter-Regular',
   },
-  frameColorContainer: {
-    marginBottom: 16,
-  },
-  colorGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10, // Reduced visible gap since the touchable area is larger
-    padding: 20,
-    backgroundColor: '#2a2a2a',
-    borderRadius: 8,
-    justifyContent: 'center',
-    marginBottom: 16,
-  },
-  colorOptionTouchable: {
-    width: 100, // Larger touchable area (invisible)
-    height: 100, // Larger touchable area (invisible)
-    alignItems: 'center',
-    justifyContent: 'center',
-    margin: 5,
-    position: 'relative',
-  },
-  colorOption: {
-    width: 70, // Original visual size
-    height: 70, // Original visual size
-    borderRadius: 35,
-    borderWidth: 3,
-    borderColor: 'rgba(255,255,255,0.2)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    position: 'relative',
-    overflow: 'hidden',
-  },
-  colorOptionSelected: {
-    borderColor: '#ffffff',
-    borderWidth: 5,
-    transform: [{ scale: 1.15 }],
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.5,
-    shadowRadius: 6,
-    elevation: 8,
-  },
-  colorSelectedIndicator: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: 'rgba(255,255,255,0.5)',
-  },
-  colorSelectedText: {
-    fontFamily: 'Inter-Bold',
-    fontSize: 18,
+  visibilityTextSelected: {
     color: '#fff',
-    marginBottom: 16,
-    textAlign: 'center',
-    paddingVertical: 8,
-  },
-  colorName: {
-    position: 'absolute',
-    bottom: -18,
-    backgroundColor: 'rgba(0,0,0,0.7)',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-    color: '#fff',
-    fontSize: 12,
     fontFamily: 'Inter-Bold',
   },
-  colorPickerContainer: {
+  styleDropdownContainer: {
     marginBottom: 16,
-  },
-  colorPickerLabel: {
-    fontFamily: 'Inter-Bold',
-    fontSize: 16,
-    color: '#fff',
-    marginBottom: 8,
-  },
-  previewSection: {
-    marginTop: 16,
-  },
-  previewTitle: {
-    fontFamily: 'Inter-Bold',
-    fontSize: 16,
-    color: '#fff',
-    marginBottom: 12,
-  },
-  previewCard: {
-    backgroundColor: '#2a2a2a',
-    borderRadius: 16,
-    padding: 16,
+    flexDirection: 'column',
     gap: 8,
   },
-  previewText: {
+  styleOption: {
+    padding: 12,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderRadius: 8,
+  },
+  styleOptionSelected: {
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    borderLeftWidth: 4,
+    borderLeftColor: '#6366f1',
+  },
+  styleText: {
+    color: '#aaa',
     fontSize: 16,
     fontFamily: 'Inter-Regular',
-    textAlign: 'center',
+  },
+  styleTextSelected: {
+    color: '#fff',
+    fontFamily: 'Inter-Bold',
   },
   errorContainer: {
     backgroundColor: '#2a0000',
@@ -964,56 +739,5 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontFamily: 'Inter-Bold',
     fontSize: 16,
-  },
-  visibilityOptions: {
-    flexDirection: 'row',
-    gap: 8,
-    marginTop: 8,
-  },
-  visibilityOption: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    padding: 12,
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    borderRadius: 12,
-  },
-  visibilityOptionSelected: {
-    backgroundColor: 'rgba(255,255,255,0.1)',
-  },
-  visibilityText: {
-    color: '#666',
-    fontSize: 14,
-    fontFamily: 'Inter-Regular',
-  },
-  visibilityTextSelected: {
-    color: '#fff',
-    fontFamily: 'Inter-Bold',
-  },
-  styleDropdownContainer: {
-    marginBottom: 16,
-    flexDirection: 'column',
-    gap: 8,
-  },
-  styleOption: {
-    padding: 12,
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    borderRadius: 8,
-  },
-  styleOptionSelected: {
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    borderLeftWidth: 4,
-    borderLeftColor: '#6366f1',
-  },
-  styleText: {
-    color: '#aaa',
-    fontSize: 16,
-    fontFamily: 'Inter-Regular',
-  },
-  styleTextSelected: {
-    color: '#fff',
-    fontFamily: 'Inter-Bold',
   },
 });

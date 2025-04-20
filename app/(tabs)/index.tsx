@@ -208,25 +208,31 @@ export default function CollectionScreen() {
   };
 
   const handleEdit = (card: Card) => {
+    // Ensure all values are properly serialized as strings
+    const serializedParams = {
+      id: card.id,
+      name: card.name || '',
+      description: card.description || '',
+      type: card.type || '',
+      role: card.role || '',
+      context: card.context || '',
+      image_url: card.image_url || '',
+      frame_width: String(card.frame_width || 8),
+      frame_color: card.frame_color || '#FFD700',
+      name_color: card.name_color || '#FFFFFF',
+      type_color: card.type_color || '#FFFFFF',
+      description_color: card.description_color || '#FFFFFF',
+      context_color: card.context_color || '#CCCCCC',
+      // Add a timestamp to ensure the route is always seen as "new" by React Navigation
+      _timestamp: Date.now().toString()
+    };
+    
     // Reset navigation stack to ensure fresh state
     router.replace({
       pathname: '/create',
-      params: {
-        id: card.id,
-        name: card.name,
-        description: card.description || '',
-        type: card.type || '',
-        role: card.role || '',
-        context: card.context || '',
-        image_url: card.image_url || '',
-        frame_width: card.frame_width || 8,
-        frame_color: card.frame_color || '#FFD700',
-        name_color: card.name_color || '#FFFFFF',
-        type_color: card.type_color || '#FFFFFF',
-        description_color: card.description_color || '#FFFFFF',
-        context_color: card.context_color || '#CCCCCC'
-      }
+      params: serializedParams
     });
+    
     setShowActions(false);
   };
 
@@ -251,7 +257,7 @@ export default function CollectionScreen() {
             styles.cardFrame,
             {
               borderWidth: item.frame_width || 8,
-              borderColor: item.frame_color || '#FFD700'
+              borderColor: '#808080' // Always use gray
             }
           ]}
           start={{ x: 0, y: 0 }}
@@ -376,7 +382,7 @@ export default function CollectionScreen() {
       colors={['#1a1a1a', '#2a2a2a']}
       style={styles.container}
       onLayout={onLayoutRootView}>
-      <Spacer backgroundColor="#1a1a1a" />
+      {/* Experiment: Removed Spacer to reduce top padding */}
       {renderCollectionTypeSelector()}
       
       <FlatList

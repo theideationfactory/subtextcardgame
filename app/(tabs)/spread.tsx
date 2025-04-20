@@ -36,6 +36,7 @@ import {
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
 import { Spacer } from '@/components/Spacer';
+import { hasDynamicIsland } from '@/utils/deviceDimensions';
 
 const supabase = createClient(
   process.env.EXPO_PUBLIC_SUPABASE_URL!,
@@ -868,7 +869,7 @@ const styles = StyleSheet.create({
   modalContent: {
     flex: 1,
     backgroundColor: '#1a1a1a',
-    marginTop: 60,
+    marginTop: hasDynamicIsland() ? 80 : 60, // More margin for Dynamic Island
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     width: '100%',

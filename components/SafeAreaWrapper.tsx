@@ -15,8 +15,8 @@ export function SafeAreaWrapper({ children, backgroundColor = '#121212' }: SafeA
         styles.container,
         {
           backgroundColor,
-          // Apply safe area insets as padding
-          paddingTop: Platform.OS === 'ios' ? 0 : insets.top, // Header handles top padding on iOS
+          // Always apply top safe area inset for iOS (including Dynamic Island)
+          paddingTop: insets.top,
           paddingBottom: insets.bottom,
           paddingLeft: insets.left,
           paddingRight: insets.right,
