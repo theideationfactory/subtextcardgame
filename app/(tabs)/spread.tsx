@@ -51,7 +51,21 @@ const supabase = createClient(
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
-const SPREADS = {
+type SpreadType = 'invitation' | 'reflection' | 'connection';
+
+const SPREADS: Record<SpreadType, {
+  name: string;
+  description: string;
+  color: string;
+  icon: any; // Using any for LucideIcon type
+  zones: Array<{
+    name: string;
+    title: string;
+    color: string;
+    icon: any; // Using any for LucideIcon type
+    description: string;
+  }>;
+}> = {
   invitation: {
     name: 'Invitation',
     description: 'A spread for planning important conversations',
@@ -148,19 +162,19 @@ export default function SpreadScreen() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [showGallery, setShowGallery] = useState(false);
-  const [activeZone, setActiveZone] = useState(null);
-  const [selectedSpread, setSelectedSpread] = useState(null);
-  const [zoneCards, setZoneCards] = useState({});
-  const [currentSpreadId, setCurrentSpreadId] = useState(null);
+  const [activeZone, setActiveZone] = useState<string | null>(null);
+  const [selectedSpread, setSelectedSpread] = useState<SpreadType | null>(null);
+  const [zoneCards, setZoneCards] = useState<Record<string, any[]>>({});
+  const [currentSpreadId, setCurrentSpreadId] = useState<string | null>(null);
   const [savingDraft, setSavingDraft] = useState(false);
   const [showSaveAs, setShowSaveAs] = useState(false);
-  const [fullscreenZone, setFullscreenZone] = useState(null);
+  const [fullscreenZone, setFullscreenZone] = useState<string | null>(null);
   const [numColumns, setNumColumns] = useState(1);
   const [expandedCardId, setExpandedCardId] = useState<string | null>(null);
   const [showFullCardView, setShowFullCardView] = useState(false);
   const [selectedCardForFullView, setSelectedCardForFullView] = useState<any>(null);
   const [spreadName, setSpreadName] = useState('');
-  const [cardMap, setCardMap] = useState({});
+  const [cardMap, setCardMap] = useState<Record<string, any>>({});
   const [galleryLoading, setGalleryLoading] = useState(false);
   
   const [fontsLoaded] = useFonts({
@@ -192,7 +206,10 @@ export default function SpreadScreen() {
 
   useEffect(() => {
     if (params.draftId) {
-      loadDraft(params.draftId);
+      const draftIdToLoad = Array.isArray(params.draftId) ? params.draftId[0] : params.draftId;
+      if (draftIdToLoad) { // Ensure we have a valid ID after potential array access
+        loadDraft(draftIdToLoad);
+      }
     }
   }, [params.draftId, cards]);
 
@@ -215,7 +232,7 @@ export default function SpreadScreen() {
     setNumColumns(columns);
   };
 
-  const checkForExistingDraft = async (spreadType) => {
+  const checkForExistingDraft = async (spreadType: SpreadType) => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
@@ -235,27 +252,27 @@ export default function SpreadScreen() {
       }
 
       if (latestDraft?.draft_data?.zoneCards) {
-        setSpreadName(latestDraft.name || SPREADS[spreadType].name);
+        setSpreadName(latestDraft.name || SPREADS[spreadType as keyof typeof SPREADS].name);
         setCurrentSpreadId(latestDraft.id);
 
-        const cardsById = cards.reduce((acc, card) => {
+        const cardsById: Record<string, any> = cards.reduce((acc: Record<string, any>, card) => {
           acc[card.id] = card;
           return acc;
         }, {});
         setCardMap(cardsById);
 
-        const restoredZoneCards = {};
-        Object.entries(latestDraft.draft_data.zoneCards).forEach(([zoneName, cardIds]) => {
-          restoredZoneCards[zoneName] = cardIds.map(id => cardsById[id]).filter(Boolean);
+        const restoredZoneCards: Record<string, any[]> = {};
+        Object.entries(latestDraft.draft_data.zoneCards).forEach(([zoneName, cardIds]: [string, any]) => {
+          restoredZoneCards[zoneName] = (cardIds as string[]).map((id: string) => cardsById[id]).filter(Boolean);
         });
         setZoneCards(restoredZoneCards);
       } else {
-        const initialZoneCards = {};
-        SPREADS[spreadType].zones.forEach(zone => {
+        const initialZoneCards: Record<string, any[]> = {};
+        SPREADS[spreadType as keyof typeof SPREADS].zones.forEach(zone => {
           initialZoneCards[zone.name] = [];
         });
         setZoneCards(initialZoneCards);
-        setSpreadName(SPREADS[spreadType].name);
+        setSpreadName(SPREADS[spreadType as keyof typeof SPREADS].name);
       }
     } catch (err) {
       console.error('Error checking for existing draft:', err);
@@ -263,7 +280,7 @@ export default function SpreadScreen() {
     }
   };
 
-  const loadDraft = async (draftId) => {
+  const loadDraft = async (draftId: string) => {
     try {
       const { data: draft, error: draftError } = await supabase
         .from('spreads')
@@ -275,18 +292,18 @@ export default function SpreadScreen() {
 
       if (draft?.draft_data?.type && draft?.draft_data?.zoneCards) {
         setSelectedSpread(draft.draft_data.type);
-        setSpreadName(draft.name || SPREADS[draft.draft_data.type].name);
+        setSpreadName(draft.name || SPREADS[draft.draft_data.type as SpreadType].name);
         setCurrentSpreadId(draft.id);
 
-        const cardsById = cards.reduce((acc, card) => {
+        const cardsById: Record<string, any> = cards.reduce((acc: Record<string, any>, card) => {
           acc[card.id] = card;
           return acc;
         }, {});
         setCardMap(cardsById);
 
-        const restoredZoneCards = {};
-        Object.entries(draft.draft_data.zoneCards).forEach(([zoneName, cardIds]) => {
-          restoredZoneCards[zoneName] = cardIds.map(id => cardsById[id]).filter(Boolean);
+        const restoredZoneCards: Record<string, any[]> = {};
+        Object.entries(draft.draft_data.zoneCards).forEach(([zoneName, cardIds]: [string, any]) => {
+          restoredZoneCards[zoneName] = (cardIds as string[]).map((id: string) => cardsById[id]).filter(Boolean);
         });
         setZoneCards(restoredZoneCards);
       }
@@ -304,7 +321,7 @@ export default function SpreadScreen() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      const zoneCardIds = {};
+      const zoneCardIds: Record<string, string[]> = {};
       Object.entries(zoneCards).forEach(([zoneName, cards]) => {
         zoneCardIds[zoneName] = cards.map(card => card.id);
       });
@@ -314,8 +331,8 @@ export default function SpreadScreen() {
         zoneCards: zoneCardIds,
       };
 
-      const spreadNameToUse = (name && name.trim()) || spreadName || SPREADS[selectedSpread].name;
-      const iconName = SPREADS[selectedSpread]?.icon?.name || 'Sparkles';
+      const spreadNameToUse = (name && name.trim()) || spreadName || (selectedSpread ? SPREADS[selectedSpread].name : '');
+      const iconName = (selectedSpread && SPREADS[selectedSpread]?.icon?.name) || 'Sparkles';
 
       if (currentSpreadId) {
         const { error: updateError } = await supabase
@@ -332,8 +349,8 @@ export default function SpreadScreen() {
           .from('spreads')
           .insert({
             name: spreadNameToUse,
-            description: SPREADS[selectedSpread].description,
-            color: SPREADS[selectedSpread].color,
+            description: selectedSpread ? SPREADS[selectedSpread].description : '',
+            color: selectedSpread ? SPREADS[selectedSpread].color : '#000000',
             icon: iconName,
             user_id: user.id,
             zones: [],
@@ -386,7 +403,7 @@ export default function SpreadScreen() {
     }
   };
 
-  const handleAddCard = (card) => {
+  const handleAddCard = (card: any) => {
     if (!activeZone) return;
     
     setZoneCards(prev => ({
@@ -404,7 +421,7 @@ export default function SpreadScreen() {
     router.push('/create');
   };
 
-  const renderSpreadOption = (spreadKey) => {
+  const renderSpreadOption = (spreadKey: SpreadType) => {
     const spread = SPREADS[spreadKey];
     const Icon = spread.icon;
 
@@ -429,7 +446,7 @@ export default function SpreadScreen() {
     );
   };
 
-  const renderGalleryItem = ({ item }) => (
+  const renderGalleryItem = ({ item }: { item: any }) => (
     <TouchableOpacity 
       style={styles.galleryItem}
       onPress={() => handleAddCard(item)}
@@ -779,7 +796,7 @@ export default function SpreadScreen() {
           style={styles.spreadSelector}
           contentContainerStyle={styles.spreadSelectorContent}
         >
-          {Object.keys(SPREADS).map(renderSpreadOption)}
+          {Object.keys(SPREADS).map((key) => renderSpreadOption(key as SpreadType))}
         </ScrollView>
       </View>
     );
