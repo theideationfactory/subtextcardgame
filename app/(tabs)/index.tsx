@@ -77,6 +77,19 @@ export default function CollectionScreen() {
     collections?: any;
   };
 
+  const { width: screenWidth } = useWindowDimensions();
+
+  const getNumColumns = () => {
+    // Always use 1 column for phones, even large ones
+    if (!isTablet()) {
+      return 1;
+    }
+    // Use more columns for larger screens (tablets), but cap at 2
+    const potentialCols = Math.max(1, Math.floor(screenWidth / 200)); // Adjust 200 based on desired min card width
+    return Math.min(potentialCols, 2); // Cap at 2 columns for tablets
+  };
+
+  const [numColumns, setNumColumns] = useState(getNumColumns());
   const [cards, setCards] = useState<Card[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -86,8 +99,7 @@ export default function CollectionScreen() {
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [deleteError, setDeleteError] = useState('');
   const [selectedType, setSelectedType] = useState<CollectionType>('personal');
-  const [numColumns, setNumColumns] = useState<number>(1);
-  const { width: screenWidth, height: screenHeight } = useWindowDimensions();
+  const { height: screenHeight } = useWindowDimensions();
   const router = useRouter();
   
   // Calculate scaling factor based on number of columns
@@ -298,20 +310,11 @@ export default function CollectionScreen() {
   const renderCard = ({ item }: { item: Card }) => {
     const cardColors = getCardTypeColor(item.type);
     
-    // Calculate card width based on number of columns and screen width
-    const cardWidth = numColumns > 1 
-      ? (screenWidth - 48 - (numColumns - 1) * 16) / numColumns // Account for padding and gaps
-      : undefined; // Full width for single column
-    
     // Calculate image height based on number of columns
     const imageHeight = numColumns > 1 ? 200 : 280; // Smaller height for multi-column
     
     // Calculate border width based on scale factor
     const borderWidth = Math.max(2, 8 * scaleFactor); // Min 2px, max 8px
-    
-    // Set fixed description height for multi-column layouts to create uniform cards
-    const descriptionHeight = numColumns > 1 ? 80 : undefined;
-    const descriptionMinHeight = numColumns > 1 ? 80 : undefined;
     
     // Calculate font sizes based on scale factor
     const nameSize = Math.max(16, 24 * scaleFactor); // Min 16px
@@ -323,7 +326,9 @@ export default function CollectionScreen() {
       <Pressable 
         style={[
           styles.card,
-          { maxWidth: cardWidth }
+          { 
+            flex: 1 // Allow card to grow within its column
+          }
         ]}>
         <LinearGradient
           colors={cardColors}
@@ -383,8 +388,7 @@ export default function CollectionScreen() {
             </View>
 
             <View style={[
-              styles.textBox,
-              numColumns > 1 && { minHeight: descriptionMinHeight } // Apply fixed height for 2-column layout
+              styles.textBox
             ]}>
               <Text style={[
                 styles.cardDescription, 
@@ -492,35 +496,12 @@ export default function CollectionScreen() {
         data={cards}
         renderItem={renderCard}
         keyExtractor={(item) => item.id}
-        numColumns={numColumns}
-        key={`cols_${numColumns}_${isLandscape ? 'h' : 'v'}`} /* Re-render when columns or orientation change */
-        extraData={screenWidth} // Ensure items re-render on orientation change
-        columnWrapperStyle={
-          numColumns > 1
-            ? [
-                styles.columnWrapper,
-                {
-                  gap: isLandscape ? 24 : 16,
-                  paddingHorizontal: isLandscape ? 16 : 8,
-                  marginBottom: isLandscape ? 12 : 16,
-                },
-              ]
-            : undefined
-        }
-        contentContainerStyle={[
-          styles.listContainer,
-          { paddingBottom: isLandscape ? 24 : 32 },
-        ]}
+        numColumns={numColumns} // Use state variable here
+        key={numColumns} // Force re-render when numColumns changes
+        contentContainerStyle={styles.listContent}
+        columnWrapperStyle={numColumns > 1 ? styles.columnWrapper : null} // Add spacing between columns
         refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            tintColor="#ffffff"
-            colors={['#6366f1', '#ec4899', '#10b981']}
-            progressBackgroundColor="#2a2a2a"
-            title="Pull to refresh"
-            titleColor="#ffffff"
-          />
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#fff" />
         }
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
@@ -649,10 +630,8 @@ const styles = StyleSheet.create({
     color: '#fff',
   },
   columnWrapper: {
-    justifyContent: 'space-between',
-    gap: 16,
-    paddingHorizontal: 8,
-    marginBottom: 16, // Add more space between rows
+    justifyContent: 'space-between', // Distribute space between columns
+    marginBottom: 16, // Add space below each row
   },
   centerContent: {
     justifyContent: 'center',
@@ -682,7 +661,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: 'Inter-Bold',
   },
-  listContainer: {
+  listContent: {
     paddingBottom: 16, // Add more bottom padding
     flexGrow: 1,
   },
@@ -765,7 +744,6 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.7)',
     padding: 8,
     borderRadius: 6,
-    minHeight: 100,
   },
   cardDescription: {
     fontFamily: 'Inter-Regular',
