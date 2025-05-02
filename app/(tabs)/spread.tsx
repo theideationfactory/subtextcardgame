@@ -12,6 +12,7 @@ import {
   ActivityIndicator,
   TextInput,
   Platform,
+  SafeAreaView,
 } from 'react-native';
 import { useFonts, Inter_400Regular, Inter_700Bold } from '@expo-google-fonts/inter';
 import { createClient } from '@supabase/supabase-js';
@@ -32,6 +33,11 @@ import {
   FileText,
   Save,
   RotateCcw,
+  Maximize2,
+  Minimize2,
+  Grid,
+  Eye,
+  EyeOff,
 } from 'lucide-react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
@@ -148,6 +154,11 @@ export default function SpreadScreen() {
   const [currentSpreadId, setCurrentSpreadId] = useState(null);
   const [savingDraft, setSavingDraft] = useState(false);
   const [showSaveAs, setShowSaveAs] = useState(false);
+  const [fullscreenZone, setFullscreenZone] = useState(null);
+  const [numColumns, setNumColumns] = useState(1);
+  const [expandedCardId, setExpandedCardId] = useState<string | null>(null);
+  const [showFullCardView, setShowFullCardView] = useState(false);
+  const [selectedCardForFullView, setSelectedCardForFullView] = useState<any>(null);
   const [spreadName, setSpreadName] = useState('');
   const [cardMap, setCardMap] = useState({});
   const [galleryLoading, setGalleryLoading] = useState(false);
@@ -188,10 +199,21 @@ export default function SpreadScreen() {
   const handleShowGallery = useCallback((zoneName: string) => {
     setActiveZone(zoneName);
     setShowGallery(true);
-    if (cards.length === 0) {
-      fetchCards();
-    }
   }, [cards.length, fetchCards]);
+
+  const toggleFullscreen = (zoneName: string) => {
+    if (fullscreenZone === zoneName) {
+      setFullscreenZone(null);
+      setNumColumns(1);
+    } else {
+      setFullscreenZone(zoneName);
+      setNumColumns(3); // Default to 3 columns when entering fullscreen
+    }
+  };
+
+  const changeColumnLayout = (columns: number) => {
+    setNumColumns(columns);
+  };
 
   const checkForExistingDraft = async (spreadType) => {
     try {
@@ -506,12 +528,16 @@ export default function SpreadScreen() {
     </Modal>
   );
 
-  const renderDropZone = (zone) => {
+  const renderDropZone = (zone: any) => {
     const Icon = zone.icon;
     const cards = zoneCards[zone.name] || [];
+    const isFullscreen = fullscreenZone === zone.name;
 
     return (
-      <View style={styles.dropZone} key={zone.name}>
+      <View 
+        style={[styles.dropZone, isFullscreen && styles.fullscreenDropZone]} 
+        key={zone.name}
+      >
         <LinearGradient
           colors={[`${zone.color}33`, `${zone.color}11`]}
           style={styles.dropZoneGradient}
@@ -521,38 +547,199 @@ export default function SpreadScreen() {
               <Icon size={16} color={zone.color} />
               <Text style={styles.dropZoneTitle}>{zone.title}</Text>
             </View>
-            <TouchableOpacity
-              style={[styles.addButton, { backgroundColor: `${zone.color}33` }]}
-              onPress={() => handleShowGallery(zone.name)}
-            >
-              <Plus size={16} color={zone.color} />
-            </TouchableOpacity>
+            <View style={styles.headerRight}>
+              {isFullscreen && (
+                <View style={styles.headerControls}>
+                  <View style={styles.columnSelector}>
+                    {[1, 2, 3, 4].map(cols => (
+                      <TouchableOpacity
+                        key={`cols-${cols}`}
+                        style={[
+                          styles.columnOption,
+                          numColumns === cols && styles.activeColumnOption,
+                          { backgroundColor: numColumns === cols ? `${zone.color}66` : `${zone.color}33` }
+                        ]}
+                        onPress={() => changeColumnLayout(cols)}
+                      >
+                        <Text style={[styles.columnOptionText, numColumns === cols && styles.activeColumnOptionText]}>
+                          {cols}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                  <TouchableOpacity
+                    style={[styles.iconButton, { backgroundColor: `${zone.color}33` }]}
+                    onPress={() => setShowFullCardView(!showFullCardView)}
+                  >
+                    {showFullCardView ? (
+                      <EyeOff size={16} color={zone.color} />
+                    ) : (
+                      <Eye size={16} color={zone.color} />
+                    )}
+                  </TouchableOpacity>
+                </View>
+              )}
+              <TouchableOpacity
+                style={[styles.iconButton, { backgroundColor: `${zone.color}33` }]}
+                onPress={() => toggleFullscreen(zone.name)}
+              >
+                {isFullscreen ? (
+                  <Minimize2 size={16} color={zone.color} />
+                ) : (
+                  <Maximize2 size={16} color={zone.color} />
+                )}
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.iconButton, { backgroundColor: `${zone.color}33` }]}
+                onPress={() => handleShowGallery(zone.name)}
+              >
+                <Plus size={16} color={zone.color} />
+              </TouchableOpacity>
+            </View>
           </View>
-          <Text style={styles.dropZoneDescription}>{zone.description}</Text>
-          <ScrollView 
-            horizontal 
-            showsHorizontalScrollIndicator={false}
-            style={styles.cardScroll}
-            contentContainerStyle={styles.cardScrollContent}
-          >
-            {cards.map((card, index) => (
-              <View key={`${card.id}-${index}`} style={styles.miniCard}>
-                <Image
-                  source={{ uri: card.image_url }}
-                  style={styles.miniCardImage}
-                  resizeMode="cover"
-                />
-                <LinearGradient
-                  colors={['transparent', 'rgba(0,0,0,0.8)']}
-                  style={styles.miniCardOverlay}
+          {!isFullscreen && <Text style={styles.dropZoneDescription}>{zone.description}</Text>}
+          {isFullscreen ? (
+            <FlatList
+              data={cards}
+              numColumns={numColumns}
+              key={`grid-${numColumns}`}
+              keyExtractor={(item, index) => `${item.id}-${index}`}
+              renderItem={({item: card, index}) => (
+                <TouchableOpacity 
+                  style={[
+                    showFullCardView ? styles.fullCardView : styles.gridCard,
+                    showFullCardView ? {
+                      width: numColumns === 1 ? '100%' : numColumns === 2 ? '50%' : numColumns === 3 ? '33.333%' : '25%',
+                      padding: numColumns === 1 ? 12 : numColumns === 2 ? 10 : numColumns === 3 ? 8 : 6,
+                      aspectRatio: undefined,
+                      height: undefined,
+                    } : {
+                      width: `${100/numColumns}%`,
+                      padding: numColumns === 1 ? 8 : numColumns === 2 ? 6 : numColumns === 3 ? 4 : 2
+                    }
+                  ]}
+                  onPress={() => {
+                    if (showFullCardView) {
+                      // In full card view, single tap selects the card
+                      setSelectedCardForFullView(card);
+                    } else {
+                      // Handle double tap with timeout
+                      const now = Date.now();
+                      const DOUBLE_TAP_DELAY = 300;
+                      
+                      if (card.lastTap && (now - card.lastTap) < DOUBLE_TAP_DELAY) {
+                        // Double tap detected
+                        if (expandedCardId === card.id) {
+                          setExpandedCardId(null);
+                        } else {
+                          setExpandedCardId(card.id);
+                        }
+                        card.lastTap = 0; // Reset to prevent triple tap issues
+                      } else {
+                        // First tap
+                        card.lastTap = now;
+                      }
+                    }
+                  }}
                 >
-                  <Text style={styles.miniCardName} numberOfLines={1}>
-                    {card.name}
-                  </Text>
-                </LinearGradient>
-              </View>
-            ))}
-          </ScrollView>
+                  {showFullCardView ? (
+                    <View style={[styles.fullCardInner, { borderColor: card.color || '#6366f1' }]}>
+                      <Image
+                        source={{ uri: card.image_url }}
+                        style={styles.fullCardImage}
+                        resizeMode="cover"
+                      />
+                      <View style={styles.fullCardContent}>
+                        <Text style={styles.fullCardName}>
+                          {card.name}
+                        </Text>
+                        <Text style={styles.fullCardType}>
+                          {card.card_type || 'Card'}
+                        </Text>
+                        <Text style={styles.fullCardDescription}>
+                          {card.description || 'No description available'}
+                        </Text>
+                      </View>
+                    </View>
+                  ) : (
+                    <View style={styles.gridCardInner}>
+                      <Image
+                        source={{ uri: card.image_url }}
+                        style={styles.gridCardImage}
+                        resizeMode="contain"
+                      />
+                      <LinearGradient
+                        colors={['transparent', 'rgba(0,0,0,0.8)']}
+                        style={[styles.gridCardOverlay, expandedCardId === card.id && styles.expandedCardOverlay]}
+                      >
+                        <Text 
+                          style={[
+                            styles.gridCardName, 
+                            {
+                              fontSize: numColumns === 1 ? 14 : numColumns === 2 ? 12 : numColumns === 3 ? 10 : 9
+                            }
+                          ]} 
+                          numberOfLines={expandedCardId === card.id ? undefined : 1}
+                        >
+                          {card.name}
+                        </Text>
+                        
+                        {expandedCardId === card.id && (
+                          <View style={styles.cardDetails}>
+                            <Text style={styles.cardType}>
+                              {card.card_type || 'Card'}
+                            </Text>
+                            <Text style={styles.cardDescription} numberOfLines={4}>
+                              {card.description || 'No description available'}
+                            </Text>
+                          </View>
+                        )}
+                      </LinearGradient>
+                    </View>
+                  )}
+                </TouchableOpacity>
+              )}
+              contentContainerStyle={styles.gridContainer}
+              showsVerticalScrollIndicator={false}
+              ListEmptyComponent={
+                <View style={styles.emptyGrid}>
+                  <Text style={styles.emptyText}>No cards added yet</Text>
+                  <TouchableOpacity
+                    style={[styles.addCardButton, { backgroundColor: zone.color }]}
+                    onPress={() => handleShowGallery(zone.name)}
+                  >
+                    <Plus size={20} color="#fff" />
+                    <Text style={styles.addCardButtonText}>Add Cards</Text>
+                  </TouchableOpacity>
+                </View>
+              }
+            />
+          ) : (
+            <ScrollView 
+              horizontal 
+              showsHorizontalScrollIndicator={false}
+              style={styles.cardScroll}
+              contentContainerStyle={styles.cardScrollContent}
+            >
+              {cards.map((card, index) => (
+                <View key={`${card.id}-${index}`} style={styles.miniCard}>
+                  <Image
+                    source={{ uri: card.image_url }}
+                    style={styles.miniCardImage}
+                    resizeMode="cover"
+                  />
+                  <LinearGradient
+                    colors={['transparent', 'rgba(0,0,0,0.8)']}
+                    style={styles.miniCardOverlay}
+                  >
+                    <Text style={styles.miniCardName} numberOfLines={1}>
+                      {card.name}
+                    </Text>
+                  </LinearGradient>
+                </View>
+              ))}
+            </ScrollView>
+          )}
         </LinearGradient>
       </View>
     );
@@ -600,38 +787,59 @@ export default function SpreadScreen() {
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity 
-          style={styles.backButton}
-          onPress={() => setSelectedSpread(null)}
-        >
-          <ArrowLeft size={24} color="#fff" />
-        </TouchableOpacity>
-        <View style={styles.titleContainer}>
-          <Text style={styles.spreadTitle}>
-            {spreadName || SPREADS[selectedSpread].name}
-          </Text>
-          <TouchableOpacity
-            style={styles.resetButton}
-            onPress={resetSpreadTitle}
-          >
-            <RotateCcw size={16} color="#666" />
-          </TouchableOpacity>
-        </View>
-        {savingDraft && (
-          <ActivityIndicator size="small" color="#6366f1" style={styles.savingIndicator} />
-        )}
-        <TouchableOpacity
-          style={styles.saveAsButton}
-          onPress={() => setShowSaveAs(true)}
-        >
-          <Save size={20} color="#6366f1" />
-        </TouchableOpacity>
-      </View>
+      {fullscreenZone ? (
+        <SafeAreaView style={styles.fullscreenContainer}>
+          <View style={styles.header}>
+            <TouchableOpacity 
+              style={styles.backButton}
+              onPress={() => setFullscreenZone(null)}
+            >
+              <ArrowLeft size={24} color="#fff" />
+            </TouchableOpacity>
+            <View style={styles.titleContainer}>
+              <Text style={styles.spreadTitle}>
+                {SPREADS[selectedSpread!].zones.find(z => z.name === fullscreenZone)?.title || ''}
+              </Text>
+            </View>
+          </View>
+          {renderDropZone(SPREADS[selectedSpread!].zones.find(z => z.name === fullscreenZone)!)}
+        </SafeAreaView>
+      ) : (
+        <>
+          <View style={styles.header}>
+            <TouchableOpacity 
+              style={styles.backButton}
+              onPress={() => setSelectedSpread(null)}
+            >
+              <ArrowLeft size={24} color="#fff" />
+            </TouchableOpacity>
+            <View style={styles.titleContainer}>
+              <Text style={styles.spreadTitle}>
+                {spreadName || SPREADS[selectedSpread!].name}
+              </Text>
+              <TouchableOpacity
+                style={styles.resetButton}
+                onPress={resetSpreadTitle}
+              >
+                <RotateCcw size={16} color="#666" />
+              </TouchableOpacity>
+            </View>
+            {savingDraft && (
+              <ActivityIndicator size="small" color="#6366f1" style={styles.savingIndicator} />
+            )}
+            <TouchableOpacity
+              style={styles.saveAsButton}
+              onPress={() => setShowSaveAs(true)}
+            >
+              <Save size={20} color="#6366f1" />
+            </TouchableOpacity>
+          </View>
 
-      <View style={styles.dropZonesContainer}>
-        {SPREADS[selectedSpread].zones.map(renderDropZone)}
-      </View>
+          <View style={styles.dropZonesContainer}>
+            {SPREADS[selectedSpread!].zones.map((zone) => renderDropZone(zone))}
+          </View>
+        </>
+      )}
 
       {renderGalleryModal()}
 
@@ -679,6 +887,126 @@ export default function SpreadScreen() {
 }
 
 const styles = StyleSheet.create({
+  gridContainer: {
+    padding: 4,
+    flexGrow: 1,
+  },
+  gridCard: {
+    padding: 6,
+    aspectRatio: 0.7, // Maintain card aspect ratio (width:height = 1:1.43)
+  },
+  gridCardInner: {
+    flex: 1,
+    borderRadius: 8,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+  },
+  gridCardImage: {
+    width: '100%',
+    height: '100%',
+  },
+  gridCardOverlay: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    padding: 6,
+  },
+  expandedCardOverlay: {
+    top: 0,
+    backgroundColor: 'rgba(0,0,0,0.75)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  cardDetails: {
+    marginTop: 8,
+    padding: 4,
+  },
+  cardType: {
+    color: '#6366f1',
+    fontSize: 12,
+    fontFamily: 'Inter-Bold',
+    textAlign: 'center',
+    marginBottom: 4,
+  },
+  cardDescription: {
+    color: 'rgba(255,255,255,0.9)',
+    fontSize: 11,
+    fontFamily: 'Inter-Regular',
+    textAlign: 'center',
+    lineHeight: 16,
+  },
+  fullCardView: {
+    margin: 8,
+  },
+  fullCardInner: {
+    flex: 1,
+    borderRadius: 12,
+    overflow: 'hidden',
+    borderWidth: 2,
+    backgroundColor: '#1a1a1a',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  fullCardImage: {
+    width: '100%',
+    height: 200,
+  },
+  fullCardContent: {
+    padding: 12,
+  },
+  fullCardName: {
+    color: '#fff',
+    fontSize: 16,
+    fontFamily: 'Inter-Bold',
+    marginBottom: 4,
+  },
+  fullCardType: {
+    color: '#6366f1',
+    fontSize: 14,
+    fontFamily: 'Inter-Bold',
+    marginBottom: 8,
+  },
+  fullCardDescription: {
+    color: 'rgba(255,255,255,0.9)',
+    fontSize: 14,
+    fontFamily: 'Inter-Regular',
+    lineHeight: 20,
+  },
+  gridCardName: {
+    color: '#fff',
+    fontFamily: 'Inter-Bold',
+    textAlign: 'center',
+    textShadowColor: 'rgba(0, 0, 0, 0.75)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 4,
+  },
+  emptyGrid: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+    minHeight: 200,
+  },
+  addCardButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 8,
+    marginTop: 16,
+  },
+  addCardButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontFamily: 'Inter-Bold',
+    marginLeft: 8,
+  },
   container: {
     flex: 1,
     backgroundColor: '#121212',
@@ -790,6 +1118,13 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     overflow: 'hidden',
   },
+  fullscreenDropZone: {
+    flex: 1,
+    height: undefined,
+  },
+  fullscreenContainer: {
+    flex: 1,
+  },
   dropZoneGradient: {
     flex: 1,
     padding: 8,
@@ -808,15 +1143,57 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flex: 1,
   },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  headerControls: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
   dropZoneTitle: {
     color: '#fff',
     fontSize: 16,
     fontFamily: 'Inter-Bold',
     marginLeft: 8,
   },
+  iconButton: {
+    padding: 4,
+    borderRadius: 4,
+  },
   addButton: {
     padding: 4,
     borderRadius: 4,
+  },
+  columnSelector: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginRight: 8,
+    backgroundColor: 'rgba(0,0,0,0.2)',
+    borderRadius: 4,
+    padding: 2,
+  },
+  columnOption: {
+    width: 24,
+    height: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 2,
+    marginHorizontal: 2,
+  },
+  activeColumnOption: {
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.5)',
+  },
+  columnOptionText: {
+    color: 'rgba(255,255,255,0.7)',
+    fontSize: 12,
+    fontFamily: 'Inter-Bold',
+  },
+  activeColumnOptionText: {
+    color: '#fff',
   },
   dropZoneDescription: {
     color: 'rgba(255,255,255,0.7)',

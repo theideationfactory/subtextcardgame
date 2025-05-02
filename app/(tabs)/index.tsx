@@ -113,37 +113,53 @@ export default function CollectionScreen() {
     }
   };
   
-  // Set ideal column count based on device type using the most reliable detection
-  useEffect(() => {
-    // Check if the device is an iPad using the isIPad helper function
-    // This is the most reliable way to detect iPads including iPad Mini
-    const isDeviceIPad = isIPad();
+  // Function to determine column count based on device and orientation
+  const getColumnCount = useCallback(() => {
+    // Get current dimensions
+    const { width, height } = Dimensions.get('window');
     
-    // Use 2 columns for iPad (including iPad Mini), 1 column for phones
-    if (isDeviceIPad) {
-      setNumColumns(2);
-    } else {
-      setNumColumns(1);
+    // Always use 1 column for phones
+    if (!isTablet()) {
+      return 1;
     }
     
-    // Log detailed device info for debugging
-    const { width, height } = Dimensions.get('window');
-    const aspectRatio = height / width;
-    const diagonalSize = Math.sqrt(width * width + height * height) / Dimensions.get('window').scale;
+    // For tablets: explicitly check if width > height for landscape orientation
+    const isLandscape = width > height;
     
-    console.log('Device info:', {
-      isPad: isIPad(),
+    // Use 3 columns in landscape, 2 in portrait for tablets
+    const columnCount = isLandscape ? 3 : 2;
+    
+    // Log detailed device info for debugging
+    console.log('Device orientation info:', {
       isTablet: isTablet(),
       isIPad: isIPad(),
       isIPadMini: isIPadMini(),
-      screenWidth,
-      screenHeight,
-      diagonalSize: diagonalSize.toFixed(0),
-      aspectRatio: aspectRatio.toFixed(2),
-      platform: Platform.OS,
-      numColumns // Log the actual number of columns being used
+      screenWidth: width,
+      screenHeight: height,
+      isLandscape: isLandscape,
+      columnCount: columnCount
     });
+    
+    return columnCount;
   }, []);
+  
+  // Function to update column count when dimensions change
+  const updateColumnCount = useCallback(() => {
+    const newColumnCount = getColumnCount();
+    setNumColumns(newColumnCount);
+  }, [getColumnCount]);
+  
+  // Set up orientation detection and column adjustment
+  useEffect(() => {
+    // Set initial column count
+    updateColumnCount();
+    
+    // Add event listener for dimension changes
+    const dimensionsSubscription = Dimensions.addEventListener('change', updateColumnCount);
+    
+    // Clean up event listener on unmount
+    return () => dimensionsSubscription.remove();
+  }, [updateColumnCount]);
 
   const [fontsLoaded] = useFonts({
     'Inter-Regular': Inter_400Regular,
@@ -310,8 +326,9 @@ export default function CollectionScreen() {
   const renderCard = ({ item }: { item: Card }) => {
     const cardColors = getCardTypeColor(item.type);
     
-    // Calculate image height based on number of columns
-    const imageHeight = numColumns > 1 ? 200 : 280; // Smaller height for multi-column
+    // Calculate image height based on number of columns - progressively smaller as columns increase
+    // Following the scaling system from previous implementations (280px → 180px → 120px) for multi-column layouts
+    const imageHeight = numColumns === 1 ? 280 : numColumns === 2 ? 180 : 120; // Scale down height as columns increase
     
     // Calculate border width based on scale factor
     const borderWidth = Math.max(2, 8 * scaleFactor); // Min 2px, max 8px
@@ -357,10 +374,10 @@ export default function CollectionScreen() {
               </Text>
             </View>
 
-            <View style={styles.artContainer}>
+            <View style={[styles.artContainer, { height: imageHeight }]}>
               <Image 
                 source={{ uri: item.image_url }}
-                style={[styles.cardArt, { height: imageHeight }]}
+                style={styles.cardArt}
                 resizeMode="cover"
               />
             </View>
@@ -700,7 +717,6 @@ const styles = StyleSheet.create({
     textShadowRadius: 4,
   },
   artContainer: {
-    height: 280,
     borderRadius: 8,
     overflow: 'hidden',
     borderWidth: 2,
