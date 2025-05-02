@@ -34,7 +34,7 @@ export default function SettingsScreen() {
 
   return (
     <View style={styles.container}>
-      <Spacer backgroundColor="#121212" />
+      {/* Spacer removed for consistent padding across tabs */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Appearance</Text>
         <View style={styles.setting}>

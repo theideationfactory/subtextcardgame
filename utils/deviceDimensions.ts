@@ -17,23 +17,49 @@ export const hasDynamicIsland = () => {
   );
 };
 
-// Device types
+// Device types - using the most reliable detection methods
 export const isTablet = () => {
-  const dim = Dimensions.get('window');
-  return (dim.width >= 768 || dim.height >= 768);
+  // Use Platform.isPad for iOS - this is the most reliable method
+  if (Platform.OS === 'ios') {
+    // Access the isPad property directly from Platform
+    // This is the official way to detect iPads including iPad Mini
+    return Platform.isPad === true;
+  } else {
+    // For Android, use screen dimensions
+    const dim = Dimensions.get('window');
+    const { width, height } = dim;
+    // Use the smallest dimension to account for orientation
+    const smallestDimension = Math.min(width, height);
+    return smallestDimension >= 600; // Standard Android tablet detection
+  }
 };
 
+// iPad specific detection
 export const isIPad = () => {
-  return Platform.OS === 'ios' && isTablet();
+  return Platform.OS === 'ios' && Platform.isPad === true;
 };
 
+// iPad Mini specific detection if needed
 export const isIPadMini = () => {
-  // iPad mini 6th gen has a resolution of 1488 x 2266 at 326 ppi
-  // We can use approximate dimensions to detect iPad mini
-  return isIPad() && (
+  if (!isIPad()) return false;
+  
+  // iPad Mini has a screen size of approximately 8 inches
+  // We can use dimensions to differentiate between iPad models
+  const dim = Dimensions.get('window');
+  const { width, height } = dim;
+  
+  // Method 1: Calculate diagonal screen size
+  const screenSize = Math.sqrt(width * width + height * height) / Dimensions.get('window').scale;
+  const isDiagonalSmall = screenSize < 1100; // Approximate threshold for iPad Mini
+  
+  // Method 2: Check specific dimensions (iPad mini 6th gen has a resolution of 1488 x 2266 at 326 ppi)
+  const isDimensionsMatch = (
     (width <= 834 && height <= 1194) || // Portrait
     (height <= 834 && width <= 1194)    // Landscape
   );
+  
+  // Use both methods for more reliable detection
+  return isDiagonalSmall || isDimensionsMatch;
 };
 
 // Responsive sizing helpers

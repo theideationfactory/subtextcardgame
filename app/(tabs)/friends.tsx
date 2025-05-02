@@ -548,7 +548,6 @@ export default function FriendsScreen() {
       colors={['#1a1a1a', '#2a2a2a']}
       style={styles.container}
     >
-      <Spacer backgroundColor="#1a1a1a" />
       {renderSectionSelector()}
       {error ? (
         <Text style={styles.errorText}>{error}</Text>
@@ -701,7 +700,7 @@ const styles = StyleSheet.create({
     margin: 16,
     borderRadius: 8,
   },
-  statusText: {
+  statusMessage: {
     color: '#666',
     textAlign: 'center',
     marginVertical: 8,

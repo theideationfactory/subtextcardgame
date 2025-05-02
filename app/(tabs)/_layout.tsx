@@ -3,11 +3,14 @@ import { Plus, Car as Cards, Settings, LayoutGrid as Layout, Users } from 'lucid
 import { router } from 'expo-router';
 import { useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Platform } from 'react-native';
 import { SafeAreaWrapper } from '@/components/SafeAreaWrapper';
+import { TouchableOpacity } from 'react-native';
 
 export default function TabLayout() {
   const { fetchCards } = useAuth();
+  const insets = useSafeAreaInsets();
 
   useEffect(() => {
     fetchCards();
@@ -23,8 +26,8 @@ export default function TabLayout() {
             borderTopWidth: 0,
             elevation: 0,
             shadowOpacity: 0,
-            height: Platform.OS === 'ios' ? 88 : 60,
-            paddingBottom: Platform.OS === 'ios' ? 28 : 8,
+            height: Platform.OS === 'ios' ? 60 : 50,
+            paddingBottom: Platform.OS === 'ios' ? insets.bottom : 8,
             paddingTop: 8,
           },
           tabBarActiveTintColor: '#fff',
@@ -42,14 +45,22 @@ export default function TabLayout() {
           options={{
             title: 'Create Card',
             tabBarIcon: ({ size, color }) => <Plus size={size} color={color} />,
-            listeners: {
-              tabPress: (e) => {
-                e.preventDefault();
-                router.push({
-                  pathname: '/create',
-                  params: {}
-                });
-              },
+            tabBarButton: (props) => {
+              // Create a custom button that doesn't pass through all props
+              return (
+                <TouchableOpacity 
+                  style={props.style}
+                  activeOpacity={0.6}
+                  onPress={() => {
+                    router.push({
+                      pathname: '/create',
+                      params: {}
+                    });
+                  }}
+                >
+                  {props.children}
+                </TouchableOpacity>
+              );
             },
           }}
         />

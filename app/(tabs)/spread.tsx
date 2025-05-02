@@ -577,7 +577,7 @@ export default function SpreadScreen() {
   if (!selectedSpread) {
     return (
       <View style={styles.container}>
-        <Spacer backgroundColor="#121212" />
+        {/* Spacer removed for consistent padding across tabs */}
         <View style={styles.header}>
           <Text style={styles.pageTitle}>Choose a Spread</Text>
           <TouchableOpacity 
@@ -682,6 +682,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#121212',
+    padding: Platform.OS === 'web' ? 16 : 8,
   },
   centerContent: {
     justifyContent: 'center',
@@ -690,7 +691,8 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 16,
+    paddingVertical: 8,
+    marginBottom: 8,
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(255,255,255,0.1)',
   },
@@ -746,10 +748,10 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   backButton: {
-    padding: 8,
-    borderRadius: 8,
+    padding: 6,
+    borderRadius: 6,
     backgroundColor: 'rgba(255,255,255,0.1)',
-    marginRight: 16,
+    marginRight: 10,
   },
   titleContainer: {
     flex: 1,
@@ -764,7 +766,7 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter-Bold',
   },
   resetButton: {
-    padding: 4,
+    padding: 3,
     borderRadius: 4,
     backgroundColor: 'rgba(255,255,255,0.1)',
   },
@@ -772,29 +774,28 @@ const styles = StyleSheet.create({
     marginLeft: 16,
   },
   saveAsButton: {
-    padding: 8,
-    borderRadius: 8,
+    padding: 6,
+    borderRadius: 6,
     backgroundColor: 'rgba(99, 102, 241, 0.1)',
-    marginLeft: 16,
+    marginLeft: 10,
   },
   dropZonesContainer: {
     flex: 1,
     justifyContent: 'space-around',
-    paddingVertical: 12,
+    paddingVertical: 4,
   },
   dropZone: {
     height: SCREEN_HEIGHT / 3 - 20,
-    marginHorizontal: 16,
-    marginVertical: 6,
-    borderRadius: 16,
+    marginBottom: 8,
+    borderRadius: 8,
     overflow: 'hidden',
   },
   dropZoneGradient: {
     flex: 1,
-    padding: 12,
+    padding: 8,
     borderWidth: 2,
     borderColor: 'rgba(255,255,255,0.1)',
-    borderRadius: 16,
+    borderRadius: 12,
   },
   dropZoneHeader: {
     flexDirection: 'row',
@@ -814,8 +815,8 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
   addButton: {
-    padding: 6,
-    borderRadius: 6,
+    padding: 4,
+    borderRadius: 4,
   },
   dropZoneDescription: {
     color: 'rgba(255,255,255,0.7)',
@@ -849,7 +850,7 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    padding: 8,
+    padding: 6,
   },
   miniCardName: {
     color: '#fff',
@@ -869,9 +870,9 @@ const styles = StyleSheet.create({
   modalContent: {
     flex: 1,
     backgroundColor: '#1a1a1a',
-    marginTop: hasDynamicIsland() ? 80 : 60, // More margin for Dynamic Island
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
+    marginTop: hasDynamicIsland() ? 60 : 40, // Reduced margin for Dynamic Island
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
     width: '100%',
   },
   saveAsModal: {
@@ -885,7 +886,7 @@ const styles = StyleSheet.create({
   modalHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 16,
+    padding: 10,
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(255,255,255,0.1)',
   },
@@ -898,8 +899,8 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   closeButton: {
-    padding: 8,
-    borderRadius: 8,
+    padding: 6,
+    borderRadius: 6,
     backgroundColor: 'rgba(255,255,255,0.1)',
   },
   createCardButton: {
@@ -920,7 +921,7 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter-Bold',
   },
   galleryGrid: {
-    padding: 8,
+    padding: 6,
   },
   galleryItem: {
     flex: 1,
@@ -941,7 +942,7 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    padding: 12,
+    padding: 8,
   },
   galleryItemName: {
     color: '#fff',

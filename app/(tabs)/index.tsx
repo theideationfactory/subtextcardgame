@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, FlatList, Pressable, Image, Modal, TouchableOpacity, RefreshControl } from 'react-native';
+import { View, Text, StyleSheet, FlatList, Pressable, Image, Modal, TouchableOpacity, RefreshControl, useWindowDimensions, Platform, PlatformIOSStatic, Dimensions } from 'react-native';
 import { useCallback, useEffect, useState } from 'react';
 import { useFonts, Inter_400Regular, Inter_700Bold } from '@expo-google-fonts/inter';
 import * as SplashScreen from 'expo-splash-screen';
@@ -8,6 +8,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import { Spacer } from '@/components/Spacer';
+import { isIPad, isTablet, isIPadMini } from '@/utils/deviceDimensions';
 
 const COLLECTION_TYPES = [
   {
@@ -85,7 +86,52 @@ export default function CollectionScreen() {
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [deleteError, setDeleteError] = useState('');
   const [selectedType, setSelectedType] = useState<CollectionType>('personal');
+  const [numColumns, setNumColumns] = useState<number>(1);
+  const { width: screenWidth, height: screenHeight } = useWindowDimensions();
   const router = useRouter();
+  
+  // Calculate scaling factor based on number of columns
+  const getScaleFactor = () => {
+    switch (numColumns) {
+      case 1: return 1.0;      // 100% - original size
+      case 2: return 0.7;      // 70% - moderately reduced
+      case 3: return 0.5;      // 50% - half size
+      case 4: return 0.35;     // 35% - very compact
+      default: return 1.0;
+    }
+  };
+  
+  // Set ideal column count based on device type using the most reliable detection
+  useEffect(() => {
+    // Check if the device is an iPad using the isIPad helper function
+    // This is the most reliable way to detect iPads including iPad Mini
+    const isDeviceIPad = isIPad();
+    
+    // Use 2 columns for iPad (including iPad Mini), 1 column for phones
+    if (isDeviceIPad) {
+      setNumColumns(2);
+    } else {
+      setNumColumns(1);
+    }
+    
+    // Log detailed device info for debugging
+    const { width, height } = Dimensions.get('window');
+    const aspectRatio = height / width;
+    const diagonalSize = Math.sqrt(width * width + height * height) / Dimensions.get('window').scale;
+    
+    console.log('Device info:', {
+      isPad: isIPad(),
+      isTablet: isTablet(),
+      isIPad: isIPad(),
+      isIPadMini: isIPadMini(),
+      screenWidth,
+      screenHeight,
+      diagonalSize: diagonalSize.toFixed(0),
+      aspectRatio: aspectRatio.toFixed(2),
+      platform: Platform.OS,
+      numColumns // Log the actual number of columns being used
+    });
+  }, []);
 
   const [fontsLoaded] = useFonts({
     'Inter-Regular': Inter_400Regular,
@@ -246,18 +292,47 @@ export default function CollectionScreen() {
     return null;
   }
 
+  // Calculate the current scale factor based on number of columns
+  const scaleFactor = getScaleFactor();
+  
   const renderCard = ({ item }: { item: Card }) => {
     const cardColors = getCardTypeColor(item.type);
     
+    // Calculate card width based on number of columns and screen width
+    const cardWidth = numColumns > 1 
+      ? (screenWidth - 48 - (numColumns - 1) * 16) / numColumns // Account for padding and gaps
+      : undefined; // Full width for single column
+    
+    // Calculate image height based on number of columns
+    const imageHeight = numColumns > 1 ? 200 : 280; // Smaller height for multi-column
+    
+    // Calculate border width based on scale factor
+    const borderWidth = Math.max(2, 8 * scaleFactor); // Min 2px, max 8px
+    
+    // Set fixed description height for multi-column layouts to create uniform cards
+    const descriptionHeight = numColumns > 1 ? 80 : undefined;
+    const descriptionMinHeight = numColumns > 1 ? 80 : undefined;
+    
+    // Calculate font sizes based on scale factor
+    const nameSize = Math.max(16, 24 * scaleFactor); // Min 16px
+    const typeSize = Math.max(12, 16 * scaleFactor); // Min 12px
+    const descSize = Math.max(12, 16 * scaleFactor); // Min 12px
+    const contextSize = Math.max(10, 14 * scaleFactor); // Min 10px
+    
     return (
-      <Pressable style={styles.card}>
+      <Pressable 
+        style={[
+          styles.card,
+          { maxWidth: cardWidth }
+        ]}>
         <LinearGradient
           colors={cardColors}
           style={[
             styles.cardFrame,
             {
-              borderWidth: item.frame_width || 8,
-              borderColor: '#808080' // Always use gray
+              borderWidth: borderWidth,
+              borderColor: '#808080', // Always use gray
+              borderRadius: 16 * scaleFactor // Scale border radius
             }
           ]}
           start={{ x: 0, y: 0 }}
@@ -265,7 +340,14 @@ export default function CollectionScreen() {
         >
           <View style={styles.cardContent}>
             <View style={styles.cardNameContainer}>
-              <Text style={[styles.cardName, { color: item.name_color || '#FFFFFF' }]}>
+              <Text style={[
+                styles.cardName, 
+                { 
+                  color: item.name_color || '#FFFFFF',
+                  fontSize: nameSize,
+                  padding: 8 * scaleFactor
+                }
+              ]}>
                 {item.name}
               </Text>
             </View>
@@ -273,14 +355,20 @@ export default function CollectionScreen() {
             <View style={styles.artContainer}>
               <Image 
                 source={{ uri: item.image_url }}
-                style={styles.cardArt}
+                style={[styles.cardArt, { height: imageHeight }]}
                 resizeMode="cover"
               />
             </View>
 
             <View style={styles.typeLine}>
               <View style={styles.typeContainer}>
-                <Text style={[styles.typeText, { color: item.type_color || '#FFFFFF' }]}>
+                <Text style={[
+                  styles.typeText, 
+                  { 
+                    color: item.type_color || '#FFFFFF',
+                    fontSize: typeSize
+                  }
+                ]}>
                   {item.type || 'Card'}
                 </Text>
               </View>
@@ -294,8 +382,18 @@ export default function CollectionScreen() {
               )}
             </View>
 
-            <View style={styles.textBox}>
-              <Text style={[styles.cardDescription, { color: item.description_color || '#FFFFFF' }]}>
+            <View style={[
+              styles.textBox,
+              numColumns > 1 && { minHeight: descriptionMinHeight } // Apply fixed height for 2-column layout
+            ]}>
+              <Text style={[
+                styles.cardDescription, 
+                { 
+                  color: item.description_color || '#FFFFFF',
+                  fontSize: descSize,
+                  lineHeight: Math.max(18, 24 * scaleFactor)
+                }
+              ]}>
                 {item.description}
               </Text>
             </View>
@@ -377,6 +475,9 @@ export default function CollectionScreen() {
     );
   }
 
+  // Determine orientation
+  const isLandscape = screenWidth > screenHeight;
+
   return (
     <LinearGradient
       colors={['#1a1a1a', '#2a2a2a']}
@@ -385,11 +486,31 @@ export default function CollectionScreen() {
       {/* Experiment: Removed Spacer to reduce top padding */}
       {renderCollectionTypeSelector()}
       
+      {/* No column selector UI - automatically set based on device type */}
+      
       <FlatList
         data={cards}
         renderItem={renderCard}
         keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.listContainer}
+        numColumns={numColumns}
+        key={`cols_${numColumns}_${isLandscape ? 'h' : 'v'}`} /* Re-render when columns or orientation change */
+        extraData={screenWidth} // Ensure items re-render on orientation change
+        columnWrapperStyle={
+          numColumns > 1
+            ? [
+                styles.columnWrapper,
+                {
+                  gap: isLandscape ? 24 : 16,
+                  paddingHorizontal: isLandscape ? 16 : 8,
+                  marginBottom: isLandscape ? 12 : 16,
+                },
+              ]
+            : undefined
+        }
+        contentContainerStyle={[
+          styles.listContainer,
+          { paddingBottom: isLandscape ? 24 : 32 },
+        ]}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -485,6 +606,53 @@ export default function CollectionScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: '#121212',
+    padding: Platform.OS === 'web' ? 16 : 8,
+  },
+  // Column selector styles
+  columnSelectorContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  columnSelectorLabel: {
+    color: '#fff',
+    marginRight: 8,
+    fontSize: 14,
+    fontFamily: 'Inter-Regular',
+  },
+  columnButtons: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  columnButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  columnButtonActive: {
+    backgroundColor: '#6366f1',
+  },
+  columnButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontFamily: 'Inter-Bold',
+  },
+  columnButtonTextActive: {
+    color: '#fff',
+  },
+  columnWrapper: {
+    justifyContent: 'space-between',
+    gap: 16,
+    paddingHorizontal: 8,
+    marginBottom: 16, // Add more space between rows
   },
   centerContent: {
     justifyContent: 'center',
@@ -492,8 +660,8 @@ const styles = StyleSheet.create({
   },
   collectionTypeContainer: {
     flexDirection: 'row',
-    padding: 16,
-    gap: 8,
+    padding: 8,
+    gap: 6,
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(255,255,255,0.1)',
   },
@@ -502,8 +670,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 12,
-    borderRadius: 12,
+    padding: 8,
+    borderRadius: 8,
     backgroundColor: 'rgba(255,255,255,0.05)',
   },
   collectionTypeIcon: {
@@ -515,7 +683,7 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter-Bold',
   },
   listContainer: {
-    padding: 16,
+    paddingBottom: 16, // Add more bottom padding
     flexGrow: 1,
   },
   card: {
@@ -536,13 +704,13 @@ const styles = StyleSheet.create({
   cardContent: {
     backgroundColor: 'rgba(0, 0, 0, 0.85)',
     borderRadius: 8,
-    padding: 6,
-    gap: 6,
+    padding: 4,
+    gap: 4,
   },
   cardNameContainer: {
     backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    padding: 8,
-    borderRadius: 8,
+    padding: 6,
+    borderRadius: 6,
   },
   cardName: {
     fontFamily: 'Inter-Bold',
@@ -568,8 +736,8 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    padding: 8,
-    borderRadius: 8,
+    padding: 6,
+    borderRadius: 6,
   },
   typeContainer: {
     flexDirection: 'row',
@@ -584,8 +752,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
+    paddingHorizontal: 6,
+    paddingVertical: 3,
     borderRadius: 4,
   },
   roleText: {
@@ -595,8 +763,8 @@ const styles = StyleSheet.create({
   },
   textBox: {
     backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    padding: 12,
-    borderRadius: 8,
+    padding: 8,
+    borderRadius: 6,
     minHeight: 100,
   },
   cardDescription: {
@@ -606,8 +774,8 @@ const styles = StyleSheet.create({
   },
   contextContainer: {
     backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    padding: 8,
-    borderRadius: 8,
+    padding: 6,
+    borderRadius: 6,
     alignItems: 'center',
   },
   contextText: {
@@ -617,11 +785,11 @@ const styles = StyleSheet.create({
   },
   settingsButton: {
     position: 'absolute',
-    top: 8,
-    right: 8,
-    padding: 8,
+    top: 6,
+    right: 6,
+    padding: 5,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    borderRadius: 8,
+    borderRadius: 6,
   },
   modalOverlay: {
     flex: 1,
@@ -632,19 +800,19 @@ const styles = StyleSheet.create({
   },
   modalContent: {
     backgroundColor: 'rgba(26, 26, 26, 0.95)',
-    borderRadius: 24,
-    padding: 20,
+    borderRadius: 16,
+    padding: 12,
     width: '80%',
     maxWidth: 400,
-    gap: 12,
+    gap: 8,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.1)',
   },
   modalButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 16,
-    borderRadius: 16,
+    padding: 10,
+    borderRadius: 10,
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
   },
   modalButtonText: {
