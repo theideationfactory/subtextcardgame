@@ -3,6 +3,12 @@
   "main": "expo-router/entry",
   "version": "1.0.0",
   "private": true,
+  "browser": {
+    "stream": "stream-browserify"
+  },
+  "overrides": {
+    "ws": "react-native-websocket"
+  },
   "scripts": {
     "dev": "EXPO_NO_TELEMETRY=1 expo start --tunnel",
     "android": "expo start --android",
@@ -45,7 +51,9 @@
     "react-native-svg": "^15.11.1",
     "react-native-url-polyfill": "^2.0.0",
     "react-native-web": "^0.19.13",
-    "react-native-webview": "13.12.5"
+    "react-native-websocket": "^1.0.2",
+    "react-native-webview": "13.12.5",
+    "stream-browserify": "^3.0.0"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",

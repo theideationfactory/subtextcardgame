@@ -38,5 +38,8 @@ export const supabase = createClient(
       flowType: 'pkce',
       debug: false, // Disabled logging to reduce console noise
     },
+    realtime: {
+      enabled: false // Disable Realtime features to avoid WebSocket dependencies
+    }
   }
 );

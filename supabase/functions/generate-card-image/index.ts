@@ -1,5 +1,17 @@
-import { createClient } from 'npm:@supabase/supabase-js@2.39.3';
+// Supabase Edge Functions use Deno runtime
+// Suppress TypeScript errors for Deno-specific imports
+// @ts-ignore: Deno-specific import
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3?deno-std=0.177.0';
+// @ts-ignore: Deno-specific import
 import OpenAI from 'npm:openai@4.24.1';
+
+// @ts-ignore: Deno namespace
+declare const Deno: {
+  env: {
+    get(key: string): string | undefined;
+  };
+  serve(handler: (req: Request) => Promise<Response>): void;
+};
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -9,7 +21,7 @@ const corsHeaders = {
 
 const BUCKET_NAME = 'card_images';
 
-Deno.serve(async (req) => {
+Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -139,7 +151,8 @@ Deno.serve(async (req) => {
         .storage
         .listBuckets();
 
-      const bucketExists = buckets?.some(bucket => bucket.name === BUCKET_NAME);
+      // @ts-ignore: bucket type
+const bucketExists = buckets?.some((bucket) => bucket.name === BUCKET_NAME);
 
       if (!bucketExists) {
         const { error: createBucketError } = await supabase
@@ -199,9 +212,11 @@ Deno.serve(async (req) => {
         },
       );
     } catch (openaiError) {
+      // @ts-ignore: openaiError type
       console.error('OpenAI API error:', openaiError);
       
-      if (openaiError.status === 400) {
+      // @ts-ignore: openaiError type
+      if (openaiError && openaiError.status === 400) {
         return new Response(
           JSON.stringify({ 
             error: 'The image could not be generated. Please try a simpler description.',
@@ -220,12 +235,14 @@ Deno.serve(async (req) => {
       throw openaiError;
     }
   } catch (error) {
+    // @ts-ignore: error type
     console.error('Image generation error:', error);
 
     return new Response(
       JSON.stringify({ 
         error: 'Failed to generate image',
-        details: error.message
+        // @ts-ignore: error type
+        details: error.message || 'Unknown error'
       }),
       {
         status: 500,
