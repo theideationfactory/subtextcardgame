@@ -655,13 +655,13 @@ export default function SpreadScreen() {
                   style={[
                     showFullCardView ? styles.fullCardView : styles.gridCard,
                     showFullCardView ? {
-                      width: numColumns === 1 ? '100%' : numColumns === 2 ? '50%' : numColumns === 3 ? '33.333%' : '25%',
-                      padding: numColumns === 1 ? 12 : numColumns === 2 ? 10 : numColumns === 3 ? 8 : 6,
+                      width: numColumns === 1 ? '99%' : numColumns === 2 ? '48.5%' : numColumns === 3 ? '32%' : '23.5%',
+                      padding: numColumns === 1 ? 6 : numColumns === 2 ? 4 : numColumns === 3 ? 3 : 1,
                       aspectRatio: undefined,
                       height: undefined,
                     } : {
-                      width: `${100/numColumns}%`,
-                      padding: numColumns === 1 ? 8 : numColumns === 2 ? 6 : numColumns === 3 ? 4 : 2
+                      width: numColumns === 1 ? '99%' : numColumns === 2 ? '48.5%' : numColumns === 3 ? '32%' : '23.5%',
+                      padding: numColumns === 1 ? 4 : numColumns === 2 ? 3 : numColumns === 3 ? 2 : 1
                     }
                   ]}
                   onPress={() => {
@@ -692,17 +692,45 @@ export default function SpreadScreen() {
                     <View style={[styles.fullCardInner, { borderColor: card.color || '#6366f1' }]}>
                       <Image
                         source={{ uri: card.image_url }}
-                        style={styles.fullCardImage}
+                        style={[
+                          styles.fullCardImage,
+                          {
+                            height: numColumns === 1 ? 200 : numColumns === 2 ? 150 : numColumns === 3 ? 100 : 70
+                          }
+                        ]}
                         resizeMode="cover"
                       />
-                      <View style={styles.fullCardContent}>
-                        <Text style={styles.fullCardName}>
+                      <View style={[
+                        styles.fullCardContent,
+                        {
+                          padding: numColumns === 1 ? 12 : numColumns === 2 ? 8 : numColumns === 3 ? 6 : 4
+                        }
+                      ]}>
+                        <Text style={[
+                          styles.fullCardName,
+                          {
+                            fontSize: numColumns === 1 ? 16 : numColumns === 2 ? 13 : numColumns === 3 ? 11 : 9
+                          }
+                        ]}>
                           {card.name}
                         </Text>
-                        <Text style={styles.fullCardType}>
+                        <Text style={[
+                          styles.fullCardType,
+                          {
+                            fontSize: numColumns === 1 ? 14 : numColumns === 2 ? 11 : numColumns === 3 ? 9 : 8,
+                            marginBottom: numColumns === 1 ? 8 : numColumns === 2 ? 5 : numColumns === 3 ? 3 : 2
+                          }
+                        ]}>
                           {card.card_type || 'Card'}
                         </Text>
-                        <Text style={styles.fullCardDescription}>
+                        <Text style={[
+                          styles.fullCardDescription,
+                          {
+                            fontSize: numColumns === 1 ? 14 : numColumns === 2 ? 11 : numColumns === 3 ? 9 : 8,
+                            lineHeight: numColumns === 1 ? 20 : numColumns === 2 ? 15 : numColumns === 3 ? 12 : 10,
+                            marginTop: numColumns === 1 ? 4 : numColumns === 2 ? 3 : numColumns === 3 ? 2 : 1
+                          }
+                        ]}>
                           {card.description || 'No description available'}
                         </Text>
                       </View>
@@ -934,12 +962,13 @@ export default function SpreadScreen() {
 
 const styles = StyleSheet.create({
   gridContainer: {
-    padding: 4,
+    padding: 0,
     flexGrow: 1,
+    width: '100%',
   },
   gridCard: {
-    padding: 6,
-    aspectRatio: 0.7, // Maintain card aspect ratio (width:height = 1:1.43)
+    padding: 2,
+    aspectRatio: 0.714, // Standard trading card ratio (5:7 or width:height = 1:1.4)
   },
   gridCardInner: {
     flex: 1,
@@ -984,7 +1013,7 @@ const styles = StyleSheet.create({
     lineHeight: 16,
   },
   fullCardView: {
-    margin: 8,
+    margin: 2,
   },
   fullCardInner: {
     flex: 1,
@@ -1000,7 +1029,7 @@ const styles = StyleSheet.create({
   },
   fullCardImage: {
     width: '100%',
-    height: 200,
+    height: 200, // This is overridden by inline styles for different column counts
   },
   fullCardContent: {
     padding: 12,
@@ -1036,7 +1065,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
-    minHeight: 200,
   },
   addCardButton: {
     flexDirection: 'row',
@@ -1155,8 +1183,7 @@ const styles = StyleSheet.create({
   },
   dropZonesContainer: {
     flex: 1,
-    justifyContent: 'space-around',
-    paddingVertical: 4,
+    gap: 12,
   },
   dropZone: {
     height: SCREEN_HEIGHT / 3 - 20,
@@ -1166,7 +1193,8 @@ const styles = StyleSheet.create({
   },
   fullscreenDropZone: {
     flex: 1,
-    height: undefined,
+    marginBottom: 0,
+    paddingHorizontal: 0,
   },
   fullscreenContainer: {
     flex: 1,
