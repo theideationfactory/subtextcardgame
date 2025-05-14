@@ -51,7 +51,7 @@ const supabase = createClient(
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
-type SpreadType = 'invitation' | 'reflection' | 'connection';
+type SpreadType = 'retroflect' | 'invitation' | 'reflection' | 'connection';
 
 const SPREADS: Record<SpreadType, {
   name: string;
@@ -66,6 +66,35 @@ const SPREADS: Record<SpreadType, {
     description: string;
   }>;
 }> = {
+  retroflect: {
+    name: 'Retroflect',
+    description: 'A spread for distilling the details of a past conversation',
+    color: '#FF9800',
+    icon: RotateCcw,
+    zones: [
+      {
+        name: 'their_moves',
+        title: 'Their Moves',
+        color: '#FF9800',
+        icon: MessageCircle,
+        description: 'What I think they said and did',
+      },
+      {
+        name: 'my_impact',
+        title: 'My Impact',
+        color: '#E91E63',
+        icon: Heart,
+        description: 'How I experienced their moves',
+      },
+      {
+        name: 'my_response',
+        title: 'My Response',
+        color: '#2196F3',
+        icon: MessageCircle,
+        description: 'What I think I said and did in response',
+      },
+    ],
+  },
   invitation: {
     name: 'Invitation',
     description: 'A spread for planning important conversations',

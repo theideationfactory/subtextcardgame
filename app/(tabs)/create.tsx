@@ -92,11 +92,18 @@ export default function CreateScreen() {
   const [showTypeDropdown, setShowTypeDropdown] = useState(false);
   const [showRoleDropdown, setShowRoleDropdown] = useState(false);
   const [showContextDropdown, setShowContextDropdown] = useState(false);
+  const [showArtStyleDropdown, setShowArtStyleDropdown] = useState(false);
   
   // Dropdown options
   const typeOptions = ['TBD', 'Impact', 'Request', 'Protect', 'Connect', 'Percept'];
   const roleOptions = ['TBD', 'Advisor', 'Confessor', 'Judge', 'Peacemaker', 'Provocateur', 'Entertainer', 'Gatekeeper'];
   const contextOptions = ['TBD', 'Self', 'Family', 'Friendship', 'Therapy', 'Peer', 'Work', 'Art', 'Politics'];
+  const artStyleOptions = [
+    { id: 'fantasy', label: 'Fantasy (MTG-inspired)' },
+    { id: 'photorealistic', label: 'Photorealistic' },
+    { id: 'anime', label: 'Anime' },
+    { id: 'digital', label: 'Digital Art' }
+  ];
 
   const [fontsLoaded] = useFonts({
     'Inter-Regular': Inter_400Regular,
@@ -387,35 +394,50 @@ export default function CreateScreen() {
         />
         
         <Text style={styles.label}>Art Style</Text>
-        <View style={styles.styleDropdownContainer}>
+        <TouchableOpacity 
+          style={styles.dropdownSelector}
+          onPress={() => setShowArtStyleDropdown(true)}
+        >
+          <Text style={styles.dropdownText}>
+            {artStyleOptions.find(option => option.id === imageStyle)?.label || 'Select art style'}
+          </Text>
+          <ChevronDown size={20} color="#666" />
+        </TouchableOpacity>
+        
+        <Modal
+          visible={showArtStyleDropdown}
+          transparent={true}
+          animationType="fade"
+          onRequestClose={() => setShowArtStyleDropdown(false)}
+        >
           <TouchableOpacity 
-            style={[styles.styleOption, imageStyle === 'fantasy' && styles.styleOptionSelected]}
-            onPress={() => setImageStyle('fantasy')}
+            style={styles.modalOverlay}
+            activeOpacity={1}
+            onPress={() => setShowArtStyleDropdown(false)}
           >
-            <Text style={[styles.styleText, imageStyle === 'fantasy' && styles.styleTextSelected]}>Fantasy (MTG-inspired)</Text>
+            <View style={styles.dropdownModal}>
+              <FlatList
+                data={artStyleOptions}
+                keyExtractor={(item) => item.id}
+                renderItem={({ item }) => (
+                  <TouchableOpacity
+                    style={styles.dropdownItem}
+                    onPress={() => {
+                      setImageStyle(item.id);
+                      setShowArtStyleDropdown(false);
+                      if (Platform.OS !== 'web') {
+                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                      }
+                    }}
+                  >
+                    <Text style={styles.dropdownItemText}>{item.label}</Text>
+                    {imageStyle === item.id && <Check size={20} color="#6366f1" />}
+                  </TouchableOpacity>
+                )}
+              />
+            </View>
           </TouchableOpacity>
-          
-          <TouchableOpacity 
-            style={[styles.styleOption, imageStyle === 'photorealistic' && styles.styleOptionSelected]}
-            onPress={() => setImageStyle('photorealistic')}
-          >
-            <Text style={[styles.styleText, imageStyle === 'photorealistic' && styles.styleTextSelected]}>Photorealistic</Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity 
-            style={[styles.styleOption, imageStyle === 'anime' && styles.styleOptionSelected]}
-            onPress={() => setImageStyle('anime')}
-          >
-            <Text style={[styles.styleText, imageStyle === 'anime' && styles.styleTextSelected]}>Anime</Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity 
-            style={[styles.styleOption, imageStyle === 'digital' && styles.styleOptionSelected]}
-            onPress={() => setImageStyle('digital')}
-          >
-            <Text style={[styles.styleText, imageStyle === 'digital' && styles.styleTextSelected]}>Digital Art</Text>
-          </TouchableOpacity>
-        </View>
+        </Modal>
       </View>
 
       <View style={styles.inputGroup}>
@@ -451,7 +473,9 @@ export default function CreateScreen() {
                     onPress={() => {
                       setType(item);
                       setShowTypeDropdown(false);
-                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                      if (Platform.OS !== 'web') {
+                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                      }
                     }}
                   >
                     <Text style={styles.dropdownItemText}>{item}</Text>
@@ -497,7 +521,9 @@ export default function CreateScreen() {
                     onPress={() => {
                       setRole(item);
                       setShowRoleDropdown(false);
-                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                      if (Platform.OS !== 'web') {
+                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                      }
                     }}
                   >
                     <Text style={styles.dropdownItemText}>{item}</Text>
@@ -543,7 +569,9 @@ export default function CreateScreen() {
                     onPress={() => {
                       setContext(item);
                       setShowContextDropdown(false);
-                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                      if (Platform.OS !== 'web') {
+                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                      }
                     }}
                   >
                     <Text style={styles.dropdownItemText}>{item}</Text>
