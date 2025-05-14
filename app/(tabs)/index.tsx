@@ -1,9 +1,10 @@
-import { View, Text, StyleSheet, FlatList, Pressable, Image, Modal, TouchableOpacity, RefreshControl, useWindowDimensions, Platform, PlatformIOSStatic, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, FlatList, Pressable, Image, Modal, TouchableOpacity, RefreshControl, useWindowDimensions, Platform, PlatformIOSStatic, Dimensions, Alert } from 'react-native';
 import { useCallback, useEffect, useState } from 'react';
 import { useFonts, Inter_400Regular, Inter_700Bold } from '@expo-google-fonts/inter';
 import * as SplashScreen from 'expo-splash-screen';
 import { useRouter } from 'expo-router';
-import { Settings2, CreditCard as Edit3, Trash2, Swords, Shield, Sparkles, Users, Globe as Globe2, Lock } from 'lucide-react-native';
+import { Settings2, CreditCard as Edit3, Trash2, Swords, Shield, Sparkles, Users, Globe as Globe2, Lock, Wallet } from 'lucide-react-native';
+import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
@@ -98,6 +99,9 @@ export default function CollectionScreen() {
   const [showActions, setShowActions] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [deleteError, setDeleteError] = useState('');
+  const [mintingNFT, setMintingNFT] = useState(false);
+  const [walletConnected, setWalletConnected] = useState(false);
+  const [walletAddress, setWalletAddress] = useState('');
   const [selectedType, setSelectedType] = useState<CollectionType>('personal');
   const { height: screenHeight } = useWindowDimensions();
   const router = useRouter();
@@ -282,32 +286,96 @@ export default function CollectionScreen() {
   };
 
   const handleEdit = (card: Card) => {
-    // Ensure all values are properly serialized as strings
-    const serializedParams = {
-      id: card.id,
-      name: card.name || '',
-      description: card.description || '',
-      type: card.type || '',
-      role: card.role || '',
-      context: card.context || '',
-      image_url: card.image_url || '',
-      frame_width: String(card.frame_width || 8),
-      frame_color: card.frame_color || '#FFD700',
-      name_color: card.name_color || '#FFFFFF',
-      type_color: card.type_color || '#FFFFFF',
-      description_color: card.description_color || '#FFFFFF',
-      context_color: card.context_color || '#CCCCCC',
-      // Add a timestamp to ensure the route is always seen as "new" by React Navigation
-      _timestamp: Date.now().toString()
-    };
-    
-    // Reset navigation stack to ensure fresh state
-    router.replace({
-      pathname: '/create',
-      params: serializedParams
-    });
-    
+    // Close modal
     setShowActions(false);
+    
+    // Navigate to Edit page
+    router.push({
+      pathname: '/create',
+      params: {
+        id: card.id,
+        name: card.name,
+        description: card.description,
+        type: card.type,
+        role: card.role || '',
+        context: card.context || '',
+        image_url: card.image_url,
+        frame_color: card.frame_color || '',
+        name_color: card.name_color || '',
+        type_color: card.type_color || '',
+        description_color: card.description_color || '',
+        context_color: card.context_color || '',
+        edit_mode: 'true'
+      }
+    });
+  };
+
+  const handleMintNFT = (card: Card) => {
+    // Close the settings modal
+    setShowActions(false);
+    
+    // Provide haptic feedback
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    
+    // Check if wallet is connected
+    if (!walletConnected) {
+      // Prompt to connect wallet
+      Alert.alert(
+        'Wallet Not Connected',
+        'You need to connect a wallet to mint this card as an NFT.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { 
+            text: 'Connect Wallet', 
+            onPress: () => {
+              // Simulate wallet connection for demo
+              setMintingNFT(true);
+              
+              setTimeout(() => {
+                const mockWalletAddress = '0x' + Math.random().toString(16).substring(2, 42);
+                setWalletAddress(mockWalletAddress);
+                setWalletConnected(true);
+                setMintingNFT(false);
+                
+                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                Alert.alert(
+                  'Wallet Connected',
+                  `Connected to wallet: ${mockWalletAddress.substring(0, 6)}...${mockWalletAddress.substring(38)}`,
+                  [
+                    { text: 'Cancel', style: 'cancel' },
+                    { 
+                      text: 'Mint NFT', 
+                      onPress: () => mintCardAsNFT(card) 
+                    }
+                  ]
+                );
+              }, 1500);
+            }
+          }
+        ]
+      );
+      return;
+    }
+    
+    // If wallet is already connected, proceed with minting
+    mintCardAsNFT(card);
+  };
+
+  const mintCardAsNFT = (card: Card) => {
+    setMintingNFT(true);
+    
+    // This is a simulation of the minting process
+    // In a production app, you would call your NFT minting function here
+    setTimeout(() => {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      setMintingNFT(false);
+      
+      Alert.alert(
+        'NFT Minted Successfully!',
+        `Your card "${card.name}" has been minted as an NFT and will soon appear in your wallet.`,
+        [{ text: 'OK' }]
+      );
+    }, 3000);
   };
 
   const onLayoutRootView = useCallback(async () => {
@@ -563,6 +631,23 @@ export default function CollectionScreen() {
             ) : null}
             {selectedType === 'personal' && (
               <>
+                <TouchableOpacity
+                  style={[styles.modalButton, styles.nftButton]}
+                  onPress={() => selectedCard && handleMintNFT(selectedCard)}
+                  disabled={mintingNFT}
+                >
+                  {mintingNFT ? (
+                    <Text style={styles.modalButtonText}>
+                      Minting NFT...
+                    </Text>
+                  ) : (
+                    <>
+                      <Wallet size={20} color="#8247E5" />
+                      <Text style={styles.modalButtonText}>Mint as NFT</Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+
                 <TouchableOpacity
                   style={styles.modalButton}
                   onPress={() => selectedCard && handleEdit(selectedCard)}
@@ -830,6 +915,9 @@ const styles = StyleSheet.create({
   },
   deleteText: {
     color: '#ff4444',
+  },
+  nftButton: {
+    backgroundColor: 'rgba(130, 71, 229, 0.2)', // Polygon/Matic purple with transparency
   },
   errorText: {
     color: '#ff4444',
