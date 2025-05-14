@@ -10,6 +10,8 @@ import {
   Platform,
   Image,
   ActivityIndicator,
+  Modal,
+  FlatList,
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { useFonts, Inter_400Regular, Inter_700Bold } from '@expo-google-fonts/inter';
@@ -18,7 +20,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import debounce from 'lodash/debounce';
-import { Wand2, ChevronDown, ChevronUp, Lock, Users, Globe2 } from 'lucide-react-native';
+import { Wand2, ChevronDown, ChevronUp, Lock, Users, Globe2, Check } from 'lucide-react-native';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -85,6 +87,16 @@ export default function CreateScreen() {
   const [showVisibility, setShowVisibility] = useState(false);
 
   const [imageStyle, setImageStyle] = useState('fantasy'); // Ensure this state exists
+  
+  // Dropdown states
+  const [showTypeDropdown, setShowTypeDropdown] = useState(false);
+  const [showRoleDropdown, setShowRoleDropdown] = useState(false);
+  const [showContextDropdown, setShowContextDropdown] = useState(false);
+  
+  // Dropdown options
+  const typeOptions = ['TBD', 'Impact', 'Request', 'Protect', 'Connect', 'Percept'];
+  const roleOptions = ['TBD', 'Advisor', 'Confessor', 'Judge', 'Peacemaker', 'Provocateur', 'Entertainer', 'Gatekeeper'];
+  const contextOptions = ['TBD', 'Self', 'Family', 'Friendship', 'Therapy', 'Peer', 'Work', 'Art', 'Politics'];
 
   const [fontsLoaded] = useFonts({
     'Inter-Regular': Inter_400Regular,
@@ -204,9 +216,9 @@ export default function CreateScreen() {
     setName('');
     setDescription('');
     setImageDescription('');
-    setType('');
-    setRole('');
-    setContext('');
+    setType('TBD'); // Default to TBD for Card Type
+    setRole('TBD'); // Default to TBD for Card Role
+    setContext('TBD'); // Default to TBD for Context
     setCardImage('');
     setVisibility(['personal']);
     setError('');
@@ -408,35 +420,140 @@ export default function CreateScreen() {
 
       <View style={styles.inputGroup}>
         <Text style={styles.label}>Card Type</Text>
-        <TextInput
-          style={styles.input}
-          value={type}
-          onChangeText={setType}
-          placeholder="e.g., Creature (optional)"
-          placeholderTextColor="#666"
-        />
+        <TouchableOpacity 
+          style={styles.dropdownSelector}
+          onPress={() => setShowTypeDropdown(true)}
+        >
+          <Text style={[styles.dropdownText, !type && styles.placeholderText]}>
+            {type || 'Select card type'}
+          </Text>
+          <ChevronDown size={20} color="#666" />
+        </TouchableOpacity>
+        
+        <Modal
+          visible={showTypeDropdown}
+          transparent={true}
+          animationType="fade"
+          onRequestClose={() => setShowTypeDropdown(false)}
+        >
+          <TouchableOpacity 
+            style={styles.modalOverlay}
+            activeOpacity={1}
+            onPress={() => setShowTypeDropdown(false)}
+          >
+            <View style={styles.dropdownModal}>
+              <FlatList
+                data={typeOptions}
+                keyExtractor={(item) => item}
+                renderItem={({ item }) => (
+                  <TouchableOpacity
+                    style={styles.dropdownItem}
+                    onPress={() => {
+                      setType(item);
+                      setShowTypeDropdown(false);
+                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                    }}
+                  >
+                    <Text style={styles.dropdownItemText}>{item}</Text>
+                    {type === item && <Check size={20} color="#6366f1" />}
+                  </TouchableOpacity>
+                )}
+              />
+            </View>
+          </TouchableOpacity>
+        </Modal>
       </View>
 
       <View style={styles.inputGroup}>
         <Text style={styles.label}>Card Role</Text>
-        <TextInput
-          style={styles.input}
-          value={role}
-          onChangeText={setRole}
-          placeholder="e.g., Attacker (optional)"
-          placeholderTextColor="#666"
-        />
+        <TouchableOpacity 
+          style={styles.dropdownSelector}
+          onPress={() => setShowRoleDropdown(true)}
+        >
+          <Text style={[styles.dropdownText, !role && styles.placeholderText]}>
+            {role || 'Select card role'}
+          </Text>
+          <ChevronDown size={20} color="#666" />
+        </TouchableOpacity>
+        
+        <Modal
+          visible={showRoleDropdown}
+          transparent={true}
+          animationType="fade"
+          onRequestClose={() => setShowRoleDropdown(false)}
+        >
+          <TouchableOpacity 
+            style={styles.modalOverlay}
+            activeOpacity={1}
+            onPress={() => setShowRoleDropdown(false)}
+          >
+            <View style={styles.dropdownModal}>
+              <FlatList
+                data={roleOptions}
+                keyExtractor={(item) => item}
+                renderItem={({ item }) => (
+                  <TouchableOpacity
+                    style={styles.dropdownItem}
+                    onPress={() => {
+                      setRole(item);
+                      setShowRoleDropdown(false);
+                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                    }}
+                  >
+                    <Text style={styles.dropdownItemText}>{item}</Text>
+                    {role === item && <Check size={20} color="#6366f1" />}
+                  </TouchableOpacity>
+                )}
+              />
+            </View>
+          </TouchableOpacity>
+        </Modal>
       </View>
 
       <View style={styles.inputGroup}>
         <Text style={styles.label}>Context</Text>
-        <TextInput
-          style={styles.input}
-          value={context}
-          onChangeText={setContext}
-          placeholder="e.g., Fantasy (optional)"
-          placeholderTextColor="#666"
-        />
+        <TouchableOpacity 
+          style={styles.dropdownSelector}
+          onPress={() => setShowContextDropdown(true)}
+        >
+          <Text style={[styles.dropdownText, !context && styles.placeholderText]}>
+            {context || 'Select context'}
+          </Text>
+          <ChevronDown size={20} color="#666" />
+        </TouchableOpacity>
+        
+        <Modal
+          visible={showContextDropdown}
+          transparent={true}
+          animationType="fade"
+          onRequestClose={() => setShowContextDropdown(false)}
+        >
+          <TouchableOpacity 
+            style={styles.modalOverlay}
+            activeOpacity={1}
+            onPress={() => setShowContextDropdown(false)}
+          >
+            <View style={styles.dropdownModal}>
+              <FlatList
+                data={contextOptions}
+                keyExtractor={(item) => item}
+                renderItem={({ item }) => (
+                  <TouchableOpacity
+                    style={styles.dropdownItem}
+                    onPress={() => {
+                      setContext(item);
+                      setShowContextDropdown(false);
+                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                    }}
+                  >
+                    <Text style={styles.dropdownItemText}>{item}</Text>
+                    {context === item && <Check size={20} color="#6366f1" />}
+                  </TouchableOpacity>
+                )}
+              />
+            </View>
+          </TouchableOpacity>
+        </Modal>
       </View>
 
       {/* Visibility Settings - Replaced dropdown with static section */}
@@ -738,6 +855,52 @@ const styles = StyleSheet.create({
   createButtonText: {
     color: '#fff',
     fontFamily: 'Inter-Bold',
+    fontSize: 16,
+  },
+  // Dropdown styles
+  dropdownSelector: {
+    backgroundColor: '#2a2a2a',
+    borderRadius: 8,
+    padding: 12,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  dropdownText: {
+    color: '#fff',
+    fontFamily: 'Inter-Regular',
+    fontSize: 16,
+  },
+  placeholderText: {
+    color: '#666',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  dropdownModal: {
+    backgroundColor: '#1e1e1e',
+    borderRadius: 12,
+    width: '100%',
+    maxHeight: 300,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#333',
+  },
+  dropdownItem: {
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#333',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  dropdownItemText: {
+    color: '#fff',
+    fontFamily: 'Inter-Regular',
     fontSize: 16,
   },
 });
