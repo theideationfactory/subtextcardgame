@@ -740,7 +740,7 @@ export default function SpreadScreen() {
                       <Image
                         source={{ uri: card.image_url }}
                         style={styles.gridCardImage}
-                        resizeMode="contain"
+                        resizeMode="cover"
                       />
                       <LinearGradient
                         colors={['transparent', 'rgba(0,0,0,0.8)']}
@@ -980,6 +980,7 @@ const styles = StyleSheet.create({
   gridCardImage: {
     width: '100%',
     height: '100%',
+    borderRadius: 7,
   },
   gridCardOverlay: {
     position: 'absolute',
