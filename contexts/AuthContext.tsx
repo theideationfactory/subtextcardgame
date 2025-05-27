@@ -25,7 +25,7 @@ type AuthContextType = {
   loading: boolean;
   cards: Card[];
   refreshSession: () => Promise<Session | null | undefined>;
-  fetchCards: () => Promise<void>;
+  fetchCards: (page?: number, limit?: number, useCache?: boolean) => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextType>({
@@ -58,23 +58,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const fetchCards = async () => {
+  const fetchCards = async (page = 0, limit = 20, useCache = true) => {
     try {
       if (!user) return;
 
-      // Fetching user cards
+      // Use cached cards if available and requested
+      if (useCache && cards.length > 0 && page === 0) {
+        return;
+      }
+
+      // Optimized query - remove expensive joins, add pagination
       const { data, error: fetchError } = await supabase
         .from('cards')
-        .select('*')
-        .eq('user_id', user.id);
+        .select('id, name, description, type, role, context, image_url, frame_width, frame_color, name_color, type_color, description_color, context_color, user_id, collection_id')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .range(page * limit, (page + 1) * limit - 1);
 
       if (fetchError) {
         console.error('Error fetching cards:', fetchError);
         throw fetchError;
       }
 
-      // Card fetch complete
-      setCards(data || []);
+      // Append to existing cards for pagination, or replace for refresh
+      if (page === 0) {
+        setCards(data || []);
+      } else {
+        setCards(prev => [...prev, ...(data || [])]);
+      }
     } catch (err) {
       console.error('Error in fetchCards:', err);
     }

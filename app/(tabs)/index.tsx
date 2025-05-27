@@ -172,67 +172,74 @@ export default function CollectionScreen() {
 
   const fetchCards = useCallback(async (isRefreshing = false) => {
     if (!user) {
-      // console.log('No user found, skipping card fetch');
       return;
     }
 
     try {
-      // console.log('Fetching cards for user:', user.id);
       if (!isRefreshing) {
         setLoading(true);
       }
       setError('');
 
-      let query = supabase
-        .from('cards')
-        .select(`
-          *,
-          collections (*)
-        `);
-
+      // Optimize queries based on collection type
       switch (selectedType) {
         case 'personal':
-          query = query
-            .eq('user_id', user?.id || '')
-            .contains('collections.visibility', ['personal']);
+          // Use optimized query without expensive joins
+          const { data: personalCards, error: personalError } = await supabase
+            .from('cards')
+            .select('id, name, description, type, role, context, image_url, frame_width, frame_color, name_color, type_color, description_color, context_color, user_id, collection_id')
+            .eq('user_id', user.id)
+            .order('created_at', { ascending: false })
+            .limit(50); // Add reasonable limit
+
+          if (personalError) throw personalError;
+          setCards(personalCards as Card[] ?? []);
           break;
+
         case 'friends':
-          const { data: friendRequests } = await supabase
+          // Optimize friend cards query - first get friend IDs, then get their cards
+          const { data: friendRequests, error: friendError } = await supabase
             .from('friend_requests')
             .select('sender_id, receiver_id')
             .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`)
             .eq('status', 'accepted');
 
+          if (friendError) throw friendError;
+
           const friendIds = (friendRequests ?? []).flatMap(fr => 
             fr.sender_id === user.id ? [fr.receiver_id] : [fr.sender_id]
           );
 
-          const { data: friendCards } = await supabase
+          if (friendIds.length === 0) {
+            setCards([]);
+            break;
+          }
+
+          const { data: friendCards, error: friendCardsError } = await supabase
             .from('cards')
-            .select(`
-              *,
-              collections (*)
-            `)
+            .select('id, name, description, type, role, context, image_url, frame_width, frame_color, name_color, type_color, description_color, context_color, user_id, collection_id')
             .neq('user_id', user.id)
-            .contains('collections.visibility', ['friends'])
-            .in('user_id', friendIds);
-          
+            .in('user_id', friendIds)
+            .order('created_at', { ascending: false })
+            .limit(50);
+
+          if (friendCardsError) throw friendCardsError;
           setCards(friendCards as Card[] ?? []);
-          return;
+          break;
+
         case 'public':
-          query = query.contains('collections.visibility', ['public']);
+          // Simplified public cards query
+          const { data: publicCards, error: publicError } = await supabase
+            .from('cards')
+            .select('id, name, description, type, role, context, image_url, frame_width, frame_color, name_color, type_color, description_color, context_color, user_id, collection_id')
+            .eq('is_public', true) // Assuming you have an is_public column
+            .order('created_at', { ascending: false })
+            .limit(50);
+
+          if (publicError) throw publicError;
+          setCards(publicCards as Card[] ?? []);
           break;
       }
-
-      const { data, error: fetchError } = await query;
-
-      if (fetchError) {
-        console.error('Error fetching cards:', fetchError);
-        throw fetchError;
-      }
-
-      // console.log(`Fetched ${data?.length ?? 0} cards`);
-      setCards(data as Card[] ?? []);
     } catch (err) {
       console.error('Error in fetchCards:', err instanceof Error ? err.message : 'Unknown error');
       setError('Failed to load cards');

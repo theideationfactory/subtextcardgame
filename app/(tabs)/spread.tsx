@@ -195,16 +195,19 @@ export default function SpreadScreen() {
   const [selectedSpread, setSelectedSpread] = useState<SpreadType | null>(null);
   const [zoneCards, setZoneCards] = useState<Record<string, any[]>>({});
   const [currentSpreadId, setCurrentSpreadId] = useState<string | null>(null);
+  const [spreadName, setSpreadName] = useState('');
   const [savingDraft, setSavingDraft] = useState(false);
   const [showSaveAs, setShowSaveAs] = useState(false);
+  const [saveAsName, setSaveAsName] = useState('');
+  const [cardMap, setCardMap] = useState<Record<string, any>>({});
   const [fullscreenZone, setFullscreenZone] = useState<string | null>(null);
   const [numColumns, setNumColumns] = useState(1);
   const [expandedCardId, setExpandedCardId] = useState<string | null>(null);
+  const [galleryLoading, setGalleryLoading] = useState(false);
+  const [gallerySearchQuery, setGallerySearchQuery] = useState('');
+  const [filteredCards, setFilteredCards] = useState<any[]>([]);
   const [showFullCardView, setShowFullCardView] = useState(false);
   const [selectedCardForFullView, setSelectedCardForFullView] = useState<any>(null);
-  const [spreadName, setSpreadName] = useState('');
-  const [cardMap, setCardMap] = useState<Record<string, any>>({});
-  const [galleryLoading, setGalleryLoading] = useState(false);
   
   const [fontsLoaded] = useFonts({
     'Inter-Regular': Inter_400Regular,
@@ -526,11 +529,21 @@ export default function SpreadScreen() {
 
     return (
       <FlatList
-        data={cards}
+        data={filteredCards}
         renderItem={renderGalleryItem}
         keyExtractor={item => item.id}
         numColumns={2}
         contentContainerStyle={styles.galleryGrid}
+        removeClippedSubviews={true}
+        maxToRenderPerBatch={8}
+        updateCellsBatchingPeriod={50}
+        initialNumToRender={8}
+        windowSize={5}
+        getItemLayout={(data, index) => ({
+          length: 200, // Fixed item height
+          offset: 200 * Math.floor(index / 2),
+          index,
+        })}
       />
     );
   };
@@ -567,6 +580,18 @@ export default function SpreadScreen() {
             <PlusCircle size={20} color="#fff" style={styles.createCardIcon} />
             <Text style={styles.createCardText}>Create New Card</Text>
           </TouchableOpacity>
+          
+          <TextInput
+            style={styles.gallerySearchInput}
+            placeholder="Search cards"
+            placeholderTextColor="#666"
+            value={gallerySearchQuery}
+            onChangeText={(text) => {
+              setGallerySearchQuery(text);
+              const filtered = cards.filter((card) => card.name.toLowerCase().includes(text.toLowerCase()));
+              setFilteredCards(filtered);
+            }}
+          />
           
           {renderGalleryContent()}
         </View>
@@ -1483,5 +1508,15 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderRadius: 12,
     marginTop: 16,
+  },
+  gallerySearchInput: {
+    backgroundColor: '#2a2a2a',
+    borderRadius: 8,
+    padding: 12,
+    color: '#fff',
+    fontFamily: 'Inter-Regular',
+    fontSize: 16,
+    marginBottom: 20,
+    width: '100%',
   },
 });
