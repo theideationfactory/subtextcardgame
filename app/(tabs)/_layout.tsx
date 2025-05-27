@@ -26,9 +26,17 @@ export default function TabLayout() {
             borderTopWidth: 0,
             elevation: 0,
             shadowOpacity: 0,
-            height: Platform.OS === 'ios' ? 60 : 50,
-            paddingBottom: Platform.OS === 'ios' ? insets.bottom : 8,
+            height: Platform.OS === 'ios' ? 80 : 70,
+            paddingBottom: Platform.OS === 'ios' ? insets.bottom : 12,
             paddingTop: 8,
+          },
+          tabBarLabelStyle: {
+            fontSize: 12,
+            marginBottom: 4,
+            fontFamily: 'Inter-Regular',
+          },
+          tabBarItemStyle: {
+            paddingVertical: 4,
           },
           tabBarActiveTintColor: '#fff',
           tabBarInactiveTintColor: '#888',
@@ -36,14 +44,14 @@ export default function TabLayout() {
         <Tabs.Screen
           name="index"
           options={{
-            title: 'Collection',
+            title: 'Cards',
             tabBarIcon: ({ size, color }) => <Cards size={size} color={color} />,
           }}
         />
         <Tabs.Screen
           name="create"
           options={{
-            title: 'Create Card',
+            title: 'Create',
             tabBarIcon: ({ size, color }) => <Plus size={size} color={color} />,
             tabBarButton: (props) => {
               // Create a custom button that doesn't pass through all props
