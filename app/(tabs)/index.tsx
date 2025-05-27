@@ -215,16 +215,36 @@ export default function CollectionScreen() {
             break;
           }
 
-          const { data: friendCards, error: friendCardsError } = await supabase
+          let friendCardsQuery = supabase
             .from('cards')
             .select('id, name, description, type, role, context, image_url, frame_width, frame_color, name_color, type_color, description_color, context_color, user_id, collection_id')
-            .neq('user_id', user.id)
             .in('user_id', friendIds)
             .order('created_at', { ascending: false })
             .limit(50);
 
+          // If is_public column exists, only show cards that are either public or shared with friends
+          try {
+            // Test if is_public column exists
+            const { error: testError } = await supabase
+              .from('cards')
+              .select('is_public')
+              .limit(1)
+              .single();
+
+            if (!testError) {
+              // Column exists, modify query to only show cards that are either public or explicitly shared
+              friendCardsQuery = friendCardsQuery
+                .or('is_public.eq.true,is_shared_with_friends.eq.true');
+            }
+          } catch (columnCheckError) {
+            // Column doesn't exist, use the basic query
+            console.log('is_public or is_shared_with_friends column not found, using basic friend filter');
+          }
+
+          const { data: friendCards, error: friendCardsError } = await friendCardsQuery;
+
           if (friendCardsError) throw friendCardsError;
-          setCards(friendCards as Card[] ?? []);
+          setCards(friendCards as Card[] || []);
           break;
 
         case 'public':

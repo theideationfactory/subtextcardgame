@@ -293,6 +293,10 @@ export default function CreateScreen() {
         collectionId = newCollection.id;
       }
 
+      // Determine visibility settings
+      const isPublic = visibility.includes('public');
+      const isSharedWithFriends = visibility.includes('friends');
+      
       const cardData = {
         name,
         description: description || '',
@@ -302,7 +306,9 @@ export default function CreateScreen() {
         image_url: cardImage,
         frame_color: DEFAULT_FRAME_COLOR,
         user_id: currentSession.user.id,
-        collection_id: collectionId
+        collection_id: collectionId,
+        is_public: isPublic,
+        is_shared_with_friends: isSharedWithFriends
       };
 
       if (isEditing) {
