@@ -222,19 +222,19 @@ export default function CollectionScreen() {
             .order('created_at', { ascending: false })
             .limit(50);
 
-          // If is_public column exists, only show cards that are either public or shared with friends
+          // Only show cards that are explicitly shared with friends
           try {
-            // Test if is_public column exists
+            // Test if is_shared_with_friends column exists
             const { error: testError } = await supabase
               .from('cards')
-              .select('is_public')
+              .select('is_shared_with_friends')
               .limit(1)
               .single();
 
             if (!testError) {
-              // Column exists, modify query to only show cards that are either public or explicitly shared
+              // Column exists, modify query to only show cards that are explicitly shared with friends
               friendCardsQuery = friendCardsQuery
-                .or('is_public.eq.true,is_shared_with_friends.eq.true');
+                .eq('is_shared_with_friends', true);
             }
           } catch (columnCheckError) {
             // Column doesn't exist, use the basic query
