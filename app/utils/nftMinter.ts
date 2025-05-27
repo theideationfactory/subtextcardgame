@@ -243,11 +243,11 @@ export class SubtextNftMinter {
         imageMetadataUri,
         cardMetadataUri
       };
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error minting Subtext card NFTs:', error);
       return {
         success: false,
-        error: error.message || 'Unknown error occurred'
+        error: error instanceof Error ? error.message : 'Unknown error occurred'
       };
     }
   }
@@ -312,3 +312,6 @@ const mintCardAsNFT = async (card, privateKey, walletAddress) => {
   }
 };
 */
+
+// Default export for React Native routing compatibility
+export default SubtextNftMinter;

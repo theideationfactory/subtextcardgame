@@ -228,16 +228,53 @@ export default function CollectionScreen() {
           break;
 
         case 'public':
-          // Simplified public cards query
-          const { data: publicCards, error: publicError } = await supabase
-            .from('cards')
-            .select('id, name, description, type, role, context, image_url, frame_width, frame_color, name_color, type_color, description_color, context_color, user_id, collection_id')
-            .eq('is_public', true) // Assuming you have an is_public column
-            .order('created_at', { ascending: false })
-            .limit(50);
+          try {
+            // First try with is_public column (if migration has been run)
+            const { data: publicCards, error: publicError } = await supabase
+              .from('cards')
+              .select('id, name, description, type, role, context, image_url, frame_width, frame_color, name_color, type_color, description_color, context_color, user_id, collection_id')
+              .eq('is_public', true)
+              .order('created_at', { ascending: false })
+              .limit(50);
 
-          if (publicError) throw publicError;
-          setCards(publicCards as Card[] ?? []);
+            if (publicError) {
+              // If is_public column doesn't exist (error code 42703), fall back to showing cards from other users
+              if (publicError.code === '42703' || publicError.message?.includes('is_public') && publicError.message?.includes('does not exist')) {
+                console.log('is_public column not found, falling back to showing other users\' cards');
+                const { data: fallbackCards, error: fallbackError } = await supabase
+                  .from('cards')
+                  .select('id, name, description, type, role, context, image_url, frame_width, frame_color, name_color, type_color, description_color, context_color, user_id, collection_id')
+                  .neq('user_id', user.id)
+                  .order('created_at', { ascending: false })
+                  .limit(50);
+
+                if (fallbackError) throw fallbackError;
+                setCards(fallbackCards as Card[] ?? []);
+                break; // Important: break here to avoid throwing the error
+              } else {
+                throw publicError;
+              }
+            } else {
+              setCards(publicCards as Card[] ?? []);
+            }
+          } catch (publicErr: any) {
+            // Check if this is the column not found error one more time
+            if (publicErr.code === '42703' || (publicErr.message?.includes('is_public') && publicErr.message?.includes('does not exist'))) {
+              console.log('Caught is_public column error in catch block, using fallback');
+              const { data: fallbackCards, error: fallbackError } = await supabase
+                .from('cards')
+                .select('id, name, description, type, role, context, image_url, frame_width, frame_color, name_color, type_color, description_color, context_color, user_id, collection_id')
+                .neq('user_id', user.id)
+                .order('created_at', { ascending: false })
+                .limit(50);
+
+              if (fallbackError) throw fallbackError;
+              setCards(fallbackCards as Card[] ?? []);
+            } else {
+              console.error('Public cards query error:', publicErr);
+              throw publicErr;
+            }
+          }
           break;
       }
     } catch (err) {

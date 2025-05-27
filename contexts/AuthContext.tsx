@@ -60,34 +60,113 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const fetchCards = async (page = 0, limit = 20, useCache = true) => {
     try {
-      if (!user) return;
+      if (!user) {
+        console.log('fetchCards: No authenticated user, skipping card fetch');
+        return;
+      }
 
       // Use cached cards if available and requested
       if (useCache && cards.length > 0 && page === 0) {
         return;
       }
 
-      // Optimized query - remove expensive joins, add pagination
-      const { data, error: fetchError } = await supabase
+      console.log(`fetchCards: Fetching cards for user ${user.id}, page ${page}`);
+
+      // First, let's try a simple query to test basic connectivity
+      const { data: testData, error: testError } = await supabase
         .from('cards')
-        .select('id, name, description, type, role, context, image_url, frame_width, frame_color, name_color, type_color, description_color, context_color, user_id, collection_id')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false })
-        .range(page * limit, (page + 1) * limit - 1);
+        .select('count', { count: 'exact', head: true })
+        .eq('user_id', user.id);
 
-      if (fetchError) {
-        console.error('Error fetching cards:', fetchError);
-        throw fetchError;
+      if (testError) {
+        console.error('fetchCards: Test query failed:', testError);
+        throw new Error(`Database connectivity test failed: ${testError.message}`);
       }
 
-      // Append to existing cards for pagination, or replace for refresh
-      if (page === 0) {
-        setCards(data || []);
-      } else {
-        setCards(prev => [...prev, ...(data || [])]);
+      console.log(`fetchCards: Test query successful, user has ${testData} cards`);
+
+      // Start with basic columns and gradually add more to identify the problematic column
+      let selectColumns = 'id, name, description, type, role, context, image_url, user_id, created_at';
+      
+      try {
+        // Try with basic columns first
+        console.log('fetchCards: Trying basic columns...');
+        const { data: basicData, error: basicError } = await supabase
+          .from('cards')
+          .select(selectColumns)
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false })
+          .range(page * limit, (page + 1) * limit - 1);
+
+        if (basicError) {
+          console.error('fetchCards: Basic query failed:', basicError);
+          throw new Error(`Basic query failed: ${basicError.message}`);
+        }
+
+        console.log(`fetchCards: Basic query successful, got ${basicData?.length || 0} cards`);
+
+        // Now try adding the additional columns one by one
+        const additionalColumns = ['frame_width', 'frame_color', 'name_color', 'type_color', 'description_color', 'context_color', 'collection_id'];
+        let workingColumns = selectColumns;
+
+        for (const col of additionalColumns) {
+          try {
+            const testSelect = `${workingColumns}, ${col}`;
+            console.log(`fetchCards: Testing with column: ${col}`);
+            
+            const { data: testColData, error: testColError } = await supabase
+              .from('cards')
+              .select(testSelect)
+              .eq('user_id', user.id)
+              .limit(1);
+
+            if (testColError) {
+              console.error(`fetchCards: Column ${col} failed:`, testColError);
+              // Skip this column and continue
+              continue;
+            }
+
+            // If successful, add to working columns
+            workingColumns = testSelect;
+            console.log(`fetchCards: Column ${col} works fine`);
+          } catch (colErr) {
+            console.error(`fetchCards: Error testing column ${col}:`, colErr);
+          }
+        }
+
+        // Now do the final query with all working columns
+        console.log(`fetchCards: Final query with columns: ${workingColumns}`);
+        const { data, error: fetchError } = await supabase
+          .from('cards')
+          .select(workingColumns)
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false })
+          .range(page * limit, (page + 1) * limit - 1);
+
+        if (fetchError) {
+          console.error('fetchCards: Final query failed:', fetchError);
+          console.error('fetchCards: Error details:', JSON.stringify(fetchError, null, 2));
+          throw new Error(`Failed to fetch cards: ${fetchError.message}`);
+        }
+
+        console.log(`fetchCards: Successfully fetched ${data?.length || 0} cards`);
+
+        // Append to existing cards for pagination, or replace for refresh
+        if (page === 0) {
+          setCards((data as any[]) || []);
+        } else {
+          setCards(prev => [...prev, ...((data as any[]) || [])]);
+        }
+
+      } catch (queryErr) {
+        console.error('fetchCards: Query execution failed:', queryErr);
+        throw queryErr;
       }
+
     } catch (err) {
-      console.error('Error in fetchCards:', err);
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+      console.error('Error in fetchCards:', errorMessage);
+      console.error('Error details:', err);
     }
   };
 
