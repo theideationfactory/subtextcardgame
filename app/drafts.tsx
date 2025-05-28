@@ -6,12 +6,23 @@ import {
   TouchableOpacity, 
   FlatList,
   ActivityIndicator,
+  Platform,
 } from 'react-native';
 import { useFonts, Inter_400Regular, Inter_700Bold } from '@expo-google-fonts/inter';
 import { useRouter } from 'expo-router';
 import { createClient } from '@supabase/supabase-js';
 import { ArrowLeft, FileText, Trash2 } from 'lucide-react-native';
 import { useAuth } from '@/contexts/AuthContext';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+// Define the structure of a draft object
+interface Draft {
+  id: string;
+  name: string;
+  last_modified: string;
+  color?: string; // Optional: used for icon color
+  // Add other properties from your 'spreads' table if needed elsewhere
+}
 
 const supabase = createClient(
   process.env.EXPO_PUBLIC_SUPABASE_URL!,
@@ -19,9 +30,11 @@ const supabase = createClient(
 );
 
 export default function DraftsScreen() {
+  const insets = useSafeAreaInsets();
+  const topPadding = Platform.OS === 'web' ? 0 : Math.max(insets.top, 4);
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
-  const [drafts, setDrafts] = useState([]);
+  const [drafts, setDrafts] = useState<Draft[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [deleting, setDeleting] = useState<string | null>(null);
@@ -128,10 +141,10 @@ export default function DraftsScreen() {
     return new Date(date).toLocaleString(undefined, options);
   };
 
-  const renderDraft = ({ item }) => (
+  const renderDraft = ({ item }: { item: Draft }) => (
     <TouchableOpacity 
       style={styles.draftItem}
-      onPress={() => router.push({
+      onPress={() => router.replace({
         pathname: '/(tabs)/spread',
         params: { draftId: item.id }
       })}
@@ -167,7 +180,7 @@ export default function DraftsScreen() {
   }
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { paddingTop: topPadding }]}>
       <View style={styles.header}>
         <TouchableOpacity 
           style={styles.backButton}
