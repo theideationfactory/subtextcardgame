@@ -38,6 +38,7 @@ import {
   Grid,
   Eye,
   EyeOff,
+  Mail, // Added for Inbox button
 } from 'lucide-react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
@@ -1076,12 +1077,16 @@ export default function SpreadScreen() {
         {/* Spacer removed for consistent padding across tabs */}
         <View style={styles.header}>
           <Text style={styles.pageTitle}>Choose a Spread</Text>
-          <TouchableOpacity 
-            style={styles.draftsButton}
+          <TouchableOpacity
+            style={styles.draftsButton} 
             onPress={() => router.push('/drafts')}
           >
             <FileText size={20} color="#6366f1" />
-            <Text style={styles.draftsButtonText}>Drafts</Text>
+            <Text style={styles.draftsButtonText}>Drafts</Text> 
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => router.push('/(tabs)/inbox')} style={styles.draftsButton}> 
+            <Mail size={24} color="#fff" />
+            <Text style={styles.draftsButtonText}>Inbox</Text> 
           </TouchableOpacity>
         </View>
         <ScrollView 
