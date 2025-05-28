@@ -12,6 +12,7 @@ import {
   ActivityIndicator,
   Modal,
   FlatList,
+  Pressable,
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { useFonts, Inter_400Regular, Inter_700Bold } from '@expo-google-fonts/inter';
@@ -20,7 +21,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import debounce from 'lodash/debounce';
-import { Wand2, ChevronDown, ChevronUp, Lock, Users, Globe2, Check } from 'lucide-react-native';
+import { Wand2, ChevronDown, ChevronUp, Lock, Users, Globe2, Check, Plus, Edit, PlusCircle } from 'lucide-react-native';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -33,6 +34,9 @@ export default function CreateScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
   const isEditing = !!params.id;
+  
+  // State to control whether the form is visible
+  const [showCardForm, setShowCardForm] = useState(false);
 
   // Initialize state with params or defaults
   const [name, setName] = useState('');
@@ -70,6 +74,43 @@ export default function CreateScreen() {
       if (params.context_color) {
         // Handle context color if needed
       }
+      
+      // Load visibility settings
+      const loadVisibilitySettings = async () => {
+        try {
+          // Fetch the card from the database to get the actual visibility settings
+          const { data: cardData, error } = await supabase
+            .from('cards')
+            .select('is_public, is_shared_with_friends')
+            .eq('id', params.id)
+            .single();
+          
+          if (error) {
+            console.error('Error fetching card visibility settings:', error);
+            return;
+          }
+          
+          if (cardData) {
+            // Set visibility based on the actual database values
+            const visibilitySettings = ['personal']; // Always include personal
+            
+            if (cardData.is_shared_with_friends) {
+              visibilitySettings.push('friends');
+            }
+            
+            if (cardData.is_public) {
+              visibilitySettings.push('public');
+            }
+            
+            console.log('Setting visibility to:', visibilitySettings);
+            setVisibility(visibilitySettings);
+          }
+        } catch (err) {
+          console.error('Failed to load visibility settings:', err);
+        }
+      };
+      
+      loadVisibilitySettings();
       
       // Log the loaded data for debugging
       console.log('Card data loaded successfully for editing');
@@ -358,8 +399,47 @@ export default function CreateScreen() {
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <Text style={styles.screenTitle}>
-        {isEditing ? 'Edit Card' : 'Create New Card'}
+        Card Creation Options
       </Text>
+      
+      {/* Card creation options row */}
+      <View style={styles.optionsContainer}>
+        <Pressable 
+          style={styles.optionCard}
+          onPress={() => setShowCardForm(true)}
+        >
+          <View style={styles.optionIconContainer}>
+            <PlusCircle size={32} color="#6366f1" />
+          </View>
+          <Text style={styles.optionTitle}>Create New Card</Text>
+          <Text style={styles.optionDescription}>Design a custom card with your own text and AI-generated image</Text>
+        </Pressable>
+        
+        {/* You can add more options here in the future */}
+        <Pressable style={[styles.optionCard, styles.comingSoonCard]}>
+          <View style={styles.optionIconContainer}>
+            <Wand2 size={32} color="#888" />
+          </View>
+          <Text style={styles.optionTitle}>AI Suggestion</Text>
+          <Text style={styles.optionDescription}>Let AI suggest card ideas based on your preferences (Coming Soon)</Text>
+          <View style={styles.comingSoonBadge}>
+            <Text style={styles.comingSoonText}>Coming Soon</Text>
+          </View>
+        </Pressable>
+      </View>
+      
+      {/* Conditional rendering of the card form */}
+      {showCardForm && (
+        <>
+          <View style={styles.formHeader}>
+            <Text style={styles.formTitle}>{isEditing ? 'Edit Card' : 'Create New Card'}</Text>
+            <TouchableOpacity 
+              style={styles.closeButton}
+              onPress={() => setShowCardForm(false)}
+            >
+              <Text style={styles.closeButtonText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
 
       <View style={styles.inputGroup}>
         <Text style={styles.label}>Card Name <Text style={styles.required}>*</Text></Text>
@@ -713,11 +793,88 @@ export default function CreateScreen() {
           </Text>
         )}
       </TouchableOpacity>
+      </>
+      )}
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
+  optionsContainer: {
+    flexDirection: 'column',
+    gap: 16,
+    marginBottom: 24,
+  },
+  optionCard: {
+    backgroundColor: '#1e1e1e',
+    borderRadius: 12,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: '#333',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  comingSoonCard: {
+    opacity: 0.7,
+    position: 'relative',
+  },
+  optionIconContainer: {
+    marginBottom: 12,
+  },
+  optionTitle: {
+    fontFamily: 'Inter-Bold',
+    fontSize: 18,
+    color: '#fff',
+    marginBottom: 8,
+  },
+  optionDescription: {
+    fontFamily: 'Inter-Regular',
+    fontSize: 14,
+    color: '#aaa',
+    lineHeight: 20,
+  },
+  comingSoonBadge: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
+    backgroundColor: '#333',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  comingSoonText: {
+    fontFamily: 'Inter-Bold',
+    fontSize: 10,
+    color: '#aaa',
+  },
+  formHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+    paddingBottom: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#333',
+  },
+  formTitle: {
+    fontFamily: 'Inter-Bold',
+    fontSize: 20,
+    color: '#fff',
+  },
+  closeButton: {
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 6,
+    backgroundColor: '#333',
+  },
+  closeButtonText: {
+    fontFamily: 'Inter-Regular',
+    fontSize: 14,
+    color: '#fff',
+  },
   container: {
     flex: 1,
     backgroundColor: '#121212',

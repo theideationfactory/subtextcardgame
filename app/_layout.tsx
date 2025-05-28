@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import * as SplashScreen from 'expo-splash-screen';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useFrameworkReady } from '@/hooks/useFrameworkReady';
@@ -72,23 +73,46 @@ export default function RootLayout() {
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
+    // Ensure splash screen is hidden when the app is ready
+    const hideSplash = async () => {
+      try {
+        await SplashScreen.hideAsync();
+      } catch (e) {
+        console.warn('Error hiding splash screen in RootLayout:', e);
+      }
+    };
+
     // Set up deep linking handler for mobile platforms
     if (Platform.OS !== 'web') {
       const subscription = Linking.addEventListener('url', ({ url }) => {
         if (url) {
           // Handle the deep link URL
-          // console.log('Deep link URL:', url);
+          console.log('Deep link URL:', url);
         }
       });
 
+      // Hide splash screen after a short delay as a fallback
+      const timeout = setTimeout(() => {
+        hideSplash();
+      }, 3000);
+
       return () => {
         subscription.remove();
+        clearTimeout(timeout);
       };
+    } else {
+      // For web, just hide the splash screen
+      hideSplash();
     }
   }, []);
 
   useEffect(() => {
-    setReady(true);
+    // Set ready state after a short delay to ensure everything is initialized
+    const timer = setTimeout(() => {
+      setReady(true);
+    }, 500);
+    
+    return () => clearTimeout(timer);
   }, []);
 
   if (!ready) {

@@ -262,7 +262,17 @@ export default function SpreadScreen() {
   const handleShowGallery = useCallback((zoneName: string) => {
     setActiveZone(zoneName);
     setShowGallery(true);
-  }, [cards.length, fetchCards]);
+    // Initialize filteredCards with all cards when opening the gallery
+    setFilteredCards(cards);
+    setGallerySearchQuery(''); // Reset search query
+  }, [cards]);
+
+  // Initialize filteredCards when cards change
+  useEffect(() => {
+    if (showGallery) {
+      setFilteredCards(cards);
+    }
+  }, [cards, showGallery]);
 
   const toggleFullscreen = (zoneName: string) => {
     if (fullscreenZone === zoneName) {
@@ -1134,9 +1144,11 @@ export default function SpreadScreen() {
             </TouchableOpacity>
           </View>
 
-          <View style={styles.dropZonesContainer}>
-            {SPREADS[selectedSpread!].zones.map((zone) => renderDropZone(zone))}
-          </View>
+          <ScrollView style={styles.dropZonesScroll} contentContainerStyle={styles.dropZonesScrollContent}>
+            <View style={styles.dropZonesContainer}>
+              {SPREADS[selectedSpread!].zones.map((zone) => renderDropZone(zone))}
+            </View>
+          </ScrollView>
         </>
       )}
 
@@ -1448,12 +1460,18 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(99, 102, 241, 0.1)',
     marginLeft: 10,
   },
-  dropZonesContainer: {
+  dropZonesScroll: {
     flex: 1,
+  },
+  dropZonesScrollContent: {
+    flexGrow: 1,
+    paddingBottom: 16, // Add some padding at the bottom for better scrolling experience
+  },
+  dropZonesContainer: {
     gap: 12,
   },
   dropZone: {
-    height: SCREEN_HEIGHT / 3 - 20,
+    minHeight: SCREEN_HEIGHT / 3 - 20, // Changed from fixed height to minHeight
     marginBottom: 8,
     borderRadius: 8,
     overflow: 'hidden',
@@ -1688,12 +1706,6 @@ const styles = StyleSheet.create({
   emptySubtext: {
     color: 'rgba(255,255,255,0.4)',
     fontSize: 14,
-    fontFamily: 'Inter-Regular',
-    textAlign: 'center',
-  },
-  errorText: {
-    color: '#ff4444',
-    fontSize: 16,
     fontFamily: 'Inter-Regular',
     textAlign: 'center',
   },

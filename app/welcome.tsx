@@ -2,9 +2,16 @@ import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useFonts, Inter_400Regular, Inter_700Bold } from '@expo-google-fonts/inter';
 import * as SplashScreen from 'expo-splash-screen';
-import { useCallback } from 'react';
+import { useCallback, useEffect } from 'react';
 
-SplashScreen.preventAutoHideAsync();
+// Ensure we don't prevent auto-hiding on subsequent renders
+let splashScreenPrevented = false;
+if (!splashScreenPrevented) {
+  SplashScreen.preventAutoHideAsync().catch(() => {
+    /* ignore error */
+  });
+  splashScreenPrevented = true;
+}
 
 export default function WelcomeScreen() {
   const router = useRouter();
@@ -13,14 +20,43 @@ export default function WelcomeScreen() {
     'Inter-Bold': Inter_700Bold,
   });
 
-  const onLayoutRootView = useCallback(async () => {
-    if (fontsLoaded) {
-      await SplashScreen.hideAsync();
-    }
-  }, [fontsLoaded]);
+  // Hide splash screen when fonts are loaded
+  useEffect(() => {
+    const hideSplash = async () => {
+      try {
+        if (fontsLoaded) {
+          await SplashScreen.hideAsync();
+        }
+      } catch (e) {
+        console.warn('Error hiding splash screen:', e);
+        // Force hide after a short delay if there's an error
+        setTimeout(() => {
+          SplashScreen.hideAsync().catch(() => {});
+        }, 1000);
+      }
+    };
 
+    hideSplash();
+    
+    // Add a timeout as a fallback to ensure splash screen is always hidden
+    const timeout = setTimeout(() => {
+      SplashScreen.hideAsync().catch(() => {});
+    }, 3000);
+    
+    return () => clearTimeout(timeout);
+  }, [fontsLoaded]);
+  
+  const onLayoutRootView = useCallback(() => {
+    // This is now handled by the useEffect
+  }, []);
+
+  // Show a simple loading indicator instead of returning null
   if (!fontsLoaded) {
-    return null;
+    return (
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <Text style={{ color: 'white' }}>Loading...</Text>
+      </View>
+    );
   }
 
   return (
