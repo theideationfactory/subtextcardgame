@@ -19,7 +19,7 @@ function useProtectedRoute() {
     if (loading || !segments.length || isNavigating) return;
 
     const inAuthGroup = segments[0] === '(tabs)';
-    const inPublicGroup = segments[0] === 'welcome' || segments[0] === 'login' || segments[0] === 'drafts';
+    const inPublicGroup = segments[0] === 'welcome' || segments[0] === 'login' || segments[0] === 'drafts' || segments[0] === 'inbox';
 
     const navigate = async () => {
       setIsNavigating(true);

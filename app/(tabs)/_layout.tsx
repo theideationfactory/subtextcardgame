@@ -93,6 +93,13 @@ export default function TabLayout() {
             tabBarIcon: ({ size, color }) => <Settings size={size} color={color} />,
           }}
         />
+        <Tabs.Screen
+          name="inbox"
+          options={{
+            href: null, // This screen is not a tab itself
+            headerShown: false, // Hide header for this screen
+          }}
+        />
       </Tabs>
     </SafeAreaWrapper>
   );

@@ -39,6 +39,7 @@ import {
   Eye,
   EyeOff,
   Mail, // Added for Inbox button
+  Send, // Added for Send button
 } from 'lucide-react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
@@ -1084,7 +1085,7 @@ export default function SpreadScreen() {
             <FileText size={20} color="#6366f1" />
             <Text style={styles.draftsButtonText}>Drafts</Text> 
           </TouchableOpacity>
-          <TouchableOpacity onPress={() => router.push('/(tabs)/inbox')} style={styles.draftsButton}> 
+          <TouchableOpacity onPress={() => router.replace('/inbox')} style={styles.draftsButton}> 
             <Mail size={24} color="#fff" />
             <Text style={styles.draftsButtonText}>Inbox</Text> 
           </TouchableOpacity>
@@ -1138,15 +1139,26 @@ export default function SpreadScreen() {
                 <RotateCcw size={16} color="#666" />
               </TouchableOpacity>
             </View>
-            {savingDraft && (
-              <ActivityIndicator size="small" color="#6366f1" style={styles.savingIndicator} />
-            )}
-            <TouchableOpacity
-              style={styles.saveAsButton}
-              onPress={() => setShowSaveAs(true)}
-            >
-              <Save size={20} color="#6366f1" />
-            </TouchableOpacity>
+            <View style={styles.headerActions}>
+              {savingDraft && (
+                <ActivityIndicator size="small" color="#6366f1" style={styles.savingIndicator} />
+              )}
+              <TouchableOpacity
+                style={[styles.iconButton, styles.saveAsButton]}
+                onPress={() => setShowSaveAs(true)}
+              >
+                <Save size={20} color="#6366f1" />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.iconButton, styles.sendButton]}
+                onPress={() => {
+                  // Send functionality will be added later
+                  console.log('Send button pressed');
+                }}
+              >
+                <Send size={24} color="#6366f1" />
+              </TouchableOpacity>
+            </View>
           </View>
 
           <ScrollView style={styles.dropZonesScroll} contentContainerStyle={styles.dropZonesScrollContent}>
@@ -1459,11 +1471,22 @@ const styles = StyleSheet.create({
   savingIndicator: {
     marginLeft: 16,
   },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginLeft: 10,
+  },
   saveAsButton: {
     padding: 6,
     borderRadius: 6,
     backgroundColor: 'rgba(99, 102, 241, 0.1)',
-    marginLeft: 10,
+    marginLeft: 8,
+  },
+  sendButton: {
+    padding: 8,
+    borderRadius: 6,
+    backgroundColor: 'rgba(99, 102, 241, 0.1)',
+    marginLeft: 8,
   },
   dropZonesScroll: {
     flex: 1,
