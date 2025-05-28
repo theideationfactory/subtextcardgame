@@ -243,7 +243,7 @@ export default function SpreadScreen() {
     const loadDraftIfNeeded = async () => {
       if (params.draftId) {
         const draftIdToLoad = Array.isArray(params.draftId) ? params.draftId[0] : params.draftId;
-        if (draftIdToLoad) { // Ensure we have a valid ID after potential array access
+        if (draftIdToLoad && draftIdToLoad !== currentSpreadId) { // Only load if it's a different draft
           try {
             // Ensure cards are loaded first
             if (!cards || cards.length === 0) {
@@ -259,7 +259,7 @@ export default function SpreadScreen() {
     };
 
     loadDraftIfNeeded();
-  }, [params.draftId, cards.length]); // Only depend on cards.length, not the entire cards array
+  }, [params.draftId, currentSpreadId]); // Use currentSpreadId instead of selectedSpread to prevent re-loading the same draft
 
   const handleShowGallery = useCallback((zoneName: string) => {
     setActiveZone(zoneName);
@@ -339,8 +339,11 @@ export default function SpreadScreen() {
 
   const loadDraft = async (draftId: string) => {
     try {
+      console.log('Loading draft with ID:', draftId);
+      
       // Ensure cards are loaded first
       if (!cards || cards.length === 0) {
+        console.log('Cards not loaded, fetching cards first...');
         await fetchCards();
       }
 
@@ -350,9 +353,21 @@ export default function SpreadScreen() {
         .eq('id', draftId)
         .single();
 
-      if (draftError) throw draftError;
+      if (draftError) {
+        console.error('Error fetching draft:', draftError);
+        throw draftError;
+      }
+
+      if (!draft) {
+        console.error('No draft found with ID:', draftId);
+        setError('Draft not found or you may not have access to it.');
+        return;
+      }
+
+      console.log('Draft loaded successfully:', draft);
 
       if (draft?.draft_data?.type && draft?.draft_data?.zoneCards) {
+        console.log('Setting spread type to:', draft.draft_data.type);
         setSelectedSpread(draft.draft_data.type);
         setSpreadName(draft.name || SPREADS[draft.draft_data.type as SpreadType].name);
         setCurrentSpreadId(draft.id);
@@ -371,10 +386,15 @@ export default function SpreadScreen() {
             .filter(Boolean);
         });
         setZoneCards(restoredZoneCards);
+        console.log('Draft state restored successfully');
+      } else {
+        console.error('Invalid draft data structure:', draft);
+        setError('Invalid draft data. The draft may be corrupted.');
       }
     } catch (err) {
       console.error('Error loading draft:', err);
-      setError('Failed to load draft. Please try again.');
+      const errorMessage = err instanceof Error ? err.message : 'Failed to load draft. Please try again.';
+      setError(errorMessage);
     }
   };
 
@@ -1124,7 +1144,15 @@ export default function SpreadScreen() {
           <View style={styles.header}>
             <TouchableOpacity 
               style={styles.backButton}
-              onPress={() => setSelectedSpread(null)}
+              onPress={() => {
+                setSelectedSpread(null);
+                setCurrentSpreadId(null);
+                setZoneCards({});
+                setSpreadName('');
+                setError('');
+                // Navigate to spread screen without draftId parameter to clear URL state
+                router.replace('/(tabs)/spread');
+              }}
             >
               <ArrowLeft size={24} color="#fff" />
             </TouchableOpacity>

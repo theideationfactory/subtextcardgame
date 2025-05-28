@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { 
   View, 
   Text, 
@@ -7,11 +7,12 @@ import {
   FlatList,
   ActivityIndicator,
   Platform,
+  Modal,
 } from 'react-native';
 import { useFonts, Inter_400Regular, Inter_700Bold } from '@expo-google-fonts/inter';
 import { useRouter } from 'expo-router';
 import { createClient } from '@supabase/supabase-js';
-import { ArrowLeft, FileText, Trash2 } from 'lucide-react-native';
+import { ArrowLeft, FileText, Trash2, Send, Check, X } from 'lucide-react-native';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -22,6 +23,12 @@ interface Draft {
   last_modified: string;
   color?: string; // Optional: used for icon color
   // Add other properties from your 'spreads' table if needed elsewhere
+}
+
+interface Friend {
+  friend_id: string;
+  email: string;
+  created_at: string;
 }
 
 const supabase = createClient(
@@ -38,7 +45,13 @@ export default function DraftsScreen() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [deleting, setDeleting] = useState<string | null>(null);
-  
+  const [showSendModal, setShowSendModal] = useState(false);
+  const [currentDraftToSend, setCurrentDraftToSend] = useState<Draft | null>(null);
+  const [friends, setFriends] = useState<Friend[]>([]);
+  const [selectedFriends, setSelectedFriends] = useState<string[]>([]); // Store friend_ids
+  const [sending, setSending] = useState(false);
+  const [friendsLoading, setFriendsLoading] = useState(false);
+
   const [fontsLoaded] = useFonts({
     'Inter-Regular': Inter_400Regular,
     'Inter-Bold': Inter_700Bold,
@@ -73,6 +86,80 @@ export default function DraftsScreen() {
     
     checkAuthAndFetchDrafts();
   }, [user, authLoading]);
+
+  const fetchFriendsForModal = useCallback(async () => {
+    if (!user) return;
+    setFriendsLoading(true);
+    try {
+      const { data, error: fetchError } = await supabase
+        .rpc('get_friends', { user_id: user.id });
+
+      if (fetchError) throw fetchError;
+      setFriends(data || []);
+    } catch (err) {
+      console.error('Error fetching friends for modal:', err);
+      setError('Failed to load friends for sharing.');
+    } finally {
+      setFriendsLoading(false);
+    }
+  }, [user]);
+
+  useEffect(() => {
+    if (showSendModal && user) {
+      fetchFriendsForModal();
+    } else if (!showSendModal) {
+      setSelectedFriends([]); // Clear selections when modal closes
+    }
+  }, [showSendModal, user, fetchFriendsForModal]);
+
+  const handleSendPress = (draft: Draft) => {
+    setCurrentDraftToSend(draft);
+    setShowSendModal(true);
+  };
+
+  const toggleFriendSelection = (friendId: string) => {
+    setSelectedFriends(prev =>
+      prev.includes(friendId) ? prev.filter(id => id !== friendId) : [...prev, friendId]
+    );
+  };
+
+  const handleSendDraft = async () => {
+    if (!currentDraftToSend || selectedFriends.length === 0) return;
+
+    setSending(true);
+    try {
+      const { error: updateError } = await supabase
+        .from('spreads')
+        .update({ 
+          shared_with_user_ids: selectedFriends, 
+          last_modified: new Date().toISOString() 
+        })
+        .eq('id', currentDraftToSend.id);
+
+      if (updateError) throw updateError;
+
+      console.log(`Draft ${currentDraftToSend.id} successfully shared with:`, selectedFriends);
+      
+      // Optionally, update the local drafts state to reflect the change
+      setDrafts(prevDrafts =>
+        prevDrafts.map(draft =>
+          draft.id === currentDraftToSend.id
+            ? { ...draft, last_modified: new Date().toISOString() } // Update last_modified locally
+            : draft
+        )
+      );
+
+      setShowSendModal(false);
+      setSelectedFriends([]);
+      setCurrentDraftToSend(null);
+      setError('');
+    } catch (err) {
+      console.error('Error sending draft:', err);
+      setError('Failed to send draft.');
+    } finally {
+      setSending(false);
+    }
+  };
 
   const fetchDrafts = async () => {
     try {
@@ -159,6 +246,12 @@ export default function DraftsScreen() {
         </Text>
       </View>
       <TouchableOpacity
+        style={styles.sendButton}
+        onPress={() => handleSendPress(item)}
+      >
+        <Send size={20} color="#6366f1" />
+      </TouchableOpacity>
+      <TouchableOpacity
         style={[
           styles.deleteButton,
           deleting === item.id && styles.deleteButtonDisabled
@@ -215,6 +308,74 @@ export default function DraftsScreen() {
           contentContainerStyle={styles.listContent}
         />
       )}
+      
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={showSendModal}
+        onRequestClose={() => setShowSendModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Share Draft</Text>
+              <TouchableOpacity onPress={() => setShowSendModal(false)} style={styles.closeButton}>
+                <X size={24} color="#fff" />
+              </TouchableOpacity>
+            </View>
+
+            {friendsLoading ? (
+              <View style={styles.centerContent}>
+                <ActivityIndicator size="large" color="#6366f1" />
+                <Text style={styles.loadingText}>Loading friends...</Text>
+              </View>
+            ) : friends.length === 0 ? (
+              <View style={styles.centerContent}>
+                <Text style={styles.emptyText}>No friends found.</Text>
+                <Text style={styles.emptySubtext}>Add friends to share your drafts.</Text>
+              </View>
+            ) : (
+              <FlatList
+                data={friends}
+                keyExtractor={item => item.friend_id}
+                renderItem={({ item }) => (
+                  <TouchableOpacity
+                    style={styles.friendItem}
+                    onPress={() => toggleFriendSelection(item.friend_id)}
+                  >
+                    <Text style={styles.friendEmail}>{item.email}</Text>
+                    {selectedFriends.includes(item.friend_id) && (
+                      <Check size={20} color="#4CAF50" />
+                    )}
+                  </TouchableOpacity>
+                )}
+                contentContainerStyle={styles.friendsList}
+              />
+            )}
+
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={styles.cancelShareButton}
+                onPress={() => setShowSendModal(false)}
+                disabled={sending}
+              >
+                <Text style={styles.buttonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.sendShareButton, selectedFriends.length === 0 && styles.sendButtonDisabled]}
+                onPress={handleSendDraft}
+                disabled={selectedFriends.length === 0 || sending}
+              >
+                {sending ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <Text style={styles.buttonText}>Send</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -285,6 +446,12 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     backgroundColor: 'rgba(255, 68, 68, 0.1)',
   },
+  sendButton: {
+    padding: 8,
+    borderRadius: 8,
+    backgroundColor: 'rgba(99, 102, 241, 0.1)',
+    marginRight: 8,
+  },
   deleteButtonDisabled: {
     opacity: 0.5,
   },
@@ -309,5 +476,86 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontFamily: 'Inter-Regular',
     textAlign: 'center',
+  },
+  modalOverlay: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+  },
+  modalContent: {
+    width: '90%',
+    maxHeight: '80%',
+    backgroundColor: '#1a1a1a',
+    borderRadius: 16,
+    padding: 20,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  modalTitle: {
+    color: '#fff',
+    fontSize: 22,
+    fontFamily: 'Inter-Bold',
+  },
+  closeButton: {
+    padding: 8,
+    borderRadius: 8,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+  },
+  friendsList: {
+    paddingVertical: 10,
+  },
+  friendItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.05)',
+  },
+  friendEmail: {
+    color: '#fff',
+    fontSize: 16,
+    fontFamily: 'Inter-Regular',
+  },
+  modalActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    marginTop: 20,
+    gap: 10,
+  },
+  cancelShareButton: {
+    backgroundColor: '#3a3a3a',
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sendShareButton: {
+    backgroundColor: '#6366f1',
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sendButtonDisabled: {
+    opacity: 0.5,
+  },
+  buttonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontFamily: 'Inter-Bold',
+  },
+  loadingText: {
+    color: '#fff',
+    marginTop: 10,
+    fontFamily: 'Inter-Regular',
   },
 });
