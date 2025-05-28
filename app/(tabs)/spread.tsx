@@ -187,7 +187,7 @@ const SPREADS: Record<SpreadType, {
 export default function SpreadScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
-  const { cards, fetchCards } = useAuth();
+  const { cards, fetchCards, user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [showGallery, setShowGallery] = useState(false);
@@ -208,7 +208,8 @@ export default function SpreadScreen() {
   const [filteredCards, setFilteredCards] = useState<any[]>([]);
   const [showFullCardView, setShowFullCardView] = useState(false);
   const [selectedCardForFullView, setSelectedCardForFullView] = useState<any>(null);
-  
+  const [successMessage, setSuccessMessage] = useState('');
+
   const [fontsLoaded] = useFonts({
     'Inter-Regular': Inter_400Regular,
     'Inter-Bold': Inter_700Bold,
@@ -237,13 +238,26 @@ export default function SpreadScreen() {
   }, [showGallery, fetchCards]);
 
   useEffect(() => {
-    if (params.draftId) {
-      const draftIdToLoad = Array.isArray(params.draftId) ? params.draftId[0] : params.draftId;
-      if (draftIdToLoad) { // Ensure we have a valid ID after potential array access
-        loadDraft(draftIdToLoad);
+    const loadDraftIfNeeded = async () => {
+      if (params.draftId) {
+        const draftIdToLoad = Array.isArray(params.draftId) ? params.draftId[0] : params.draftId;
+        if (draftIdToLoad) { // Ensure we have a valid ID after potential array access
+          try {
+            // Ensure cards are loaded first
+            if (!cards || cards.length === 0) {
+              await fetchCards();
+            }
+            await loadDraft(draftIdToLoad);
+          } catch (err) {
+            console.error('Error loading draft:', err);
+            setError('Failed to load draft. Please try again.');
+          }
+        }
       }
-    }
-  }, [params.draftId, cards]);
+    };
+
+    loadDraftIfNeeded();
+  }, [params.draftId, cards.length]); // Only depend on cards.length, not the entire cards array
 
   const handleShowGallery = useCallback((zoneName: string) => {
     setActiveZone(zoneName);
@@ -266,7 +280,6 @@ export default function SpreadScreen() {
 
   const checkForExistingDraft = async (spreadType: SpreadType) => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
       const { data: latestDraft, error: draftError } = await supabase
@@ -314,6 +327,11 @@ export default function SpreadScreen() {
 
   const loadDraft = async (draftId: string) => {
     try {
+      // Ensure cards are loaded first
+      if (!cards || cards.length === 0) {
+        await fetchCards();
+      }
+
       const { data: draft, error: draftError } = await supabase
         .from('spreads')
         .select('*')
@@ -327,35 +345,56 @@ export default function SpreadScreen() {
         setSpreadName(draft.name || SPREADS[draft.draft_data.type as SpreadType].name);
         setCurrentSpreadId(draft.id);
 
-        const cardsById: Record<string, any> = cards.reduce((acc: Record<string, any>, card) => {
-          acc[card.id] = card;
-          return acc;
-        }, {});
+        // Create a fresh cardsById map with the latest cards
+        const cardsById: Record<string, any> = {};
+        cards.forEach(card => {
+          cardsById[card.id] = card;
+        });
         setCardMap(cardsById);
 
         const restoredZoneCards: Record<string, any[]> = {};
         Object.entries(draft.draft_data.zoneCards).forEach(([zoneName, cardIds]: [string, any]) => {
-          restoredZoneCards[zoneName] = (cardIds as string[]).map((id: string) => cardsById[id]).filter(Boolean);
+          restoredZoneCards[zoneName] = (cardIds as string[])
+            .map((id: string) => cardsById[id])
+            .filter(Boolean);
         });
         setZoneCards(restoredZoneCards);
       }
     } catch (err) {
       console.error('Error loading draft:', err);
-      setError('Failed to load draft');
+      setError('Failed to load draft. Please try again.');
     }
   };
 
   const saveDraft = async (name?: string) => {
-    if (!selectedSpread) return;
+    if (!selectedSpread) {
+      console.error('No spread selected');
+      return false;
+    }
 
     try {
       setSavingDraft(true);
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
+      
+      // Check if user is authenticated using AuthContext
+      if (!user || !user.id) {
+        console.error('No authenticated user from AuthContext');
+        const error = new Error('No authenticated user');
+        console.error('Auth error details:', { user, hasId: user?.id ? 'yes' : 'no' });
+        throw error;
+      }
+      
+      console.log('Saving draft for user:', user.id);
+      
+      // Log authentication state
+      const { data: { session } } = await supabase.auth.getSession();
+      console.log('Current session:', session ? 'exists' : 'null');
+      console.log('Session user ID:', session?.user?.id);
+      console.log('AuthContext user ID:', user.id);
+      
+      // Prepare zone cards data
       const zoneCardIds: Record<string, string[]> = {};
-      Object.entries(zoneCards).forEach(([zoneName, cards]) => {
-        zoneCardIds[zoneName] = cards.map(card => card.id);
+      Object.entries(zoneCards).forEach(([zoneName, cardsInZone]) => {
+        zoneCardIds[zoneName] = cardsInZone.map(card => card.id);
       });
 
       const draftData = {
@@ -363,46 +402,198 @@ export default function SpreadScreen() {
         zoneCards: zoneCardIds,
       };
 
-      const spreadNameToUse = (name && name.trim()) || spreadName || (selectedSpread ? SPREADS[selectedSpread].name : '');
-      const iconName = (selectedSpread && SPREADS[selectedSpread]?.icon?.name) || 'Sparkles';
+      console.log('Prepared draft data:', JSON.stringify(draftData, null, 2));
 
-      if (currentSpreadId) {
-        const { error: updateError } = await supabase
+      const spreadNameToUse = (name && name.trim()) || spreadName || (selectedSpread ? SPREADS[selectedSpread].name : 'Untitled Spread');
+      const iconName = (selectedSpread && SPREADS[selectedSpread]?.icon?.name) || 'Sparkles';
+      const currentTimestamp = new Date().toISOString();
+      const spreadZones = selectedSpread ? 
+        SPREADS[selectedSpread].zones.map(zone => ({
+          name: zone.name, 
+          title: zone.title, 
+          color: zone.color, 
+          description: zone.description 
+        })) : [];
+
+      // Prepare the data to save
+      const dataToSave = {
+        name: spreadNameToUse,
+        description: selectedSpread ? SPREADS[selectedSpread].description : '',
+        color: selectedSpread ? SPREADS[selectedSpread].color : '#000000',
+        icon: iconName,
+        user_id: user.id, // Explicitly set user_id
+        zones: spreadZones,
+        is_draft: true,
+        draft_data: draftData,
+        last_modified: currentTimestamp
+      };
+      
+      console.log('Data being saved to database:', JSON.stringify(dataToSave, null, 2));
+      
+      // Log the current RLS context
+      const { data: rlsContext } = await supabase.rpc('current_setting', { name: 'role' });
+      console.log('Current RLS role:', rlsContext);
+      
+      // Test RLS with a direct query
+      try {
+        const { data: testData, error: testError } = await supabase
           .from('spreads')
-          .update({
+          .select('id')
+          .eq('user_id', user.id)
+          .limit(1);
+          
+        console.log('RLS test query result:', { testData, testError });
+      } catch (testErr) {
+        console.error('RLS test query failed:', testErr);
+      }
+
+      let result;
+      
+      try {
+        if (currentSpreadId) {
+          // Update existing spread
+          console.log('Updating existing spread with ID:', currentSpreadId);
+          const updateData = {
             name: spreadNameToUse,
             draft_data: draftData,
-          })
-          .eq('id', currentSpreadId);
+            is_draft: true,
+            last_modified: currentTimestamp,
+          };
+          
+          console.log('Update data:', JSON.stringify(updateData, null, 2));
+          
+          const { data, error: updateError } = await supabase
+            .from('spreads')
+            .update(updateData)
+            .eq('id', currentSpreadId)
+            .select()
+            .single();
 
-        if (updateError) throw updateError;
-      } else {
-        const { data: newDraft, error: insertError } = await supabase
-          .from('spreads')
-          .insert({
+          if (updateError) {
+            console.error('Update error details:', updateError);
+            throw updateError;
+          }
+          
+          console.log('Successfully updated spread:', data);
+          result = data;
+        } else {
+          // Create new spread
+          console.log('Creating new spread');
+          
+          const insertData = {
             name: spreadNameToUse,
             description: selectedSpread ? SPREADS[selectedSpread].description : '',
             color: selectedSpread ? SPREADS[selectedSpread].color : '#000000',
             icon: iconName,
-            user_id: user.id,
-            zones: [],
+            user_id: user.id, // Explicitly set user_id
+            zones: spreadZones,
             is_draft: true,
             draft_data: draftData,
-          })
-          .select()
-          .single();
+            last_modified: currentTimestamp
+          };
+          
+          console.log('Insert data:', JSON.stringify(insertData, null, 2));
+          
+          // Try a direct SQL insert as a fallback
+          try {
+            const { data: newDraft, error: insertError } = await supabase
+              .from('spreads')
+              .insert(insertData)
+              .select()
+              .single();
 
-        if (insertError) throw insertError;
-        setCurrentSpreadId(newDraft.id);
+            if (insertError) {
+              console.error('Insert error details:', insertError);
+              
+              // Try with RPC function as fallback
+              console.log('Trying with RPC function as fallback...');
+              const { data: rpcResult, error: rpcError } = await supabase.rpc('create_spread', {
+                p_name: insertData.name,
+                p_description: insertData.description,
+                p_color: insertData.color,
+                p_icon: insertData.icon,
+                p_zones: insertData.zones,
+                p_draft_data: insertData.draft_data,
+                p_user_id: insertData.user_id
+              });
+              
+              if (rpcError) throw rpcError;
+              
+              console.log('Successfully created spread via RPC:', rpcResult);
+              setCurrentSpreadId(rpcResult.id);
+              result = rpcResult;
+            } else {
+              if (!newDraft) throw new Error('No data returned when creating spread');
+              
+              console.log('Successfully created new spread:', newDraft);
+              setCurrentSpreadId(newDraft.id);
+              result = newDraft;
+            }
+          } catch (insertErr) {
+            console.error('Error during spread creation:', insertErr);
+            throw insertErr;
+          }
+        }
+
+        if (name && name.trim()) {
+          setSpreadName(name.trim());
+        }
+
+        // Show success message
+        setError('');
+        setSuccessMessage('Draft saved successfully!');
+        setTimeout(() => setSuccessMessage(''), 3000);
+        return true;
+        
+      } catch (dbError: any) {
+        console.error('Database error details:', {
+          code: dbError.code,
+          message: dbError.message,
+          details: dbError.details,
+          hint: dbError.hint,
+          error: dbError
+        });
+        
+        // Check if it's an RLS policy error
+        if (dbError?.code === '42501') {
+          const errorMessage = 'Database permissions error. ';
+          const hint = dbError.hint ? `\n\nHint: ${dbError.hint}` : '';
+          setError(errorMessage + 'Please contact support or check the console for details.' + hint);
+          
+          console.error('RLS Policy Error:', dbError.message);
+          console.error('Current RLS policies:');
+          
+          // Log current RLS policies
+          const { data: policies } = await supabase
+            .from('pg_policies')
+            .select('*')
+            .eq('tablename', 'spreads');
+          console.table(policies);
+          
+          // Log current user and role
+          const { data: userData } = await supabase.auth.getUser();
+          console.log('Current auth user:', userData.user?.id);
+          
+          // Log RLS context
+          const { data: rlsContext } = await supabase.rpc('current_setting', { name: 'role' });
+          console.log('Current RLS role:', rlsContext);
+          
+          // Suggest next steps
+          console.log('\nNext steps to debug:');
+          console.log('1. Check if RLS is enabled on the spreads table');
+          console.log('2. Verify the user has the authenticated role');
+          console.log('3. Check for any BEFORE INSERT triggers that might be modifying the data');
+          
+        } else {
+          throw dbError;
+        }
       }
-
-      if (name && name.trim()) {
-        setSpreadName(name.trim());
-      }
-
+      
     } catch (err) {
-      console.error('Error saving draft:', err);
-      setError('Failed to save draft');
+      console.error('Error in saveDraft:', err);
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+      setError(`Failed to save draft: ${errorMessage}`);
+      return false;
     } finally {
       setSavingDraft(false);
       setShowSaveAs(false);
@@ -855,7 +1046,16 @@ export default function SpreadScreen() {
   if (error) {
     return (
       <View style={[styles.container, styles.centerContent]}>
-        <Text style={styles.errorText}>{error}</Text>
+        {error ? (
+          <View style={styles.errorContainer}>
+            <Text style={styles.errorText}>{error}</Text>
+          </View>
+        ) : null}
+        {successMessage ? (
+          <View style={styles.successContainer}>
+            <Text style={styles.successText}>{successMessage}</Text>
+          </View>
+        ) : null}
       </View>
     );
   }
@@ -961,7 +1161,22 @@ export default function SpreadScreen() {
             <View style={styles.saveAsButtons}>
               <TouchableOpacity
                 style={[styles.saveAsActionButton, styles.saveButton]}
-                onPress={() => saveDraft(spreadName)}
+                onPress={async () => {
+                  if (!spreadName.trim()) return;
+                  
+                  try {
+                    const success = await saveDraft(spreadName);
+                    if (success) {
+                      setSuccessMessage('Draft saved successfully!');
+                      // Clear success message after 3 seconds
+                      setTimeout(() => setSuccessMessage(''), 3000);
+                      setShowSaveAs(false);
+                    }
+                  } catch (err) {
+                    console.error('Error in save handler:', err);
+                    setError(`Failed to save: ${err instanceof Error ? err.message : 'Unknown error'}`);
+                  }
+                }}
                 disabled={!spreadName.trim() || savingDraft}
               >
                 {savingDraft ? (
@@ -986,6 +1201,32 @@ export default function SpreadScreen() {
 }
 
 const styles = StyleSheet.create({
+  errorContainer: {
+    backgroundColor: '#FEE2E2',
+    padding: 12,
+    borderRadius: 8,
+    margin: 16,
+    borderLeftWidth: 4,
+    borderLeftColor: '#DC2626',
+  },
+  errorText: {
+    color: '#DC2626',
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  successContainer: {
+    backgroundColor: '#D1FAE5',
+    padding: 12,
+    borderRadius: 8,
+    margin: 16,
+    borderLeftWidth: 4,
+    borderLeftColor: '#10B981',
+  },
+  successText: {
+    color: '#065F46',
+    fontSize: 14,
+    fontWeight: '500',
+  },
   gridContainer: {
     padding: 0,
     flexGrow: 1,

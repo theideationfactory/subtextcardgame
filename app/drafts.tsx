@@ -11,6 +11,7 @@ import { useFonts, Inter_400Regular, Inter_700Bold } from '@expo-google-fonts/in
 import { useRouter } from 'expo-router';
 import { createClient } from '@supabase/supabase-js';
 import { ArrowLeft, FileText, Trash2 } from 'lucide-react-native';
+import { useAuth } from '@/contexts/AuthContext';
 
 const supabase = createClient(
   process.env.EXPO_PUBLIC_SUPABASE_URL!,
@@ -19,6 +20,7 @@ const supabase = createClient(
 
 export default function DraftsScreen() {
   const router = useRouter();
+  const { user, loading: authLoading } = useAuth();
   const [drafts, setDrafts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -30,26 +32,69 @@ export default function DraftsScreen() {
   });
 
   useEffect(() => {
-    fetchDrafts();
-  }, []);
+    const checkAuthAndFetchDrafts = async () => {
+      try {
+        // Wait for auth loading to complete
+        if (authLoading) return;
+        
+        // Check if we have a valid user
+        if (!user) {
+          console.error('No authenticated user');
+          setError('Please log in to view your drafts');
+          // Redirect to login screen after a short delay
+          setTimeout(() => {
+            router.replace('/login');
+          }, 2000);
+          return;
+        }
+        
+        // If we have a user, fetch drafts
+        await fetchDrafts();
+      } catch (err) {
+        console.error('Error in auth check:', err);
+        setError('Authentication error. Please log in again.');
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    checkAuthAndFetchDrafts();
+  }, [user, authLoading]);
 
   const fetchDrafts = async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
+      setLoading(true);
+      setError('');
+      
+      // Ensure user is available
+      if (!user) {
+        throw new Error('Not authenticated');
+      }
+      
+      console.log('Fetching drafts for user:', user.id);
+      
       const { data, error: fetchError } = await supabase
         .from('spreads')
         .select('*')
         .eq('user_id', user.id)
-        .eq('is_draft', true)
         .order('last_modified', { ascending: false });
 
       if (fetchError) throw fetchError;
+      
+      console.log('Fetched drafts:', data?.length || 0);
       setDrafts(data || []);
+      
     } catch (err) {
       console.error('Error fetching drafts:', err);
-      setError('Failed to load drafts');
+      const errorMessage = err instanceof Error ? err.message : 'Failed to load drafts';
+      setError(errorMessage);
+      
+      // If unauthorized, redirect to login
+      if (errorMessage.includes('auth') || errorMessage.includes('authenticated')) {
+        setTimeout(() => {
+          router.replace('/login');
+        }, 2000);
+      }
     } finally {
       setLoading(false);
     }

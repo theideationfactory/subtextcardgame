@@ -463,7 +463,7 @@ export default function CollectionScreen() {
     const imageHeight = numColumns === 1 ? 280 : numColumns === 2 ? 180 : 120; // Scale down height as columns increase
     
     // Calculate border width based on scale factor
-    const borderWidth = Math.max(2, 8 * scaleFactor); // Min 2px, max 8px
+    const borderWidth = Math.max(1, 3 * scaleFactor); // Min 1px, max 3px
     
     // Calculate font sizes based on scale factor
     const nameSize = Math.max(16, 24 * scaleFactor); // Min 16px
