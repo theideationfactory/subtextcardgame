@@ -211,6 +211,7 @@ export default function SpreadScreen() {
   const [showFullCardView, setShowFullCardView] = useState(false);
   const [selectedCardForFullView, setSelectedCardForFullView] = useState<any>(null);
   const [successMessage, setSuccessMessage] = useState('');
+  const [cardToRemove, setCardToRemove] = useState<{card: any, zone: string} | null>(null);
 
   const [fontsLoaded] = useFonts({
     'Inter-Regular': Inter_400Regular,
@@ -678,6 +679,42 @@ export default function SpreadScreen() {
     router.push('/create');
   };
 
+  const removeCardFromZone = (cardId: string, zoneName: string) => {
+    setZoneCards(prev => {
+      const newZoneCards = { ...prev };
+      if (newZoneCards[zoneName]) {
+        newZoneCards[zoneName] = newZoneCards[zoneName].filter(card => card.id !== cardId);
+      }
+      return newZoneCards;
+    });
+    setCardToRemove(null);
+  };
+
+  const handleCardPress = (card: any, zoneName: string) => {
+    const now = Date.now();
+    const DOUBLE_TAP_DELAY = 300;
+    
+    if (card.lastTap && (now - card.lastTap) < DOUBLE_TAP_DELAY) {
+      // Double tap detected - show remove confirmation
+      setCardToRemove({ card, zone: zoneName });
+      card.lastTap = 0; // Reset to prevent triple tap issues
+    } else {
+      // First tap - handle single tap behavior
+      card.lastTap = now;
+      
+      // Existing single tap behavior
+      if (showFullCardView) {
+        setSelectedCardForFullView(card);
+      } else {
+        if (expandedCardId === card.id) {
+          setExpandedCardId(null);
+        } else {
+          setExpandedCardId(card.id);
+        }
+      }
+    }
+  };
+
   const renderSpreadOption = (spreadKey: SpreadType) => {
     const spread = SPREADS[spreadKey];
     const Icon = spread.icon;
@@ -914,29 +951,7 @@ export default function SpreadScreen() {
                       padding: numColumns === 1 ? 4 : numColumns === 2 ? 3 : numColumns === 3 ? 2 : 1
                     }
                   ]}
-                  onPress={() => {
-                    if (showFullCardView) {
-                      // In full card view, single tap selects the card
-                      setSelectedCardForFullView(card);
-                    } else {
-                      // Handle double tap with timeout
-                      const now = Date.now();
-                      const DOUBLE_TAP_DELAY = 300;
-                      
-                      if (card.lastTap && (now - card.lastTap) < DOUBLE_TAP_DELAY) {
-                        // Double tap detected
-                        if (expandedCardId === card.id) {
-                          setExpandedCardId(null);
-                        } else {
-                          setExpandedCardId(card.id);
-                        }
-                        card.lastTap = 0; // Reset to prevent triple tap issues
-                      } else {
-                        // First tap
-                        card.lastTap = now;
-                      }
-                    }
-                  }}
+                  onPress={() => handleCardPress(card, zone.name)}
                 >
                   {showFullCardView ? (
                     <View style={[styles.fullCardInner, { borderColor: card.color || '#6366f1' }]}>
@@ -1046,7 +1061,11 @@ export default function SpreadScreen() {
               contentContainerStyle={styles.cardScrollContent}
             >
               {cards.map((card, index) => (
-                <View key={`${card.id}-${index}`} style={styles.miniCard}>
+                <TouchableOpacity 
+                  key={`${card.id}-${index}`} 
+                  style={styles.miniCard}
+                  onPress={() => handleCardPress(card, zone.name)}
+                >
                   <Image
                     source={{ uri: card.image_url }}
                     style={styles.miniCardImage}
@@ -1060,7 +1079,7 @@ export default function SpreadScreen() {
                       {card.name}
                     </Text>
                   </LinearGradient>
-                </View>
+                </TouchableOpacity>
               ))}
             </ScrollView>
           )}
@@ -1200,6 +1219,39 @@ export default function SpreadScreen() {
       )}
 
       {renderGalleryModal()}
+
+      {/* Simple Remove Card Confirmation */}
+      <Modal
+        visible={!!cardToRemove}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setCardToRemove(null)}
+      >
+        <TouchableOpacity 
+          style={styles.simpleModalOverlay}
+          activeOpacity={1}
+          onPress={() => setCardToRemove(null)}
+        >
+          <View style={styles.simpleModalContent}>
+            <Text style={styles.simpleModalText}>Remove card?</Text>
+            <View style={styles.simpleModalButtons}>
+              <TouchableOpacity
+                style={styles.simpleModalButton}
+                onPress={() => setCardToRemove(null)}
+              >
+                <Text style={styles.simpleModalButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <View style={styles.simpleModalDivider} />
+              <TouchableOpacity
+                style={[styles.simpleModalButton, styles.simpleModalButtonDanger]}
+                onPress={() => cardToRemove && removeCardFromZone(cardToRemove.card.id, cardToRemove.zone)}
+              >
+                <Text style={[styles.simpleModalButtonText, styles.simpleModalButtonDangerText]}>Remove</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </TouchableOpacity>
+      </Modal>
 
       <Modal
         visible={showSaveAs}
@@ -1352,6 +1404,53 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 4,
     elevation: 5,
+  },
+  // Simple Remove Confirmation Styles
+  simpleModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  simpleModalContent: {
+    backgroundColor: '#2a2a3a',
+    borderRadius: 14,
+    width: 280,
+    overflow: 'hidden',
+  },
+  simpleModalText: {
+    color: '#fff',
+    fontSize: 16,
+    textAlign: 'center',
+    padding: 24,
+    fontFamily: 'Inter-Regular',
+  },
+  simpleModalButtons: {
+    flexDirection: 'row',
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  simpleModalButton: {
+    flex: 1,
+    padding: 16,
+    alignItems: 'center',
+  },
+  simpleModalButtonText: {
+    color: '#0a84ff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  simpleModalButtonDanger: {
+    borderLeftWidth: 1,
+    borderLeftColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  simpleModalButtonDangerText: {
+    color: '#ff453a',
+  },
+  simpleModalDivider: {
+    width: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
   },
   fullCardImage: {
     width: '100%',
@@ -1626,8 +1725,8 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
   },
   miniCard: {
-    width: 120,
-    height: 168,
+    width: 100,
+    height: 140,
     borderRadius: 8,
     overflow: 'hidden',
     backgroundColor: '#2a2a2a',
