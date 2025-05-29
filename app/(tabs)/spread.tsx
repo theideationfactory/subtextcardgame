@@ -342,9 +342,10 @@ export default function SpreadScreen() {
       console.log('Loading draft with ID:', draftId);
       
       // Ensure cards are loaded first
-      if (!cards || cards.length === 0) {
+      let currentCards = cards;
+      if (!currentCards || currentCards.length === 0) {
         console.log('Cards not loaded, fetching cards first...');
-        await fetchCards();
+        currentCards = await fetchCards(); // Capture the returned cards
       }
 
       const { data: draft, error: draftError } = await supabase
@@ -374,7 +375,7 @@ export default function SpreadScreen() {
 
         // Create a fresh cardsById map with the latest cards
         const cardsById: Record<string, any> = {};
-        cards.forEach(card => {
+        currentCards.forEach(card => {
           cardsById[card.id] = card;
         });
         setCardMap(cardsById);

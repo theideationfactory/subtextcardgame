@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
-import type { User, Session } from '@supabase/supabase-js';
+import type { User, Session, PostgrestError } from '@supabase/supabase-js';
 
 type Card = {
   id: string;
@@ -25,7 +25,7 @@ type AuthContextType = {
   loading: boolean;
   cards: Card[];
   refreshSession: () => Promise<Session | null | undefined>;
-  fetchCards: (page?: number, limit?: number, useCache?: boolean) => Promise<void>;
+  fetchCards: (page?: number, limit?: number, useCache?: boolean) => Promise<Card[]>;
 };
 
 const AuthContext = createContext<AuthContextType>({
@@ -33,7 +33,7 @@ const AuthContext = createContext<AuthContextType>({
   loading: true,
   cards: [],
   refreshSession: async () => null,
-  fetchCards: async () => {},
+  fetchCards: async () => [],
 });
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -58,16 +58,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const fetchCards = async (page = 0, limit = 20, useCache = true) => {
+  const fetchCards = async (page = 0, limit = 20, useCache = true): Promise<Card[]> => {
     try {
       if (!user) {
         console.log('fetchCards: No authenticated user, skipping card fetch');
-        return;
+        return [];
       }
 
       // Use cached cards if available and requested
       if (useCache && cards.length > 0 && page === 0) {
-        return;
+        return cards;
       }
 
       console.log(`fetchCards: Fetching cards for user ${user.id}, page ${page}`);
@@ -151,12 +151,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         console.log(`fetchCards: Successfully fetched ${data?.length || 0} cards`);
 
-        // Append to existing cards for pagination, or replace for refresh
+        // Explicitly cast data to Card[] | null here using a double assertion
+        const fetchedCards: Card[] = (data as unknown as Card[] | null) || [];
+        let newCards: Card[];
         if (page === 0) {
-          setCards((data as any[]) || []);
+          newCards = fetchedCards;
         } else {
-          setCards(prev => [...prev, ...((data as any[]) || [])]);
+          newCards = [...cards, ...fetchedCards];
         }
+        setCards(newCards);
+        return newCards;
 
       } catch (queryErr) {
         console.error('fetchCards: Query execution failed:', queryErr);
@@ -167,7 +171,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const errorMessage = err instanceof Error ? err.message : 'Unknown error';
       console.error('Error in fetchCards:', errorMessage);
       console.error('Error details:', err);
+      return []; // Return empty array on error
     }
+    return []; // Should not be reached, but for type safety
   };
 
   useEffect(() => {
@@ -189,7 +195,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setUser(session?.user ?? null);
           
           if (session?.user) {
-            await fetchCards();
+            await fetchCards(); // This call updates the state, no need to capture return here
           }
         }
       } catch (error) {
@@ -211,7 +217,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         console.log('User signed in');
         setUser(session?.user ?? null);
         if (session?.user) {
-          await fetchCards();
+          await fetchCards(); // This call updates the state, no need to capture return here
         }
       } else if (event === 'SIGNED_OUT') {
         console.log('User signed out');
@@ -228,7 +234,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUser(session?.user ?? null);
         
         if (session?.user) {
-          await fetchCards();
+          await fetchCards(); // This call updates the state, no need to capture return here
         } else {
           setCards([]);
         }

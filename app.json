@@ -1,8 +1,8 @@
 {
   "expo": {
     "name": "Subtext",
-    "slug": "bolt-expo-nativewind",
-    "version": "1.0.0",
+    "slug": "subtext-card-game",
+    "version": "1.0.1",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "myapp",
@@ -16,10 +16,24 @@
       "**/*"
     ],
     "ios": {
+      "buildNumber": "4",
       "supportsTablet": true,
       "bundleIdentifier": "com.adamkretz.subtext",
       "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSCameraUsageDescription": "We need access to your camera to take photos for your cards.",
+        "NSPhotoLibraryUsageDescription": "We need access to your photo library to select images for your cards.",
+        "NSMicrophoneUsageDescription": "We need access to your microphone for audio recordings.",
+        "NSFaceIDUsageDescription": "We use Face ID to secure your account.",
+        "CFBundleAllowMixedLocalizations": true
+      },
+      "config": {
+        "usesNonExemptEncryption": false
+      },
+      "entitlements": {
+        "com.apple.developer.applesignin": [
+          "Default"
+        ]
       }
     },
     "android": {
@@ -52,8 +66,9 @@
         "origin": false
       },
       "eas": {
-        "projectId": "bc236e6d-0090-4c00-82ed-ba3981318bf5"
+        "projectId": "36a2ea6f-78db-430d-acf1-4605e47047ea"
       }
-    }
+    },
+    "owner": "arkretz44"
   }
 }
