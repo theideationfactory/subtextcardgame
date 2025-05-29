@@ -452,122 +452,197 @@ export default function CollectionScreen() {
     return null;
   }
 
-  // Calculate the current scale factor based on number of columns
+  // Calculate scaling factor based on number of columns
   const scaleFactor = getScaleFactor();
   
+  // Calculate card dimensions based on traditional trading card ratio (2.5:3.5)
+  const getCardDimensions = () => {
+    // Base width depends on screen width and number of columns
+    const cardWidth = (screenWidth / numColumns) - (24 * numColumns); // Account for margins
+    
+    // Calculate height based on the 2.5:3.5 ratio (7:5 height:width)
+    const cardHeight = cardWidth * (3.5 / 2.5);
+    
+    // Image should take up approximately half the card height
+    const imageHeight = cardHeight * 0.5;
+    
+    return { cardWidth, cardHeight, imageHeight };
+  };
+
   const renderCard = ({ item }: { item: Card }) => {
     const cardColors = getCardTypeColor(item.type);
     
-    // Calculate image height based on number of columns - progressively smaller as columns increase
-    // Following the scaling system from previous implementations (280px → 180px → 120px) for multi-column layouts
-    const imageHeight = numColumns === 1 ? 280 : numColumns === 2 ? 180 : 120; // Scale down height as columns increase
+    // Get card dimensions based on the 2.5:3.5 ratio
+    const { cardWidth, cardHeight, imageHeight } = getCardDimensions();
     
     // Calculate border width based on scale factor
     const borderWidth = Math.max(1, 3 * scaleFactor); // Min 1px, max 3px
     
     // Calculate font sizes based on scale factor
-    const nameSize = Math.max(16, 24 * scaleFactor); // Min 16px
-    const typeSize = Math.max(12, 16 * scaleFactor); // Min 12px
-    const descSize = Math.max(12, 16 * scaleFactor); // Min 12px
-    const contextSize = Math.max(10, 14 * scaleFactor); // Min 10px
+    const nameFontSize = Math.max(12, Math.round(24 * scaleFactor));
+    const typeFontSize = Math.max(10, Math.round(16 * scaleFactor));
+    const descriptionFontSize = Math.max(9, Math.round(16 * scaleFactor));
+    const contextFontSize = Math.max(8, Math.round(14 * scaleFactor));
+    
+    // Calculate padding based on scale factor
+    const contentPadding = Math.max(4, Math.round(8 * scaleFactor));
     
     return (
-      <Pressable 
+      <Pressable
         style={[
           styles.card,
           { 
-            flex: 1 // Allow card to grow within its column
+            width: cardWidth,
+            height: cardHeight,
           }
-        ]}>
+        ]}
+        onPress={() => handleEdit(item)}
+      >
         <LinearGradient
           colors={cardColors}
-          style={[
-            styles.cardFrame,
-            {
-              borderWidth: borderWidth,
-              borderColor: '#808080', // Always use gray
-              borderRadius: 16 * scaleFactor // Scale border radius
-            }
-          ]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
+          style={[
+            styles.cardFrame,
+            { 
+              borderWidth: borderWidth,
+              height: '100%',
+            }
+          ]}
         >
-          <View style={styles.cardContent}>
+          <View 
+            style={[
+              styles.cardContent,
+              { 
+                padding: contentPadding,
+                height: '100%',
+              }
+            ]}
+          >
+            {/* Top section - Card name */}
             <View style={styles.cardNameContainer}>
-              <Text style={[
-                styles.cardName, 
-                { 
-                  color: item.name_color || '#FFFFFF',
-                  fontSize: nameSize,
-                  padding: 8 * scaleFactor
-                }
-              ]}>
+              <Text 
+                style={[
+                  styles.cardName, 
+                  { 
+                    fontSize: nameFontSize,
+                    color: item.name_color || '#FFFFFF' 
+                  }
+                ]}
+                numberOfLines={1}
+              >
                 {item.name}
               </Text>
             </View>
 
-            <View style={[styles.artContainer, { height: imageHeight }]}>
-              <Image 
+            {/* Middle section - Card image (50% of card height) */}
+            <View 
+              style={[
+                styles.artContainer,
+                { height: imageHeight }
+              ]}
+            >
+              <Image
                 source={{ uri: item.image_url }}
                 style={styles.cardArt}
                 resizeMode="cover"
               />
             </View>
 
-            <View style={styles.typeLine}>
-              <View style={styles.typeContainer}>
-                <Text style={[
-                  styles.typeText, 
+            {/* Bottom section - Type line and description (50% of card height) */}
+            <View style={{ flex: 1 }}>
+              {/* Type line */}
+              <View style={[styles.typeLine, { marginTop: contentPadding }]}>
+                <View style={styles.typeContainer}>
+                  <Text 
+                    style={[
+                      styles.typeText, 
+                      { 
+                        fontSize: typeFontSize,
+                        color: item.type_color || '#FFFFFF' 
+                      }
+                    ]}
+                  >
+                    {item.type}
+                  </Text>
+                </View>
+                
+                {item.role && (
+                  <View style={styles.roleContainer}>
+                    {getCardRoleIcon(item.role)}
+                    <Text 
+                      style={[
+                        styles.roleText, 
+                        { 
+                          fontSize: Math.max(8, Math.round(14 * scaleFactor)),
+                          color: '#FFFFFF' 
+                        }
+                      ]}
+                    >
+                      {item.role}
+                    </Text>
+                  </View>
+                )}
+              </View>
+
+              {/* Description - directly below type line */}
+              <View 
+                style={[
+                  styles.textBox,
                   { 
-                    color: item.type_color || '#FFFFFF',
-                    fontSize: typeSize
+                    marginTop: contentPadding / 2,
+                    flex: 1,
                   }
-                ]}>
-                  {item.type || 'Card'}
+                ]}
+              >
+                <Text 
+                  style={[
+                    styles.cardDescription, 
+                    { 
+                      fontSize: descriptionFontSize,
+                      lineHeight: Math.max(14, Math.round(24 * scaleFactor)),
+                      color: item.description_color || '#FFFFFF' 
+                    }
+                  ]}
+                  numberOfLines={Math.max(3, Math.round(6 * scaleFactor))}
+                >
+                  {item.description}
                 </Text>
               </View>
-              {item.role && (
-                <View style={styles.roleContainer}>
-                  {getCardRoleIcon(item.role)}
-                  <Text style={[styles.roleText, { color: item.type_color || '#FFFFFF' }]}>
-                    {item.role}
+
+              {/* Context - at the bottom of the card */}
+              {item.context && (
+                <View style={[styles.contextContainer, { marginTop: contentPadding / 2 }]}>
+                  <Text 
+                    style={[
+                      styles.contextText, 
+                      { 
+                        fontSize: contextFontSize,
+                        color: item.context_color || '#CCCCCC' 
+                      }
+                    ]}
+                  >
+                    {item.context}
                   </Text>
                 </View>
               )}
             </View>
 
-            <View style={[
-              styles.textBox
-            ]}>
-              <Text style={[
-                styles.cardDescription, 
-                { 
-                  color: item.description_color || '#FFFFFF',
-                  fontSize: descSize,
-                  lineHeight: Math.max(18, 24 * scaleFactor)
-                }
-              ]}>
-                {item.description}
-              </Text>
-            </View>
-
-            {item.context && (
-              <View style={styles.contextContainer}>
-                <Text style={[styles.contextText, { color: item.context_color || '#CCCCCC' }]}>
-                  {item.context}
-                </Text>
-              </View>
-            )}
-
+            {/* Settings button - absolute positioned */}
             <TouchableOpacity
-              style={styles.settingsButton}
+              style={[
+                styles.settingsButton,
+                { 
+                  padding: Math.max(3, Math.round(5 * scaleFactor)),
+                }
+              ]}
               onPress={() => {
                 setSelectedCard(item);
                 setShowActions(true);
                 setDeleteError('');
               }}
             >
-              <Settings2 size={20} color="#fff" />
+              <Settings2 size={Math.max(12, Math.round(20 * scaleFactor))} color="#fff" />
             </TouchableOpacity>
           </View>
         </LinearGradient>
@@ -844,7 +919,7 @@ const styles = StyleSheet.create({
   cardFrame: {
     borderRadius: 16,
     borderWidth: 8,
-    borderColor: '#FFD700',
+    borderColor: '#C0C0C0',
   },
   cardContent: {
     backgroundColor: 'rgba(0, 0, 0, 0.85)',
