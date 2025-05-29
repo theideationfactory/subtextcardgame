@@ -640,6 +640,7 @@ export default function SpreadScreen() {
       setSavingDraft(true);
       const defaultName = SPREADS[selectedSpread].name;
       setSpreadName(defaultName);
+      setZoneCards({}); // Clear all cards from zones
 
       if (currentSpreadId) {
         const { error: updateError } = await supabase
