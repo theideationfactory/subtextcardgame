@@ -42,10 +42,14 @@ export default function CreateScreen() {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [imageDescription, setImageDescription] = useState('');
-  const [type, setType] = useState('');
-  const [role, setRole] = useState('');
-  const [context, setContext] = useState('');
+  const [type, setType] = useState('TBD');
+  const [role, setRole] = useState('TBD');
+  const [context, setContext] = useState('TBD');
   const [cardImage, setCardImage] = useState('');
+  
+  // Get return parameters for navigation
+  const returnTo = params.returnTo as string | undefined;
+  const returnZone = params.zone as string | undefined;
   
   // Use useEffect to properly set the state values from params
   useEffect(() => {
@@ -385,8 +389,20 @@ export default function CreateScreen() {
         setSuccessMessage('Card created successfully!');
         setTimeout(() => {
           setSuccessMessage('');
-          router.replace('/');
-        }, 2000);
+          if (returnTo === 'spread' && returnZone) {
+            // If we came from a spread zone, go back to the spread
+            router.replace({
+              pathname: '/spread',
+              params: { 
+                autoAddCard: newCard?.id,
+                autoAddZone: returnZone
+              }
+            });
+          } else {
+            // Otherwise go to the main screen
+            router.replace('/');
+          }
+        }, 1500);
       }
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'An unknown error occurred');

@@ -212,11 +212,44 @@ export default function SpreadScreen() {
   const [selectedCardForFullView, setSelectedCardForFullView] = useState<any>(null);
   const [successMessage, setSuccessMessage] = useState('');
   const [cardToRemove, setCardToRemove] = useState<{card: any, zone: string} | null>(null);
+  const [autoAddCard, setAutoAddCard] = useState<string | null>(null);
+  const [autoAddZone, setAutoAddZone] = useState<string | null>(null);
 
   const [fontsLoaded] = useFonts({
     'Inter-Regular': Inter_400Regular,
     'Inter-Bold': Inter_700Bold,
   });
+
+  // Handle auto-adding a card when returning from create screen
+  useEffect(() => {
+    if (params.autoAddCard && params.autoAddZone) {
+      const cardId = Array.isArray(params.autoAddCard) ? params.autoAddCard[0] : params.autoAddCard;
+      const zone = Array.isArray(params.autoAddZone) ? params.autoAddZone[0] : params.autoAddZone;
+      
+      setAutoAddCard(cardId);
+      setAutoAddZone(zone);
+      
+      // Clear the params to prevent re-adding on re-render
+      router.setParams({});
+    }
+  }, [params.autoAddCard, params.autoAddZone]);
+  
+  // Try to find and add the auto-add card when cards are loaded
+  useEffect(() => {
+    if (autoAddCard && autoAddZone && cards.length > 0) {
+      const cardToAdd = cards.find(card => card.id === autoAddCard);
+      if (cardToAdd) {
+        setZoneCards(prev => ({
+          ...prev,
+          [autoAddZone]: [...(prev[autoAddZone] || []), cardToAdd]
+        }));
+        setSuccessMessage('Card added to spread!');
+        setTimeout(() => setSuccessMessage(''), 3000);
+      }
+      setAutoAddCard(null);
+      setAutoAddZone(null);
+    }
+  }, [autoAddCard, autoAddZone, cards]);
 
   useEffect(() => {
     const initializeScreen = async () => {
@@ -262,18 +295,36 @@ export default function SpreadScreen() {
     loadDraftIfNeeded();
   }, [params.draftId, currentSpreadId]); // Use currentSpreadId instead of selectedSpread to prevent re-loading the same draft
 
-  const handleShowGallery = useCallback((zoneName: string) => {
+  const handleShowGallery = useCallback(async (zoneName: string) => {
     setActiveZone(zoneName);
+    setGalleryLoading(true);
+    try {
+      // Fetch the latest cards, bypassing cache
+      const latestCards = await fetchCards(0, 20, false);
+      setFilteredCards(latestCards);
+    } catch (err) {
+      console.error('Error fetching cards:', err);
+      // Fall back to current cards if fetch fails
+      setFilteredCards(cards);
+    } finally {
+      setGalleryLoading(false);
+    }
     setShowGallery(true);
-    // Initialize filteredCards with all cards when opening the gallery
-    setFilteredCards(cards);
     setGallerySearchQuery(''); // Reset search query
-  }, [cards]);
+  }, [fetchCards, cards]);
 
-  // Initialize filteredCards when cards change
+  // Update filteredCards when cards change and gallery is open
   useEffect(() => {
     if (showGallery) {
-      setFilteredCards(cards);
+      setFilteredCards(prev => {
+        // Only update if there's an actual change in cards
+        const cardIds = new Set(cards.map(card => card.id));
+        const prevIds = new Set(prev.map(card => card.id));
+        const hasChanges = cards.length !== prev.length || 
+                         cards.some(card => !prevIds.has(card.id)) ||
+                         prev.some(card => !cardIds.has(card.id));
+        return hasChanges ? [...cards] : prev;
+      });
     }
   }, [cards, showGallery]);
 
@@ -674,9 +725,12 @@ export default function SpreadScreen() {
   };
 
   const handleCreateCard = () => {
+    const currentZone = activeZone;
     setShowGallery(false);
-    setActiveZone(null);
-    router.push('/create');
+    router.push({
+      pathname: '/create',
+      params: { returnTo: 'spread', zone: currentZone }
+    });
   };
 
   const removeCardFromZone = (cardId: string, zoneName: string) => {
