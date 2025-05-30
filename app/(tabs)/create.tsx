@@ -431,7 +431,20 @@ export default function CreateScreen() {
           <Text style={styles.optionDescription}>Design a custom card with your own text and AI-generated image</Text>
         </Pressable>
         
-        {/* You can add more options here in the future */}
+        <Pressable 
+          style={[styles.optionCard, styles.comingSoonCard]}
+          onPress={() => router.push('/(tabs)/ai-card-flow')}
+        >
+          <View style={styles.optionIconContainer}>
+            <Wand2 size={32} color="#888" />
+          </View>
+          <Text style={styles.optionTitle}>AI Card Flow</Text>
+          <Text style={styles.optionDescription}>Generate multiple cards in a guided AI-powered flow (Coming Soon)</Text>
+          <View style={styles.comingSoonBadge}>
+            <Text style={styles.comingSoonText}>Coming Soon</Text>
+          </View>
+        </Pressable>
+        
         <Pressable style={[styles.optionCard, styles.comingSoonCard]}>
           <View style={styles.optionIconContainer}>
             <Wand2 size={32} color="#888" />
