@@ -121,6 +121,20 @@ export default function TabLayout() {
             headerShown: false, // Hide header for this screen
           }}
         />
+        <Tabs.Screen
+          name="ai-card-flow-step4"
+          options={{
+            href: null, // This screen is not a tab itself
+            headerShown: false, // Hide header for this screen
+          }}
+        />
+        <Tabs.Screen
+          name="ai-card-flow-review"
+          options={{
+            href: null, // This screen is not a tab itself
+            headerShown: false, // Hide header for this screen
+          }}
+        />
       </Tabs>
     </SafeAreaWrapper>
   );

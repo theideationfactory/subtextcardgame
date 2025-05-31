@@ -212,17 +212,15 @@ export default function AICardFlowStep3() {
     if (Platform.OS !== 'web') {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     }
-    
-    // In a real implementation, you would navigate to the next step
-    // with the card data
-    // router.push({
-    //   pathname: '/(tabs)/ai-card-flow-step4',
-    //   params: { 
-    //     cardData: JSON.stringify(cardData),
-    //     selectedCards: selectedCardIds.join(','),
-    //     prompt: conversationPrompt
-    //   }
-    // });
+    // Pass along cardData as JSON string, selectedCards, and prompt
+    router.push({
+      pathname: '/(tabs)/ai-card-flow-step4',
+      params: {
+        cardData: JSON.stringify(cardData),
+        selectedCards: selectedCardIds.join(','),
+        prompt: conversationPrompt,
+      },
+    });
   };
   
   const renderDropdown = (
