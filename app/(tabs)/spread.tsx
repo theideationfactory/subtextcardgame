@@ -293,7 +293,7 @@ export default function SpreadScreen() {
     };
 
     loadDraftIfNeeded();
-  }, [params.draftId, currentSpreadId]); // Use currentSpreadId instead of selectedSpread to prevent re-loading the same draft
+  }, [params.draftId]); // Only re-run if params.draftId changes
 
   const handleShowGallery = useCallback(async (zoneName: string) => {
     setActiveZone(zoneName);
@@ -685,31 +685,16 @@ export default function SpreadScreen() {
     }
   };
 
-  const resetSpreadTitle = async () => {
+  const resetSpreadTitle = () => {
     if (!selectedSpread) return;
     
-    try {
-      setSavingDraft(true);
-      const defaultName = SPREADS[selectedSpread].name;
-      setSpreadName(defaultName);
-      setZoneCards({}); // Clear all cards from zones
-
-      if (currentSpreadId) {
-        const { error: updateError } = await supabase
-          .from('spreads')
-          .update({
-            name: defaultName,
-          })
-          .eq('id', currentSpreadId);
-
-        if (updateError) throw updateError;
-      }
-    } catch (err) {
-      console.error('Error resetting spread name:', err);
-      setError('Failed to reset spread name');
-    } finally {
-      setSavingDraft(false);
-    }
+    // Clear local UI state
+    const defaultName = SPREADS[selectedSpread].name;
+    setSpreadName(defaultName);
+    setZoneCards({}); // Clear all cards from zones
+    setCurrentSpreadId(null); // Sever link to any previously saved draft
+    setError(''); // Clear any previous errors
+    // Do NOT update the database here. The user is starting fresh locally.
   };
 
   const handleAddCard = (card: any) => {
