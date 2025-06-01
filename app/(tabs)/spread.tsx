@@ -293,7 +293,7 @@ export default function SpreadScreen() {
     };
 
     loadDraftIfNeeded();
-  }, [params.draftId]); // Only re-run if params.draftId changes
+  }, [params.draftId, currentSpreadId]); // Use currentSpreadId instead of selectedSpread to prevent re-loading the same draft
 
   const handleShowGallery = useCallback(async (zoneName: string) => {
     setActiveZone(zoneName);
@@ -397,7 +397,7 @@ export default function SpreadScreen() {
       let currentCards = cards;
       if (!currentCards || currentCards.length === 0) {
         console.log('Cards not loaded, fetching cards first...');
-        currentCards = await fetchCards(); // Capture the returned cards
+        currentCards = await fetchCards(0, 1000, false); // Capture the returned cards, ensure no cache, fetch a larger limit
       }
 
       const { data: draft, error: draftError } = await supabase
@@ -418,6 +418,9 @@ export default function SpreadScreen() {
       }
 
       console.log('Draft loaded successfully:', draft);
+    if (draft?.draft_data?.zoneCards) {
+      console.log('Card IDs in shared draft zoneCards:', JSON.stringify(draft.draft_data.zoneCards));
+    }
 
       if (draft?.draft_data?.type && draft?.draft_data?.zoneCards) {
         console.log('Setting spread type to:', draft.draft_data.type);
@@ -430,6 +433,7 @@ export default function SpreadScreen() {
         currentCards.forEach(card => {
           cardsById[card.id] = card;
         });
+        console.log('Available card IDs in cardMap:', Object.keys(cardsById));
         setCardMap(cardsById);
 
         const restoredZoneCards: Record<string, any[]> = {};

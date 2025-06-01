@@ -124,38 +124,99 @@ export default function DraftsScreen() {
   };
 
   const handleSendDraft = async () => {
-    if (!currentDraftToSend || selectedFriends.length === 0) return;
+    if (!currentDraftToSend || selectedFriends.length === 0 || !user) return;
 
     setSending(true);
     try {
-      const { error: updateError } = await supabase
+      // First, get the full draft data to duplicate
+      const { data: originalDraft, error: fetchError } = await supabase
         .from('spreads')
-        .update({ 
-          shared_with_user_ids: selectedFriends, 
-          last_modified: new Date().toISOString() 
-        })
-        .eq('id', currentDraftToSend.id);
+        .select('*')
+        .eq('id', currentDraftToSend.id)
+        .single();
 
-      if (updateError) throw updateError;
+      if (fetchError) throw fetchError;
+      if (!originalDraft) throw new Error('Could not find the original draft');
 
-      console.log(`Draft ${currentDraftToSend.id} successfully shared with:`, selectedFriends);
+      // Extract card IDs from the original draft's draft_data.zoneCards
+      let cardIdsToMakePublic: string[] = [];
+      if (originalDraft.draft_data && originalDraft.draft_data.zoneCards) {
+        const zoneCards = originalDraft.draft_data.zoneCards as Record<string, string[]>; // Type assertion
+        const allCardIds = Object.values(zoneCards).flat();
+        cardIdsToMakePublic = [...new Set(allCardIds)]; // Get unique card IDs
+      }
+
+      // If there are cards in the draft, update their is_public status
+      if (cardIdsToMakePublic.length > 0) {
+        console.log('Making cards public:', cardIdsToMakePublic);
+        const { error: updateCardsError } = await supabase
+          .from('cards')
+          .update({ is_public: true })
+          .in('id', cardIdsToMakePublic);
+
+        if (updateCardsError) {
+          console.error('Error making cards public:', updateCardsError);
+          throw new Error('Failed to update card visibility for sharing.');
+        }
+        console.log('Successfully made cards public for sharing.');
+      }
+
+      // Create a new shared draft with "Shared" in the title
+      const sharedDraftName = `${originalDraft.name} (Shared)`;
       
-      // Optionally, update the local drafts state to reflect the change
-      setDrafts(prevDrafts =>
-        prevDrafts.map(draft =>
-          draft.id === currentDraftToSend.id
-            ? { ...draft, last_modified: new Date().toISOString() } // Update last_modified locally
-            : draft
-        )
-      );
+      // Create a complete copy of all fields from the original draft
+      const sharedDraft = {
+        // Copy all fields from the original draft
+        ...originalDraft,
+        // Override specific fields for the shared version
+        id: undefined, // Remove ID so a new one is generated
+        name: sharedDraftName,
+        is_draft: true,
+        user_id: user.id,
+        shared_with_user_ids: selectedFriends,
+        last_modified: new Date().toISOString()
+      };
+      
+      // Ensure all required fields have default values if missing
+      if (!sharedDraft.color) sharedDraft.color = '#6366f1';
+      if (!sharedDraft.icon) sharedDraft.icon = 'FileText';
+      if (!sharedDraft.description) sharedDraft.description = 'Shared spread';
+      if (!sharedDraft.zones) sharedDraft.zones = [];
+      
+      console.log('Creating shared draft with data:', JSON.stringify(sharedDraft, null, 2));
+      
+      // Insert the complete shared draft
+      const { data: newDraft, error: insertError } = await supabase
+        .from('spreads')
+        .insert(sharedDraft)
+        .select()
+        .single();
+
+      if (insertError) throw insertError;
+
+      console.log(`Created shared draft ${newDraft.id} from ${currentDraftToSend.id}, shared with:`, selectedFriends);
+      
+      // No need to update the original draft
+      // Just add the new draft to the local state
+      if (newDraft) {
+        setDrafts(prevDrafts => [
+          {
+            id: newDraft.id,
+            name: sharedDraftName,
+            last_modified: newDraft.last_modified,
+            color: originalDraft.color
+          },
+          ...prevDrafts
+        ]);
+      }
 
       setShowSendModal(false);
       setSelectedFriends([]);
       setCurrentDraftToSend(null);
       setError('');
     } catch (err) {
-      console.error('Error sending draft:', err);
-      setError('Failed to send draft.');
+      console.error('Error creating shared draft:', err);
+      setError('Failed to create shared draft.');
     } finally {
       setSending(false);
     }

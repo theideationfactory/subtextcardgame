@@ -135,11 +135,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
 
         // Now do the final query with all working columns
-        console.log(`fetchCards: Final query with columns: ${workingColumns}`);
+        const filterCondition = `user_id.eq.${user.id},is_public.eq.true`;
+      console.log(`fetchCards: Final query with columns: ${workingColumns} using filter: .or(${filterCondition})`);
         const { data, error: fetchError } = await supabase
           .from('cards')
           .select(workingColumns)
-          .eq('user_id', user.id)
+          .or(`user_id.eq.${user.id},is_public.eq.true`)
           .order('created_at', { ascending: false })
           .range(page * limit, (page + 1) * limit - 1);
 

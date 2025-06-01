@@ -12,6 +12,8 @@ interface SharedDraft {
   last_modified: string;
   color?: string;
   user_id: string; // The ID of the user who shared it
+  shared_with_user_ids?: string[]; // Array of user IDs this draft is shared with
+  direction: 'incoming' | 'outgoing'; // Whether this draft was shared with the user or by the user
 }
 
 const supabase = createClient(
@@ -46,16 +48,39 @@ export default function InboxScreen() {
         return;
       }
 
-      // Query for drafts where the current user's ID is in the shared_with_user_ids array
-      const { data, error: fetchError } = await supabase
+      // Query for incoming drafts (shared with the current user)
+      const { data: incomingData, error: incomingError } = await supabase
         .from('spreads')
-        .select('id, name, last_modified, color, user_id')
+        .select('id, name, last_modified, color, user_id, shared_with_user_ids')
         .contains('shared_with_user_ids', [user.id])
         .order('last_modified', { ascending: false });
 
-      if (fetchError) throw fetchError;
+      if (incomingError) throw incomingError;
 
-      setSharedDrafts(data || []);
+      // Query for outgoing drafts (shared by the current user with others)
+      const { data: outgoingData, error: outgoingError } = await supabase
+        .from('spreads')
+        .select('id, name, last_modified, color, user_id, shared_with_user_ids')
+        .eq('user_id', user.id)
+        .not('shared_with_user_ids', 'is', null)
+        .order('last_modified', { ascending: false });
+
+      if (outgoingError) throw outgoingError;
+
+      // Process incoming drafts
+      const incomingDrafts = (incomingData || []).map(draft => ({
+        ...draft,
+        direction: 'incoming' as const
+      }));
+
+      // Process outgoing drafts
+      const outgoingDrafts = (outgoingData || []).map(draft => ({
+        ...draft,
+        direction: 'outgoing' as const
+      }));
+
+      // Combine both types of drafts
+      setSharedDrafts([...incomingDrafts, ...outgoingDrafts]);
     } catch (err) {
       console.error('Error fetching shared drafts:', err);
       const errorMessage = err instanceof Error ? err.message : 'Failed to load shared drafts';
@@ -75,25 +100,39 @@ export default function InboxScreen() {
     return new Date(date).toLocaleString(undefined, options);
   };
 
-  const renderSharedDraft = ({ item }: { item: SharedDraft }) => (
-    <TouchableOpacity 
-      style={styles.draftItem}
-      onPress={() => router.replace({
-        pathname: '/(tabs)/spread',
-        params: { draftId: item.id } // Use draftId to open the spread
-      })}
-    >
-      <View style={styles.draftInfo}>
-        <View style={styles.draftHeader}>
-          <FileText size={20} color={item.color} style={styles.draftIcon} />
-          <Text style={styles.draftName}>{item.name}</Text>
+  const renderSharedDraft = ({ item }: { item: SharedDraft }) => {
+    // Determine label based on direction
+    const directionLabel = item.direction === 'incoming' ? 'Received' : 'Sent';
+    
+    // Add a badge/indicator for the direction
+    const badgeStyle = item.direction === 'incoming' ? 
+      styles.incomingBadge : styles.outgoingBadge;
+    const badgeTextStyle = item.direction === 'incoming' ? 
+      styles.incomingBadgeText : styles.outgoingBadgeText;
+      
+    return (
+      <TouchableOpacity 
+        style={styles.draftItem}
+        onPress={() => router.replace({
+          pathname: '/(tabs)/spread',
+          params: { draftId: item.id } // Use draftId to open the spread
+        })}
+      >
+        <View style={styles.draftInfo}>
+          <View style={styles.draftHeader}>
+            <FileText size={20} color={item.color} style={styles.draftIcon} />
+            <Text style={styles.draftName}>{item.name}</Text>
+            <View style={badgeStyle}>
+              <Text style={badgeTextStyle}>{directionLabel}</Text>
+            </View>
+          </View>
+          <Text style={styles.draftDate}>
+            {directionLabel}: {formatDate(item.last_modified)}
+          </Text>
         </View>
-        <Text style={styles.draftDate}>
-          Shared: {formatDate(item.last_modified)}
-        </Text>
-      </View>
-    </TouchableOpacity>
-  );
+      </TouchableOpacity>
+    );
+  };
 
   return (
     <View style={styles.container}>
@@ -135,6 +174,30 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#000',
+  },
+  incomingBadge: {
+    backgroundColor: '#4CAF50',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
+    marginLeft: 8,
+  },
+  outgoingBadge: {
+    backgroundColor: '#6366f1',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
+    marginLeft: 8,
+  },
+  incomingBadgeText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: 'bold',
+  },
+  outgoingBadgeText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: 'bold',
   },
   header: {
     flexDirection: 'row',
