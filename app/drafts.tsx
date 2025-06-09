@@ -139,26 +139,46 @@ export default function DraftsScreen() {
       if (!originalDraft) throw new Error('Could not find the original draft');
 
       // Extract card IDs from the original draft's draft_data.zoneCards
-      let cardIdsToMakePublic: string[] = [];
+      let cardIdsToShare: string[] = [];
       if (originalDraft.draft_data && originalDraft.draft_data.zoneCards) {
         const zoneCards = originalDraft.draft_data.zoneCards as Record<string, string[]>; // Type assertion
         const allCardIds = Object.values(zoneCards).flat();
-        cardIdsToMakePublic = [...new Set(allCardIds)]; // Get unique card IDs
+        cardIdsToShare = [...new Set(allCardIds)]; // Get unique card IDs
       }
 
-      // If there are cards in the draft, update their is_public status
-      if (cardIdsToMakePublic.length > 0) {
-        console.log('Making cards public:', cardIdsToMakePublic);
-        const { error: updateCardsError } = await supabase
+      // If there are cards in the draft, update their shared_with_user_ids
+      if (cardIdsToShare.length > 0 && selectedFriends.length > 0) {
+        console.log('Sharing cards with specific users:', cardIdsToShare);
+        
+        // First, fetch the current shared_with_user_ids for all cards
+        const { data: cardsData, error: fetchCardsError } = await supabase
           .from('cards')
-          .update({ is_public: true })
-          .in('id', cardIdsToMakePublic);
-
-        if (updateCardsError) {
-          console.error('Error making cards public:', updateCardsError);
-          throw new Error('Failed to update card visibility for sharing.');
+          .select('id, shared_with_user_ids')
+          .in('id', cardIdsToShare);
+          
+        if (fetchCardsError) {
+          console.error('Error fetching cards:', fetchCardsError);
+          throw new Error('Failed to fetch cards for sharing.');
         }
-        console.log('Successfully made cards public for sharing.');
+        
+        // For each card, update its shared_with_user_ids to include all selected friends
+        for (const card of cardsData || []) {
+          // Create a new array with existing shared_with_user_ids plus new friends
+          const currentSharedWith = card.shared_with_user_ids || [];
+          const newSharedWith = [...new Set([...currentSharedWith, ...selectedFriends])];
+          
+          const { error: updateCardError } = await supabase
+            .from('cards')
+            .update({ shared_with_user_ids: newSharedWith })
+            .eq('id', card.id);
+            
+          if (updateCardError) {
+            console.error(`Error updating card ${card.id}:`, updateCardError);
+            throw new Error('Failed to update card visibility for sharing.');
+          }
+        }
+        
+        console.log(`Successfully shared cards with ${selectedFriends.length} users.`);
       }
 
       // Create a new shared draft with "Shared" in the title
