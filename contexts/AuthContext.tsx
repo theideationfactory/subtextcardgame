@@ -140,7 +140,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const { data, error: fetchError } = await supabase
           .from('cards')
           .select(workingColumns)
-          .or(`user_id.eq.${user.id},is_public.eq.true`)
+          .or(`user_id.eq.${user.id},is_public.eq.true,shared_with_user_ids.cs.{${user.id}}`)
           .order('created_at', { ascending: false })
           .range(page * limit, (page + 1) * limit - 1);
 
