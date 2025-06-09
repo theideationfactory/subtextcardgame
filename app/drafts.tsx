@@ -194,6 +194,7 @@ export default function DraftsScreen() {
         is_draft: true,
         user_id: user.id,
         shared_with_user_ids: selectedFriends,
+        share_with_specific_friends: true, // Set this to true to indicate specific sharing
         last_modified: new Date().toISOString()
       };
       
@@ -212,7 +213,28 @@ export default function DraftsScreen() {
         .select()
         .single();
 
-      if (insertError) throw insertError;
+      if (insertError) throw insertError;      
+      
+      // Double-check that shared_with_user_ids was properly set
+      if (!newDraft.shared_with_user_ids || newDraft.shared_with_user_ids.length === 0) {
+        console.warn('shared_with_user_ids was not set properly on the new draft. Updating directly...');
+        
+        // Update the draft directly to ensure shared_with_user_ids is set
+        const { error: updateError } = await supabase
+          .from('spreads')
+          .update({ 
+            shared_with_user_ids: selectedFriends,
+            share_with_specific_friends: true
+          })
+          .eq('id', newDraft.id);
+          
+        if (updateError) {
+          console.error('Error updating shared_with_user_ids on draft:', updateError);
+          // Continue anyway since the cards should still be shared
+        } else {
+          console.log(`Updated shared_with_user_ids on draft ${newDraft.id}`);
+        }
+      }
 
       console.log(`Created shared draft ${newDraft.id} from ${currentDraftToSend.id}, shared with:`, selectedFriends);
       
