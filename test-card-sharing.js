@@ -104,7 +104,10 @@ async function runTest() {
       
       const { error: updateCardError } = await supabase
         .from('cards')
-        .update({ shared_with_user_ids: newSharedWith })
+        .update({
+          shared_with_user_ids: newSharedWith,
+          share_with_specific_friends: true
+        })
         .eq('id', card.id);
         
       if (updateCardError) throw updateCardError;
