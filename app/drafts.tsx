@@ -128,184 +128,116 @@ export default function DraftsScreen() {
 
     setSending(true);
     try {
-      // First, get the full draft data to duplicate
-      const { data: originalDraft, error: fetchError } = await supabase
+      // Get the full spread data to update
+      const { data: spreadData, error: fetchError } = await supabase
         .from('spreads')
         .select('*')
         .eq('id', currentDraftToSend.id)
         .single();
 
       if (fetchError) throw fetchError;
-      if (!originalDraft) throw new Error('Could not find the original draft');
+      if (!spreadData) throw new Error('Could not find the spread');
       
-      // Create a new shared draft with "Shared" in the title
-      const sharedDraftName = `${originalDraft.name} (Shared)`;
+      console.log('Updating spread sharing for:', spreadData.name);
+      console.log('Selected friends to share with:', selectedFriends);
       
-      // Create a complete copy of all fields from the original draft
-      const sharedDraft = {
-        // Copy all fields from the original draft
-        ...originalDraft,
-        // Override specific fields for the shared version
-        id: undefined, // Remove ID so a new one is generated
-        name: sharedDraftName,
-        is_draft: true,
-        user_id: user.id,
-        shared_with_user_ids: selectedFriends,
-        share_with_specific_friends: true, // Set this to true to indicate specific sharing
-        last_modified: new Date().toISOString()
-      };
+      // 1. Update the spread's shared_with_user_ids
+      // Merge existing shared_with_user_ids with new ones
+      const currentSharedWith = Array.isArray(spreadData.shared_with_user_ids) 
+        ? spreadData.shared_with_user_ids 
+        : [];
+      const newSharedWith = Array.from(new Set([...currentSharedWith, ...selectedFriends]));
       
-      // Ensure all required fields have default values if missing
-      if (!sharedDraft.color) sharedDraft.color = '#6366f1';
-      if (!sharedDraft.icon) sharedDraft.icon = 'FileText';
-      if (!sharedDraft.description) sharedDraft.description = 'Shared spread';
-      if (!sharedDraft.zones) sharedDraft.zones = [];
+      console.log('Updating spread sharing info:', {
+        current: currentSharedWith,
+        new: newSharedWith
+      });
       
-      console.log('Creating shared draft with data:', JSON.stringify(sharedDraft, null, 2));
-      
-      // Insert the complete shared draft FIRST, before updating cards
-      const { data: newDraft, error: insertError } = await supabase
+      const { error: updateSpreadError } = await supabase
         .from('spreads')
-        .insert(sharedDraft)
-        .select()
-        .single();
-
-      if (insertError) throw insertError;
-      if (!newDraft) throw new Error('Failed to create new shared draft');
-      
-      // Double-check that shared_with_user_ids was properly set
-      if (!newDraft.shared_with_user_ids || newDraft.shared_with_user_ids.length === 0) {
-        console.warn('shared_with_user_ids was not set properly on the new draft. Updating directly...');
+        .update({
+          shared_with_user_ids: newSharedWith,
+          share_with_specific_friends: true
+        })
+        .eq('id', currentDraftToSend.id);
         
-        // Update the draft directly to ensure shared_with_user_ids is set
-        const { error: updateError } = await supabase
-          .from('spreads')
-          .update({ 
-            shared_with_user_ids: selectedFriends,
-            share_with_specific_friends: true
-          })
-          .eq('id', newDraft.id);
-          
-        if (updateError) {
-          console.error('Error updating shared_with_user_ids:', updateError);
-        }
-      }
-
-      // Extract card IDs from the original draft's draft_data.zoneCards
-      let cardIdsToShare: string[] = [];
-      if (originalDraft.draft_data && originalDraft.draft_data.zoneCards) {
-        const zoneCards = originalDraft.draft_data.zoneCards as Record<string, string[]>; // Type assertion
-        const allCardIds = Object.values(zoneCards).flat();
-        cardIdsToShare = [...new Set(allCardIds)]; // Get unique card IDs
+      if (updateSpreadError) {
+        console.error('Error updating spread sharing info:', updateSpreadError);
+        throw new Error('Failed to update spread sharing information');
       }
       
-      if (cardIdsToShare.length > 0) {
-        console.log('Sharing cards with specific users:', cardIdsToShare);
+      console.log('Successfully updated spread sharing info');
+      
+      // 2. Get all cards in the spread
+      const zoneCards = spreadData.draft_data?.zoneCards || {};
+      const cardIds = Object.values(zoneCards).flat();
+      
+      if (cardIds.length === 0) {
+        console.log('No cards found in the spread');
+      } else {
+        console.log(`Found ${cardIds.length} cards in spread:`, cardIds);
         
-        // First, fetch the current shared_with_user_ids for all cards
-        const { data: cardsData, error: fetchCardsError } = await supabase
+        // 3. Fetch all cards data
+        const { data: cardsData, error: cardsError } = await supabase
           .from('cards')
-          .select('id, user_id, shared_with_user_ids, share_with_specific_friends')
-          .in('id', cardIdsToShare);
-          
-        if (fetchCardsError) {
-          console.error('Error fetching cards:', fetchCardsError);
-          throw new Error('Failed to fetch cards for sharing.');
+          .select('*')
+          .in('id', cardIds);
+        
+        if (cardsError) {
+          console.error('Error fetching cards:', cardsError);
+          throw new Error('Failed to fetch cards for sharing');
         }
         
-        console.log('Cards fetched:', cardsData);
-        console.log('User context:', user);
+        console.log(`Retrieved ${cardsData?.length || 0} cards from database`);
         
-        // For each card, create a new copy with the shared_with_user_ids updated
-        const oldToNewCardIds: Record<string, string> = {};
+        // 4. Update sharing info for each card
         for (const card of cardsData || []) {
-          console.log('Card ownership:', card);
-          console.log('User ID:', user.id);
-          console.log('Card user ID:', card.user_id);
-          if (card.user_id !== user.id) {
-            console.error('Card is not owned by the current user. Skipping update.');
-            continue;
-          }
-          
-          // Create a new array with existing shared_with_user_ids plus new friends
-          const currentSharedWith = card.shared_with_user_ids || [];
-          const newSharedWith = [...new Set([...currentSharedWith, ...selectedFriends])];
-          
-          console.log(`Creating new card copy with updated shared_with_user_ids:`, {
-            current: { shared_with_user_ids: currentSharedWith, share_with_specific_friends: card.share_with_specific_friends },
-            new: { shared_with_user_ids: newSharedWith, share_with_specific_friends: true, spread_id: newDraft.id }
+          console.log(`Processing card ${card.id}:`, {
+            cardOwner: card.user_id,
+            currentUser: user.id,
+            name: card.name
           });
           
-          const newCard = {
-            ...card,
-            id: undefined, // Remove ID so a new one is generated
-            shared_with_user_ids: newSharedWith,
-            share_with_specific_friends: true,
-            spread_id: newDraft.id // Link card to the shared spread created earlier
-          };
-          
-          const { data: newCardData, error: insertCardError } = await supabase
-            .from('cards')
-            .insert(newCard)
-            .select()
-            .single();
+          // Only update cards owned by the current user
+          if (card.user_id === user.id) {
+            // Merge existing shared_with_user_ids with new ones
+            const cardSharedWith = Array.isArray(card.shared_with_user_ids) 
+              ? card.shared_with_user_ids 
+              : [];
+            const updatedSharedWith = Array.from(new Set([...cardSharedWith, ...selectedFriends]));
             
-          if (insertCardError) {
-            console.error(`Error inserting new card copy ${card.id}:`, insertCardError);
-            console.log('Error details:', insertCardError.details);
-            console.log('Error hint:', insertCardError.hint);
-            console.log('Error code:', insertCardError.code);
-            throw new Error('Failed to insert new card copy for sharing.');
+            console.log(`Updating card ${card.id} sharing info:`, {
+              current: cardSharedWith,
+              new: updatedSharedWith
+            });
+            
+            const { error: updateCardError } = await supabase
+              .from('cards')
+              .update({
+                shared_with_user_ids: updatedSharedWith,
+                share_with_specific_friends: true,
+                spread_id: currentDraftToSend.id // Ensure card is linked to the spread
+              })
+              .eq('id', card.id);
+              
+            if (updateCardError) {
+              console.error(`Error updating card ${card.id}:`, updateCardError);
+              console.error('Error details:', updateCardError.details);
+              console.error('Error hint:', updateCardError.hint);
+            } else {
+              console.log(`✓ Successfully updated card ${card.id} sharing info`);
+            }
           } else {
-            console.log(`✅ New card copy ${newCardData.id} inserted successfully:`, newCardData);
-            oldToNewCardIds[card.id] = newCardData.id;
+            console.log(`Skipping card ${card.id} (not owned by current user)`);
+            // Note: We're not modifying cards owned by other users
           }
         }
-        
-        console.log(`Successfully shared cards with ${selectedFriends.length} users.`);
-        
-        // Update the shared spread's zoneCards with new card IDs
-        const zoneCards = originalDraft.draft_data.zoneCards as Record<string, string[]>; // Type assertion
-        const updatedZoneCards = Object.fromEntries(
-          Object.entries(zoneCards).map(([zone, cardIds]) => [
-            zone,
-            cardIds.map(cardId => oldToNewCardIds[cardId] || cardId)
-          ])
-        );
-        
-        const { error: updateZoneCardsError } = await supabase
-          .from('spreads')
-          .update({
-            draft_data: {
-              ...originalDraft.draft_data,
-              zoneCards: updatedZoneCards
-            }
-          })
-          .eq('id', newDraft.id);
-          
-        if (updateZoneCardsError) {
-          console.error('Error updating zoneCards:', updateZoneCardsError);
-        }
       }
-
-      console.log(`Created shared draft ${newDraft.id} from ${currentDraftToSend.id}, shared with:`, selectedFriends);
       
-      // No need to update the original draft
-      // Just add the new draft to the local state
-      setDrafts(prevDrafts => [
-        {
-          id: newDraft.id,
-          name: sharedDraftName,
-          last_modified: newDraft.last_modified,
-          color: originalDraft.color
-        },
-        ...prevDrafts
-      ]);
-
-
       setShowSendModal(false);
       setSelectedFriends([]);
       setCurrentDraftToSend(null);
+      alert('Successfully shared the spread!');
       setError('');
     } catch (err) {
       console.error('Error creating shared draft:', err);

@@ -18,6 +18,7 @@ type Card = {
   context_color: string;
   user_id: string;
   collection_id?: string;
+  shared_with_user_ids?: string[];
 };
 
 type AuthContextType = {
@@ -137,12 +138,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // Now do the final query with all working columns
         const filterCondition = `user_id.eq.${user.id},is_public.eq.true`;
       console.log(`fetchCards: Final query with columns: ${workingColumns} using filter: .or(${filterCondition})`);
-        const { data, error: fetchError } = await supabase
+        const query = supabase
           .from('cards')
           .select(workingColumns)
           .or(`user_id.eq.${user.id},is_public.eq.true,shared_with_user_ids.cs.{${user.id}}`)
           .order('created_at', { ascending: false })
           .range(page * limit, (page + 1) * limit - 1);
+
+        const { data, error: fetchError } = await query;
 
         if (fetchError) {
           console.error('fetchCards: Final query failed:', fetchError);

@@ -46,6 +46,27 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Spacer } from '@/components/Spacer';
 import { hasDynamicIsland } from '@/utils/deviceDimensions';
 
+// Define the types for our data structures
+interface Card {
+  id: string;
+  name: string;
+  description: string;
+  image_url: string;
+}
+
+interface Spread {
+  id: string;
+  name: string;
+  description: string;
+  color: string;
+  icon: string;
+  user_id: string;
+  zones: any[]; // Consider defining a proper type for zones
+  is_draft: boolean;
+  draft_data: any; // Consider defining a proper type for draft_data
+  last_modified: string;
+}
+
 const supabase = createClient(
   process.env.EXPO_PUBLIC_SUPABASE_URL!,
   process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY!
@@ -474,12 +495,6 @@ export default function SpreadScreen() {
       
       console.log('Saving draft for user:', user.id);
       
-      // Log authentication state
-      const { data: { session } } = await supabase.auth.getSession();
-      console.log('Current session:', session ? 'exists' : 'null');
-      console.log('Session user ID:', session?.user?.id);
-      console.log('AuthContext user ID:', user.id);
-      
       // Prepare zone cards data
       const zoneCardIds: Record<string, string[]> = {};
       Object.entries(zoneCards).forEach(([zoneName, cardsInZone]) => {
@@ -519,24 +534,7 @@ export default function SpreadScreen() {
       
       console.log('Data being saved to database:', JSON.stringify(dataToSave, null, 2));
       
-      // Log the current RLS context
-      const { data: rlsContext } = await supabase.rpc('current_setting', { name: 'role' });
-      console.log('Current RLS role:', rlsContext);
-      
-      // Test RLS with a direct query
-      try {
-        const { data: testData, error: testError } = await supabase
-          .from('spreads')
-          .select('id')
-          .eq('user_id', user.id)
-          .limit(1);
-          
-        console.log('RLS test query result:', { testData, testError });
-      } catch (testErr) {
-        console.error('RLS test query failed:', testErr);
-      }
-
-      let result;
+      let result: Spread | null = null;
       
       try {
         if (currentSpreadId) {
@@ -624,6 +622,32 @@ export default function SpreadScreen() {
           }
         }
 
+        // Update spread_id for all cards in the spread after successful save
+        if (result) {
+          const spreadId = result.id;
+          const allCardIds = Object.values(zoneCardIds).flat();
+          if (allCardIds.length > 0) {
+            console.log(`Linking ${allCardIds.length} cards to spread ${spreadId}`);
+            
+            const linkPromises = allCardIds.map(cardId =>
+              supabase.rpc('link_card_to_spread', {
+                card_id_to_link: cardId,
+                target_spread_id: spreadId,
+              })
+            );
+            
+            const results = await Promise.allSettled(linkPromises);
+            
+            results.forEach((promiseResult, index) => {
+              if (promiseResult.status === 'rejected') {
+                console.error(`Error linking card ${allCardIds[index]} to spread:`, promiseResult.reason);
+              } else if (promiseResult.value.error) {
+                console.error(`Error linking card ${allCardIds[index]} to spread:`, promiseResult.value.error);
+              }
+            });
+          }
+        }
+
         if (name && name.trim()) {
           setSpreadName(name.trim());
         }
@@ -660,8 +684,7 @@ export default function SpreadScreen() {
           console.table(policies);
           
           // Log current user and role
-          const { data: userData } = await supabase.auth.getUser();
-          console.log('Current auth user:', userData.user?.id);
+          console.log('Current auth user:', user.id);
           
           // Log RLS context
           const { data: rlsContext } = await supabase.rpc('current_setting', { name: 'role' });
@@ -701,13 +724,27 @@ export default function SpreadScreen() {
     // Do NOT update the database here. The user is starting fresh locally.
   };
 
-  const handleAddCard = (card: any) => {
+  const handleAddCard = async (card: any) => {
     if (!activeZone) return;
     
+    // Update local state first
     setZoneCards(prev => ({
       ...prev,
       [activeZone]: [...(prev[activeZone] || []), card],
     }));
+    
+    // Use the new RPC to link the card to the spread
+    if (currentSpreadId) {
+      const { error } = await supabase.rpc('link_card_to_spread', {
+        card_id_to_link: card.id,
+        target_spread_id: currentSpreadId,
+      });
+
+      if (error) {
+        console.error('Error linking card to spread:', error);
+        // Don't throw error - the UI update already happened and this is a background operation
+      }
+    }
     
     setShowGallery(false);
     setActiveZone(null);
@@ -722,7 +759,8 @@ export default function SpreadScreen() {
     });
   };
 
-  const removeCardFromZone = (cardId: string, zoneName: string) => {
+  const removeCardFromZone = async (cardId: string, zoneName: string) => {
+    // Update local state first
     setZoneCards(prev => {
       const newZoneCards = { ...prev };
       if (newZoneCards[zoneName]) {
@@ -730,6 +768,17 @@ export default function SpreadScreen() {
       }
       return newZoneCards;
     });
+    
+    // Use the new RPC to unlink the card from the spread
+    const { error } = await supabase.rpc('unlink_card_from_spread', {
+      card_id_to_unlink: cardId,
+    });
+
+    if (error) {
+      console.error('Error unlinking card from spread:', error);
+      // Don't throw error - UI update already happened
+    }
+    
     setCardToRemove(null);
   };
 
