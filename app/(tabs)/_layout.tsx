@@ -1,0 +1,141 @@
+import { Tabs } from 'expo-router';
+import { Plus, Car as Cards, Settings, LayoutGrid as Layout, Users } from 'lucide-react-native';
+import { router } from 'expo-router';
+import { useEffect } from 'react';
+import { useAuth } from '@/contexts/AuthContext';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Platform } from 'react-native';
+import { SafeAreaWrapper } from '@/components/SafeAreaWrapper';
+import { TouchableOpacity } from 'react-native';
+
+export default function TabLayout() {
+  const { fetchCards } = useAuth();
+  const insets = useSafeAreaInsets();
+
+  useEffect(() => {
+    fetchCards();
+  }, [fetchCards]);
+
+  return (
+    <SafeAreaWrapper>
+      <Tabs
+        screenOptions={{
+          headerShown: false,
+          tabBarStyle: {
+            backgroundColor: '#1a1a1a',
+            borderTopWidth: 0,
+            elevation: 0,
+            shadowOpacity: 0,
+            height: Platform.OS === 'ios' ? 80 : 70,
+            paddingBottom: Platform.OS === 'ios' ? insets.bottom : 12,
+            paddingTop: 8,
+          },
+          tabBarLabelStyle: {
+            fontSize: 12,
+            marginBottom: 4,
+            fontFamily: 'Inter-Regular',
+          },
+          tabBarItemStyle: {
+            paddingVertical: 4,
+          },
+          tabBarActiveTintColor: '#fff',
+          tabBarInactiveTintColor: '#888',
+        }}>
+        <Tabs.Screen
+          name="index"
+          options={{
+            title: 'Cards',
+            tabBarIcon: ({ size, color }) => <Cards size={size} color={color} />,
+          }}
+        />
+        <Tabs.Screen
+          name="create"
+          options={{
+            title: 'Create',
+            tabBarIcon: ({ size, color }) => <Plus size={size} color={color} />,
+            tabBarButton: (props) => {
+              // Create a custom button that doesn't pass through all props
+              return (
+                <TouchableOpacity 
+                  style={props.style}
+                  activeOpacity={0.6}
+                  onPress={() => {
+                    router.push({
+                      pathname: '/create',
+                      params: {}
+                    });
+                  }}
+                >
+                  {props.children}
+                </TouchableOpacity>
+              );
+            },
+          }}
+        />
+        <Tabs.Screen
+          name="spread"
+          options={{
+            title: 'Spread',
+            tabBarIcon: ({ size, color }) => <Layout size={size} color={color} />,
+          }}
+        />
+        <Tabs.Screen
+          name="friends"
+          options={{
+            title: 'Friends',
+            tabBarIcon: ({ size, color }) => <Users size={size} color={color} />,
+          }}
+        />
+        <Tabs.Screen
+          name="settings"
+          options={{
+            title: 'Settings',
+            tabBarIcon: ({ size, color }) => <Settings size={size} color={color} />,
+          }}
+        />
+        <Tabs.Screen
+          name="inbox"
+          options={{
+            href: null, // This screen is not a tab itself
+            headerShown: false, // Hide header for this screen
+          }}
+        />
+        <Tabs.Screen
+          name="ai-card-flow"
+          options={{
+            href: null, // This screen is not a tab itself
+            headerShown: false, // Hide header for this screen
+          }}
+        />
+        <Tabs.Screen
+          name="ai-card-flow-step2"
+          options={{
+            href: null, // This screen is not a tab itself
+            headerShown: false, // Hide header for this screen
+          }}
+        />
+        <Tabs.Screen
+          name="ai-card-flow-step3"
+          options={{
+            href: null, // This screen is not a tab itself
+            headerShown: false, // Hide header for this screen
+          }}
+        />
+        <Tabs.Screen
+          name="ai-card-flow-step4"
+          options={{
+            href: null, // This screen is not a tab itself
+            headerShown: false, // Hide header for this screen
+          }}
+        />
+        <Tabs.Screen
+          name="ai-card-flow-review"
+          options={{
+            href: null, // This screen is not a tab itself
+            headerShown: false, // Hide header for this screen
+          }}
+        />
+      </Tabs>
+    </SafeAreaWrapper>
+  );
+}
