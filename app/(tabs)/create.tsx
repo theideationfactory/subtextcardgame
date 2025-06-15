@@ -122,6 +122,7 @@ export default function CreateScreen() {
   }, [params.id, params.name, params.description, params.type, params.role, params.context, params.image_url]);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isGeneratingDescription, setIsGeneratingDescription] = useState(false);
+  const [isGeneratingImageDescription, setIsGeneratingImageDescription] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const [error, setError] = useState('');
   const [errorDetails, setErrorDetails] = useState('');
@@ -309,6 +310,55 @@ export default function CreateScreen() {
       }
     } finally {
       setIsGeneratingDescription(false);
+    }
+  };
+
+  // Function to generate an image description based on card name, type, and description
+  const handleGenerateImageDescription = async () => {
+    if (!name) {
+      setError('Please provide a card name');
+      return;
+    }
+
+    setIsGeneratingImageDescription(true);
+    setError('');
+    setErrorDetails('');
+
+    try {
+      // First, try to refresh the session to ensure we have the latest token
+      const currentSession = await refreshSession();
+      
+      if (!currentSession || !currentSession.access_token) {
+        throw new Error('You must be logged in to generate an image description');
+      }
+
+      // Call the Supabase Edge Function to generate an image description
+      const { data, error } = await supabase.functions.invoke('generate-image-description', {
+        body: { 
+          cardName: name,
+          cardType: type !== 'TBD' ? type : undefined,
+          cardDescription: description || undefined
+        },
+      });
+
+      if (error) {
+        throw new Error(`API Error: ${error.message}`);
+      }
+
+      if (!data || !data.imageDescription) {
+        throw new Error('No image description was generated');
+      }
+      
+      setImageDescription(data.imageDescription);
+    } catch (err) {
+      console.error('Image description generation error:', err);
+      if (err instanceof Error) {
+        setError(err.message);
+      } else {
+        setError('An unknown error occurred');
+      }
+    } finally {
+      setIsGeneratingImageDescription(false);
     }
   };
 
@@ -570,6 +620,20 @@ export default function CreateScreen() {
           numberOfLines={4}
           textAlignVertical="top"
         />
+        <TouchableOpacity 
+          style={[styles.generateButton, styles.descriptionButton, (!name || isGeneratingImageDescription) && styles.generateButtonDisabled]} 
+          onPress={handleGenerateImageDescription}
+          disabled={!name || isGeneratingImageDescription}
+        >
+          {isGeneratingImageDescription ? (
+            <ActivityIndicator color="#fff" size="small" />
+          ) : (
+            <>
+              <Wand2 size={18} color="#fff" style={styles.buttonIcon} />
+              <Text style={styles.generateButtonText}>Generate Image Description</Text>
+            </>
+          )}
+        </TouchableOpacity>
         
         <Text style={styles.label}>Art Style</Text>
         <TouchableOpacity 
