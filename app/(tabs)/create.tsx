@@ -121,6 +121,7 @@ export default function CreateScreen() {
     }
   }, [params.id, params.name, params.description, params.type, params.role, params.context, params.image_url]);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isGeneratingDescription, setIsGeneratingDescription] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const [error, setError] = useState('');
   const [errorDetails, setErrorDetails] = useState('');
@@ -260,6 +261,54 @@ export default function CreateScreen() {
     } finally {
       setIsGenerating(false);
       setAuthChecking(false);
+    }
+  };
+
+  // Function to generate a description based on card name and type
+  const handleGenerateDescription = async () => {
+    if (!name) {
+      setError('Please provide a card name');
+      return;
+    }
+
+    setIsGeneratingDescription(true);
+    setError('');
+    setErrorDetails('');
+
+    try {
+      // First, try to refresh the session to ensure we have the latest token
+      const currentSession = await refreshSession();
+      
+      if (!currentSession || !currentSession.access_token) {
+        throw new Error('You must be logged in to generate a description');
+      }
+
+      // Call the Supabase Edge Function to generate a description
+      const { data, error } = await supabase.functions.invoke('generate-card-description', {
+        body: { 
+          cardName: name,
+          cardType: type !== 'TBD' ? type : undefined
+        },
+      });
+
+      if (error) {
+        throw new Error(`API Error: ${error.message}`);
+      }
+
+      if (!data || !data.description) {
+        throw new Error('No description was generated');
+      }
+      
+      setDescription(data.description);
+    } catch (err) {
+      console.error('Description generation error:', err);
+      if (err instanceof Error) {
+        setError(err.message);
+      } else {
+        setError('An unknown error occurred');
+      }
+    } finally {
+      setIsGeneratingDescription(false);
     }
   };
 
@@ -493,6 +542,20 @@ export default function CreateScreen() {
           numberOfLines={4}
           textAlignVertical="top"
         />
+        <TouchableOpacity 
+          style={[styles.generateButton, styles.descriptionButton, (!name || isGeneratingDescription) && styles.generateButtonDisabled]} 
+          onPress={handleGenerateDescription}
+          disabled={!name || isGeneratingDescription}
+        >
+          {isGeneratingDescription ? (
+            <ActivityIndicator color="#fff" size="small" />
+          ) : (
+            <>
+              <Wand2 size={18} color="#fff" style={styles.buttonIcon} />
+              <Text style={styles.generateButtonText}>Generate Description</Text>
+            </>
+          )}
+        </TouchableOpacity>
       </View>
       
       <View style={styles.inputGroup}>
@@ -1038,6 +1101,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 16,
+  },
+  descriptionButton: {
+    marginTop: 8,
+    marginBottom: 0,
   },
   generateButtonDisabled: {
     backgroundColor: '#4338ca',

@@ -51,7 +51,9 @@ export default function InboxScreen() {
       // Query for incoming drafts (shared with the current user)
       const { data: incomingData, error: incomingError } = await supabase
         .from('spreads')
-        .select('id, name, last_modified, color, user_id, shared_with_user_ids')
+        .select(`
+          id, name, last_modified, color, user_id, shared_with_user_ids
+        `)
         .contains('shared_with_user_ids', [user.id])
         .order('last_modified', { ascending: false });
 
@@ -60,7 +62,9 @@ export default function InboxScreen() {
       // Query for outgoing drafts (shared by the current user with others)
       const { data: outgoingData, error: outgoingError } = await supabase
         .from('spreads')
-        .select('id, name, last_modified, color, user_id, shared_with_user_ids')
+        .select(`
+          id, name, last_modified, color, user_id, shared_with_user_ids
+        `)
         .eq('user_id', user.id)
         .not('shared_with_user_ids', 'is', null)
         .order('last_modified', { ascending: false });

@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
   Platform,
   Modal,
+  Alert,
 } from 'react-native';
 import { useFonts, Inter_400Regular, Inter_700Bold } from '@expo-google-fonts/inter';
 import { useRouter } from 'expo-router';
@@ -127,121 +128,65 @@ export default function DraftsScreen() {
     if (!currentDraftToSend || selectedFriends.length === 0 || !user) return;
 
     setSending(true);
+    
     try {
-      // Get the full spread data to update
-      const { data: spreadData, error: fetchError } = await supabase
-        .from('spreads')
-        .select('*')
-        .eq('id', currentDraftToSend.id)
-        .single();
+      // 1. Start by fetching the full spread data
+      const { data: spreadData, error: fetchError } = await supabase.rpc('get_spread_with_cards', {
+        spread_id: currentDraftToSend.id,
+        user_id: user.id
+      });
 
       if (fetchError) throw fetchError;
       if (!spreadData) throw new Error('Could not find the spread');
       
-      console.log('Updating spread sharing for:', spreadData.name);
-      console.log('Selected friends to share with:', selectedFriends);
+      console.log('Sharing spread:', spreadData.name);
+      console.log('Sharing with users:', selectedFriends);
       
-      // 1. Update the spread's shared_with_user_ids
-      // Merge existing shared_with_user_ids with new ones
-      const currentSharedWith = Array.isArray(spreadData.shared_with_user_ids) 
-        ? spreadData.shared_with_user_ids 
-        : [];
-      const newSharedWith = Array.from(new Set([...currentSharedWith, ...selectedFriends]));
-      
-      console.log('Updating spread sharing info:', {
-        current: currentSharedWith,
-        new: newSharedWith
+      // 2. Use an RPC call to handle the sharing transaction atomically
+      const { data: result, error: shareError } = await supabase.rpc('share_spread_with_users', {
+        p_spread_id: currentDraftToSend.id,
+        p_recipient_ids: selectedFriends,
+        p_sharer_id: user.id
       });
       
-      const { error: updateSpreadError } = await supabase
-        .from('spreads')
-        .update({
-          shared_with_user_ids: newSharedWith,
-          share_with_specific_friends: true
-        })
-        .eq('id', currentDraftToSend.id);
-        
-      if (updateSpreadError) {
-        console.error('Error updating spread sharing info:', updateSpreadError);
-        throw new Error('Failed to update spread sharing information');
+      if (shareError) {
+        console.error('Error in sharing transaction:', shareError);
+        throw new Error(shareError.message || 'Failed to share spread');
       }
       
-      console.log('Successfully updated spread sharing info');
+      console.log('Sharing successful:', result);
       
-      // 2. Get all cards in the spread
-      const zoneCards = spreadData.draft_data?.zoneCards || {};
-      const cardIds = Object.values(zoneCards).flat();
-      
-      if (cardIds.length === 0) {
-        console.log('No cards found in the spread');
-      } else {
-        console.log(`Found ${cardIds.length} cards in spread:`, cardIds);
-        
-        // 3. Fetch all cards data
-        const { data: cardsData, error: cardsError } = await supabase
-          .from('cards')
-          .select('*')
-          .in('id', cardIds);
-        
-        if (cardsError) {
-          console.error('Error fetching cards:', cardsError);
-          throw new Error('Failed to fetch cards for sharing');
-        }
-        
-        console.log(`Retrieved ${cardsData?.length || 0} cards from database`);
-        
-        // 4. Update sharing info for each card
-        for (const card of cardsData || []) {
-          console.log(`Processing card ${card.id}:`, {
-            cardOwner: card.user_id,
-            currentUser: user.id,
-            name: card.name
-          });
-          
-          // Only update cards owned by the current user
-          if (card.user_id === user.id) {
-            // Merge existing shared_with_user_ids with new ones
-            const cardSharedWith = Array.isArray(card.shared_with_user_ids) 
-              ? card.shared_with_user_ids 
-              : [];
-            const updatedSharedWith = Array.from(new Set([...cardSharedWith, ...selectedFriends]));
-            
-            console.log(`Updating card ${card.id} sharing info:`, {
-              current: cardSharedWith,
-              new: updatedSharedWith
-            });
-            
-            const { error: updateCardError } = await supabase
-              .from('cards')
-              .update({
-                shared_with_user_ids: updatedSharedWith,
-                share_with_specific_friends: true,
-                spread_id: currentDraftToSend.id // Ensure card is linked to the spread
-              })
-              .eq('id', card.id);
-              
-            if (updateCardError) {
-              console.error(`Error updating card ${card.id}:`, updateCardError);
-              console.error('Error details:', updateCardError.details);
-              console.error('Error hint:', updateCardError.hint);
-            } else {
-              console.log(`✓ Successfully updated card ${card.id} sharing info`);
-            }
-          } else {
-            console.log(`Skipping card ${card.id} (not owned by current user)`);
-            // Note: We're not modifying cards owned by other users
-          }
-        }
-      }
-      
+      // 3. Update local state
       setShowSendModal(false);
       setSelectedFriends([]);
       setCurrentDraftToSend(null);
-      alert('Successfully shared the spread!');
+      
+      // 4. Show success message
+      Alert.alert(
+        'Success', 
+        'Spread shared successfully!',
+        [{ text: 'OK' }]
+      );
+      
       setError('');
     } catch (err) {
-      console.error('Error creating shared draft:', err);
-      setError('Failed to create shared draft.');
+      console.error('Error sharing spread:', err);
+      
+      // More specific error handling
+      let errorMessage = 'Failed to share spread.';
+      if (err instanceof Error) {
+        errorMessage = err.message;
+      } else if (typeof err === 'string') {
+        errorMessage = err;
+      }
+      
+      Alert.alert(
+        'Sharing Failed',
+        errorMessage,
+        [{ text: 'OK' }]
+      );
+      
+      setError(errorMessage);
     } finally {
       setSending(false);
     }

@@ -15,8 +15,6 @@ const supabase = createClient(
 SplashScreen.preventAutoHideAsync();
 
 export default function SettingsScreen() {
-  const [darkMode, setDarkMode] = useState(true);
-  const [notifications, setNotifications] = useState(true);
   const [walletConnected, setWalletConnected] = useState(false);
   const [walletAddress, setWalletAddress] = useState('');
   const router = useRouter();
@@ -64,32 +62,6 @@ export default function SettingsScreen() {
   return (
     <View style={styles.container}>
       {/* Spacer removed for consistent padding across tabs */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Appearance</Text>
-        <View style={styles.setting}>
-          <Text style={styles.settingText}>Dark Mode</Text>
-          <Switch
-            value={darkMode}
-            onValueChange={setDarkMode}
-            trackColor={{ false: '#3e3e3e', true: '#007AFF' }}
-            thumbColor="#fff"
-          />
-        </View>
-      </View>
-
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Notifications</Text>
-        <View style={styles.setting}>
-          <Text style={styles.settingText}>Enable Notifications</Text>
-          <Switch
-            value={notifications}
-            onValueChange={setNotifications}
-            trackColor={{ false: '#3e3e3e', true: '#007AFF' }}
-            thumbColor="#fff"
-          />
-        </View>
-      </View>
-
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Web3 & NFTs</Text>
         {!walletConnected ? (
