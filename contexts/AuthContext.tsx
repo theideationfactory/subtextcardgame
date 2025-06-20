@@ -19,6 +19,7 @@ type Card = {
   user_id: string;
   collection_id?: string;
   shared_with_user_ids?: string[];
+  is_shared_with_friends?: boolean;
 };
 
 type AuthContextType = {
@@ -26,7 +27,7 @@ type AuthContextType = {
   loading: boolean;
   cards: Card[];
   refreshSession: () => Promise<Session | null | undefined>;
-  fetchCards: (page?: number, limit?: number, useCache?: boolean) => Promise<Card[]>;
+  fetchCards: (page?: number, limit?: number, useCache?: boolean, scope?: string) => Promise<Card[]>;
 };
 
 const AuthContext = createContext<AuthContextType>({
@@ -59,7 +60,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const fetchCards = async (page = 0, limit = 20, useCache = true): Promise<Card[]> => {
+    const fetchCards = async (page = 0, limit = 20, useCache = true, scope?: string): Promise<Card[]> => {
     try {
       if (!user) {
         console.log('fetchCards: No authenticated user, skipping card fetch');
@@ -67,11 +68,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       // Use cached cards if available and requested
-      if (useCache && cards.length > 0 && page === 0) {
+            if (useCache && !scope && cards.length > 0 && page === 0) {
         return cards;
       }
 
-      console.log(`fetchCards: Fetching cards for user ${user.id}, page ${page}`);
+            console.log(`fetchCards: Fetching cards for user ${user.id}, page ${page}, scope: ${scope}`);
 
       // First, let's try a simple query to test basic connectivity
       const { data: testData, error: testError } = await supabase
@@ -107,7 +108,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         console.log(`fetchCards: Basic query successful, got ${basicData?.length || 0} cards`);
 
         // Now try adding the additional columns one by one
-        const additionalColumns = ['frame_width', 'frame_color', 'name_color', 'type_color', 'description_color', 'context_color', 'collection_id'];
+        const additionalColumns = ['frame_width', 'frame_color', 'name_color', 'type_color', 'description_color', 'context_color', 'collection_id', 'is_shared_with_friends'];
         let workingColumns = selectColumns;
 
         for (const col of additionalColumns) {
@@ -138,10 +139,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // Now do the final query with all working columns
         const filterCondition = `user_id.eq.${user.id},is_public.eq.true`;
       console.log(`fetchCards: Final query with columns: ${workingColumns} using filter: .or(${filterCondition})`);
-        const query = supabase
+                const query = supabase
           .from('cards')
-          .select(workingColumns)
-          .or(`user_id.eq.${user.id},is_public.eq.true,shared_with_user_ids.cs.{${user.id}}`)
+          .select(workingColumns);
+
+        if (scope === 'Personal') {
+          query.eq('user_id', user.id);
+        } else if (scope === 'Public') {
+          query.eq('is_public', true);
+        } else if (scope === 'Friends') {
+                    const friendsConditions = [`shared_with_user_ids.cs.{${user.id}}`];
+          if (workingColumns.includes('is_shared_with_friends')) {
+            friendsConditions.push('is_shared_with_friends.eq.true');
+          }
+          query.or(friendsConditions.join(','));
+        } else {
+          query.or(`user_id.eq.${user.id},is_public.eq.true,shared_with_user_ids.cs.{${user.id}}`);
+        }
+
+        query
           .order('created_at', { ascending: false })
           .range(page * limit, (page + 1) * limit - 1);
 
@@ -157,12 +173,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         // Explicitly cast data to Card[] | null here using a double assertion
         const fetchedCards: Card[] = (data as unknown as Card[] | null) || [];
-        let newCards: Card[];
-        if (page === 0) {
-          newCards = fetchedCards;
-        } else {
-          newCards = [...cards, ...fetchedCards];
-        }
+                // If it's the first page or a scope is applied, we replace the cards. Otherwise, we append for pagination.
+        const newCards = (page === 0 || scope) ? fetchedCards : [...cards, ...fetchedCards];
         setCards(newCards);
         return newCards;
 

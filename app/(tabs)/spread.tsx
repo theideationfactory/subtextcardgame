@@ -228,6 +228,7 @@ export default function SpreadScreen() {
   const [expandedCardId, setExpandedCardId] = useState<string | null>(null);
   const [galleryLoading, setGalleryLoading] = useState(false);
   const [gallerySearchQuery, setGallerySearchQuery] = useState('');
+  const [activeScope, setActiveScope] = useState('Personal');
   const [filteredCards, setFilteredCards] = useState<any[]>([]);
   const [showFullCardView, setShowFullCardView] = useState(false);
   const [selectedCardForFullView, setSelectedCardForFullView] = useState<any>(null);
@@ -276,6 +277,7 @@ export default function SpreadScreen() {
     const initializeScreen = async () => {
       try {
         setLoading(true);
+        // Fetch all cards initially to populate the base `cards` state
         await fetchCards();
       } catch (err) {
         console.error('Error initializing screen:', err);
@@ -286,13 +288,24 @@ export default function SpreadScreen() {
     };
 
     initializeScreen();
-  }, []);
+  }, []); // Run only once on mount
 
+  // This effect reacts to gallery visibility and scope changes to fetch the correct cards.
   useEffect(() => {
     if (showGallery) {
-      fetchCards();
+      setGalleryLoading(true);
+      fetchCards(0, 20, false, activeScope)
+        .then(scopedCards => {
+          setFilteredCards(scopedCards);
+          setGalleryLoading(false);
+        })
+        .catch(err => {
+          console.error('Error fetching scoped cards:', err);
+          setError('Failed to load cards for this view.');
+          setGalleryLoading(false);
+        });
     }
-  }, [showGallery, fetchCards]);
+  }, [showGallery, activeScope]);
 
   useEffect(() => {
     const loadDraftIfNeeded = async () => {
@@ -300,7 +313,7 @@ export default function SpreadScreen() {
         const draftIdToLoad = Array.isArray(params.draftId) ? params.draftId[0] : params.draftId;
         if (draftIdToLoad && draftIdToLoad !== currentSpreadId) { // Only load if it's a different draft
           try {
-            // Ensure cards are loaded first
+            // Ensure all cards are available before loading a draft
             if (!cards || cards.length === 0) {
               await fetchCards();
             }
@@ -314,25 +327,13 @@ export default function SpreadScreen() {
     };
 
     loadDraftIfNeeded();
-  }, [params.draftId, currentSpreadId]); // Use currentSpreadId instead of selectedSpread to prevent re-loading the same draft
+  }, [params.draftId, currentSpreadId]); // Corrected dependencies
 
-  const handleShowGallery = useCallback(async (zoneName: string) => {
+  const handleShowGallery = useCallback((zoneName: string) => {
     setActiveZone(zoneName);
-    setGalleryLoading(true);
-    try {
-      // Fetch the latest cards, bypassing cache
-      const latestCards = await fetchCards(0, 20, false);
-      setFilteredCards(latestCards);
-    } catch (err) {
-      console.error('Error fetching cards:', err);
-      // Fall back to current cards if fetch fails
-      setFilteredCards(cards);
-    } finally {
-      setGalleryLoading(false);
-    }
     setShowGallery(true);
     setGallerySearchQuery(''); // Reset search query
-  }, [fetchCards, cards]);
+  }, []);
 
   // Update filteredCards when cards change and gallery is open
   useEffect(() => {
@@ -854,6 +855,9 @@ export default function SpreadScreen() {
   );
 
   const renderGalleryContent = () => {
+    // This will be used later to filter cards based on the active tab
+    const cardsForScope = filteredCards; // For now, just use all filtered cards
+
     if (galleryLoading) {
       return (
         <View style={styles.galleryLoadingContainer}>
@@ -935,18 +939,41 @@ export default function SpreadScreen() {
             <Text style={styles.createCardText}>Create New Card</Text>
           </TouchableOpacity>
           
-          <TextInput
-            style={styles.gallerySearchInput}
-            placeholder="Search cards"
-            placeholderTextColor="#666"
-            value={gallerySearchQuery}
-            onChangeText={(text) => {
-              setGallerySearchQuery(text);
-              const filtered = cards.filter((card) => card.name.toLowerCase().includes(text.toLowerCase()));
-              setFilteredCards(filtered);
-            }}
-          />
-          
+          <View style={{ paddingHorizontal: 16, paddingTop: 16 }}>
+            <View style={styles.tabContainer}>
+              <TouchableOpacity
+                style={[styles.tab, activeScope === 'Personal' && styles.activeTab]}
+                onPress={() => setActiveScope('Personal')}
+              >
+                <Text style={[styles.tabText, activeScope === 'Personal' && styles.activeTabText]}>Personal</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.tab, activeScope === 'Friends' && styles.activeTab]}
+                onPress={() => setActiveScope('Friends')}
+              >
+                <Text style={[styles.tabText, activeScope === 'Friends' && styles.activeTabText]}>Friends</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.tab, activeScope === 'Public' && styles.activeTab]}
+                onPress={() => setActiveScope('Public')}
+              >
+                <Text style={[styles.tabText, activeScope === 'Public' && styles.activeTabText]}>Public</Text>
+              </TouchableOpacity>
+            </View>
+
+            <TextInput
+              style={styles.gallerySearchInput}
+              placeholder="Search cards"
+              placeholderTextColor="#666"
+              value={gallerySearchQuery}
+              onChangeText={(text) => {
+                setGallerySearchQuery(text);
+                const filtered = cards.filter((card) => card.name.toLowerCase().includes(text.toLowerCase()));
+                setFilteredCards(filtered);
+              }}
+            />
+          </View>
+
           {renderGalleryContent()}
         </View>
       </View>
@@ -2023,7 +2050,31 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontFamily: 'Inter-Regular',
     fontSize: 16,
-    marginBottom: 20,
+    marginTop: 16,
     width: '100%',
+  },
+  tabContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    backgroundColor: '#2a2a2a',
+    borderRadius: 8,
+    padding: 4,
+  },
+  tab: {
+    flex: 1,
+    paddingVertical: 8,
+    alignItems: 'center',
+    borderRadius: 6,
+  },
+  activeTab: {
+    backgroundColor: '#6366f1',
+  },
+  tabText: {
+    color: 'rgba(255,255,255,0.7)',
+    fontFamily: 'Inter-Bold',
+    fontSize: 14,
+  },
+  activeTabText: {
+    color: '#fff',
   },
 });
