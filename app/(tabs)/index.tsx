@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, FlatList, Pressable, Image, Modal, TouchableOpacity, RefreshControl, useWindowDimensions, Platform, PlatformIOSStatic, Dimensions, Alert } from 'react-native';
+import { View, Text, TextInput, StyleSheet, FlatList, Pressable, Image, Modal, TouchableOpacity, RefreshControl, useWindowDimensions, Platform, PlatformIOSStatic, Dimensions, Alert } from 'react-native';
 import { useCallback, useEffect, useState } from 'react';
 import { useFonts, Inter_400Regular, Inter_700Bold } from '@expo-google-fonts/inter';
 import * as SplashScreen from 'expo-splash-screen';
@@ -103,6 +103,7 @@ export default function CollectionScreen() {
   const [walletConnected, setWalletConnected] = useState(false);
   const [walletAddress, setWalletAddress] = useState('');
   const [selectedType, setSelectedType] = useState<CollectionType>('personal');
+  const [showTypeMenu, setShowTypeMenu] = useState(false);
   const { height: screenHeight } = useWindowDimensions();
   const router = useRouter();
   
@@ -712,8 +713,54 @@ export default function CollectionScreen() {
       style={styles.container}
       onLayout={onLayoutRootView}>
       {/* Experiment: Removed Spacer to reduce top padding */}
-      {renderCollectionTypeSelector()}
-      
+      {/* Top action bar */}
+      <View style={styles.topBarContainer}>
+        {/* Collection type dropdown */}
+        <View style={styles.dropdownButtonContainer}>
+          <TouchableOpacity
+            style={styles.topBarButton}
+            onPress={() => setShowTypeMenu(!showTypeMenu)}
+          >
+            <Text style={styles.topBarButtonText}>
+              {COLLECTION_TYPES.find(t => t.id === selectedType)?.name} {showTypeMenu ? '▲' : '▼'}
+            </Text>
+          </TouchableOpacity>
+          {showTypeMenu && (
+            <View style={styles.dropdownMenu}>
+              {COLLECTION_TYPES.map(type => (
+                <TouchableOpacity
+                  key={type.id}
+                  style={styles.dropdownItem}
+                  onPress={() => {
+                    setSelectedType(type.id);
+                    setShowTypeMenu(false);
+                  }}
+                >
+                  <Text
+                    style={[
+                      styles.dropdownItemText,
+                      selectedType === type.id && { color: type.color },
+                    ]}
+                  >
+                    {type.name}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
+        </View>
+
+        {/* Decks dropdown placeholder */}
+        <TouchableOpacity style={[styles.topBarButton, styles.buttonDisabled]} disabled>
+          <Text style={styles.topBarButtonText}>Decks ▼</Text>
+        </TouchableOpacity>
+
+        {/* Search box placeholder */}
+        <View style={[styles.searchBox, styles.buttonDisabled]}>
+          <Text style={styles.searchPlaceholder}>Search</Text>
+        </View>
+      </View>
+
       {/* No column selector UI - automatically set based on device type */}
       
       <FlatList
@@ -1096,5 +1143,71 @@ const styles = StyleSheet.create({
   },
   buttonDisabled: {
     opacity: 0.5,
+  },
+
+  /* --- New top bar styles --- */
+  topBarContainer: {
+    flexDirection: 'row',
+    gap: 8,
+    paddingHorizontal: 16,
+    marginBottom: 12,
+  },
+  topBarButton: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 8,
+    borderRadius: 8,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+  },
+  topBarButtonText: {
+    color: '#fff',
+    fontFamily: 'Inter-Bold',
+    fontSize: 14,
+  },
+  searchBox: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 8,
+    borderRadius: 8,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+  },
+  searchPlaceholder: {
+    color: '#777',
+    fontFamily: 'Inter-Regular',
+    fontSize: 14,
+  },
+  dropdownButtonContainer: {
+    position: 'relative',
+    flex: 1,
+    zIndex: 1000,
+  },
+  dropdownMenu: {
+    position: 'absolute',
+    top: 40,
+    left: 0,
+    right: 0,
+    backgroundColor: 'rgba(26,26,26,0.95)',
+    borderRadius: 12,
+    paddingVertical: 8,
+    width: '100%',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+    gap: 4,
+  },
+  dropdownItem: {
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+  },
+  dropdownItemText: {
+    color: '#fff',
+    fontFamily: 'Inter-Regular',
+    fontSize: 16,
   },
 });
