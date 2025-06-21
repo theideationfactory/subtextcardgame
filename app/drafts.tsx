@@ -23,6 +23,7 @@ interface Draft {
   name: string;
   last_modified: string;
   color?: string; // Optional: used for icon color
+  draft_data?: any; // Optional: used for draft data
   // Add other properties from your 'spreads' table if needed elsewhere
 }
 
@@ -130,31 +131,67 @@ export default function DraftsScreen() {
     setSending(true);
     
     try {
-      // 1. Start by fetching the full spread data
-      const { data: spreadData, error: fetchError } = await supabase.rpc('get_spread_with_cards', {
-        spread_id: currentDraftToSend.id,
-        user_id: user.id
-      });
-
-      if (fetchError) throw fetchError;
-      if (!spreadData) throw new Error('Could not find the spread');
-      
-      console.log('Sharing spread:', spreadData.name);
+      console.log('Sharing spread:', currentDraftToSend.name);
       console.log('Sharing with users:', selectedFriends);
       
-      // 2. Use an RPC call to handle the sharing transaction atomically
-      const { data: result, error: shareError } = await supabase.rpc('share_spread_with_users', {
-        p_spread_id: currentDraftToSend.id,
-        p_recipient_ids: selectedFriends,
-        p_sharer_id: user.id
-      });
+      // 0. First, ensure all cards in the spread are properly linked via spread_id
+      const draftData = currentDraftToSend.draft_data;
+      const allCardIds: string[] = [];
       
-      if (shareError) {
-        console.error('Error in sharing transaction:', shareError);
-        throw new Error(shareError.message || 'Failed to share spread');
+      if (draftData && draftData.zoneCards) {
+        Object.values(draftData.zoneCards).forEach((cardIds: any) => {
+          if (Array.isArray(cardIds)) {
+            allCardIds.push(...cardIds);
+          }
+        });
       }
       
-      console.log('Sharing successful:', result);
+      if (allCardIds.length > 0) {
+        console.log('Linking cards to spread:', allCardIds);
+        const { error: linkError } = await supabase
+          .from('cards')
+          .update({ spread_id: currentDraftToSend.id })
+          .in('id', allCardIds)
+          .eq('user_id', user.id);
+        
+        if (linkError) {
+          console.error('Error linking cards to spread:', linkError);
+          throw new Error(linkError.message || 'Failed to link cards to spread');
+        }
+      }
+      
+      // 1. Update the spread's shared_with_user_ids to include the selected friends
+      const { data: spreadResult, error: spreadError } = await supabase
+        .from('spreads')
+        .update({
+          shared_with_user_ids: selectedFriends,
+          share_with_specific_friends: true,
+          last_modified: new Date().toISOString()
+        })
+        .eq('id', currentDraftToSend.id)
+        .eq('user_id', user.id); // Ensure only the owner can share
+      
+      if (spreadError) {
+        console.error('Error updating spread sharing:', spreadError);
+        throw new Error(spreadError.message || 'Failed to share spread');
+      }
+      
+      // 2. Update all cards in the spread to share with the same friends
+      const { data: cardsResult, error: cardsError } = await supabase
+        .from('cards')
+        .update({
+          shared_with_user_ids: selectedFriends,
+          share_with_specific_friends: true
+        })
+        .eq('spread_id', currentDraftToSend.id)
+        .eq('user_id', user.id); // Ensure only cards owned by the user are updated
+      
+      if (cardsError) {
+        console.error('Error updating cards sharing:', cardsError);
+        throw new Error(cardsError.message || 'Failed to share cards in spread');
+      }
+      
+      console.log('Sharing successful');
       
       // 3. Update local state
       setShowSendModal(false);
