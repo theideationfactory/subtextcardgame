@@ -42,8 +42,8 @@ export default function CreateScreen() {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [imageDescription, setImageDescription] = useState('');
-  const [type, setType] = useState('TBD');
-  const [role, setRole] = useState('TBD');
+  const [type, setType] = useState('Intention');
+  const [role, setRole] = useState('');
   const [context, setContext] = useState('TBD');
   const [cardImage, setCardImage] = useState('');
   
@@ -142,8 +142,19 @@ export default function CreateScreen() {
   const [showArtStyleDropdown, setShowArtStyleDropdown] = useState(false);
   
   // Dropdown options
-  const typeOptions = ['TBD', 'Impact', 'Request', 'Protect', 'Connect', 'Percept'];
-  const roleOptions = ['TBD', 'Advisor', 'Confessor', 'Judge', 'Peacemaker', 'Provocateur', 'Entertainer', 'Gatekeeper'];
+  const typeOptions = ['Intention', 'Context', 'Impact', 'Accuracy', 'Agenda', 'Needs', 'Emotion', 'Role'];
+  // Map of detail options for each Phenomena
+  const subOptionsMap: Record<string, string[]> = {
+    Intention: ['Impact', 'Request', 'Protect', 'Connect'],
+    Role: ['Advisor', 'Confessor', 'Judge', 'Peacemaker', 'Provocateur', 'Entertainer', 'Gatekeeper'],
+    Context: ['Setting', 'Timing', 'Relationship', 'Power'],
+    Impact: ['Very Positive', 'Slightly Positive', 'Neutral', 'Slightly Negative', 'Very Negative'],
+    Accuracy: ['Veridical', 'Mostly True', 'Distorted', 'Completely Off-Base', 'Manipulative'],
+    Needs: ['Connection', 'Autonomy', 'Safety', 'Meaning', 'Play', 'Rest'],
+    Emotion: ['Joy', 'Anger', 'Fear', 'Sadness', 'Surprise', 'Disgust', 'Love'],
+  };
+
+  const roleOptions = useMemo(() => subOptionsMap[type] || [], [type]);
   const contextOptions = ['TBD', 'Self', 'Family', 'Friendship', 'Therapy', 'Peer', 'Work', 'Art', 'Politics'];
   const artStyleOptions = [
     { id: 'fantasy', label: 'Fantasy (MTG-inspired)' },
@@ -367,8 +378,8 @@ export default function CreateScreen() {
     setName('');
     setDescription('');
     setImageDescription('');
-    setType('TBD'); // Default to TBD for Card Type
-    setRole('TBD'); // Default to TBD for Card Role
+    setType('Intention'); // Default to Intention for Phenomena
+    setRole(''); // Reset detail
     setContext('TBD'); // Default to TBD for Context
     setCardImage('');
     setVisibility(['personal']);
@@ -445,6 +456,7 @@ export default function CreateScreen() {
         name,
         description: description || '',
         type: type || 'Card',
+        phenomena: type || null,
         role: role || 'General',
         context: context || 'Fantasy',
         image_url: cardImage,
@@ -683,13 +695,13 @@ export default function CreateScreen() {
       </View>
 
       <View style={styles.inputGroup}>
-        <Text style={styles.label}>Card Type</Text>
+        <Text style={styles.label}>Phenomena</Text>
         <TouchableOpacity 
           style={styles.dropdownSelector}
           onPress={() => setShowTypeDropdown(true)}
         >
           <Text style={[styles.dropdownText, !type && styles.placeholderText]}>
-            {type || 'Select card type'}
+            {type || 'Select phenomena'}
           </Text>
           <ChevronDown size={20} color="#666" />
         </TouchableOpacity>
@@ -714,6 +726,7 @@ export default function CreateScreen() {
                     style={styles.dropdownItem}
                     onPress={() => {
                       setType(item);
+                       setRole('');
                       setShowTypeDropdown(false);
                       if (Platform.OS !== 'web') {
                         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -731,13 +744,13 @@ export default function CreateScreen() {
       </View>
 
       <View style={styles.inputGroup}>
-        <Text style={styles.label}>Card Role</Text>
+        <Text style={styles.label}>Phenomena Detail</Text>
         <TouchableOpacity 
           style={styles.dropdownSelector}
           onPress={() => setShowRoleDropdown(true)}
         >
           <Text style={[styles.dropdownText, !role && styles.placeholderText]}>
-            {role || 'Select card role'}
+            {role || 'Select detail'}
           </Text>
           <ChevronDown size={20} color="#666" />
         </TouchableOpacity>

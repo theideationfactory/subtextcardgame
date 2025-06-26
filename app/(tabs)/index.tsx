@@ -1151,6 +1151,8 @@ const styles = StyleSheet.create({
     gap: 8,
     paddingHorizontal: 16,
     marginBottom: 12,
+    position: 'relative',
+    zIndex: 3000,
   },
   topBarButton: {
     flex: 1,
@@ -1198,7 +1200,8 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
     shadowRadius: 3.84,
-    elevation: 5,
+    elevation: 10,
+    zIndex: 4000,
     gap: 4,
   },
   dropdownItem: {
