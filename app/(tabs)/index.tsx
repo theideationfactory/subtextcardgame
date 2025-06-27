@@ -722,7 +722,7 @@ export default function CollectionScreen() {
             onPress={() => setShowTypeMenu(!showTypeMenu)}
           >
             <Text style={styles.topBarButtonText}>
-              {COLLECTION_TYPES.find(t => t.id === selectedType)?.name} {showTypeMenu ? '▲' : '▼'}
+              {COLLECTION_TYPES.find(t => t.id === selectedType)?.name}
             </Text>
           </TouchableOpacity>
           {showTypeMenu && (
@@ -752,7 +752,7 @@ export default function CollectionScreen() {
 
         {/* Decks dropdown placeholder */}
         <TouchableOpacity style={[styles.topBarButton, styles.buttonDisabled]} disabled>
-          <Text style={styles.topBarButtonText}>Decks ▼</Text>
+          <Text style={styles.topBarButtonText}>Decks</Text>
         </TouchableOpacity>
 
         {/* Search box placeholder */}
@@ -1183,7 +1183,7 @@ const styles = StyleSheet.create({
   dropdownButtonContainer: {
     position: 'relative',
     flex: 1,
-    zIndex: 1000,
+    zIndex: 10000,
   },
   dropdownMenu: {
     position: 'absolute',
@@ -1200,8 +1200,8 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
     shadowRadius: 3.84,
-    elevation: 10,
-    zIndex: 4000,
+    elevation: 20,
+    zIndex: 10000,
     gap: 4,
   },
   dropdownItem: {
