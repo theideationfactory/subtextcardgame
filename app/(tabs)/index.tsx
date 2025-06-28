@@ -356,7 +356,7 @@ export default function CollectionScreen() {
     
     // Navigate to Edit page
     router.push({
-      pathname: '/create',
+      pathname: '/card-creation-new',
       params: {
         id: card.id,
         name: card.name,

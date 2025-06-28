@@ -135,6 +135,13 @@ export default function TabLayout() {
             headerShown: false, // Hide header for this screen
           }}
         />
+        <Tabs.Screen
+          name="card-creation-new"
+          options={{
+            href: null, // This screen is not a tab itself
+            headerShown: false, // Hide header for this screen
+          }}
+        />
       </Tabs>
     </SafeAreaWrapper>
   );

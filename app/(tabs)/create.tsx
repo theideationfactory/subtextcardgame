@@ -543,6 +543,17 @@ export default function CreateScreen() {
         </Pressable>
         
         <Pressable 
+          style={styles.optionCard}
+          onPress={() => router.push('/(tabs)/card-creation-new')}
+        >
+          <View style={styles.optionIconContainer}>
+            <Plus size={32} color="#6366f1" />
+          </View>
+          <Text style={styles.optionTitle}>Card Creation (New)</Text>
+          <Text style={styles.optionDescription}>Create a card with a streamlined interface and back navigation</Text>
+        </Pressable>
+        
+        <Pressable 
           style={[styles.optionCard, styles.comingSoonCard]}
           onPress={() => router.push('/(tabs)/ai-card-flow')}
         >
