@@ -890,7 +890,6 @@ const styles = StyleSheet.create({
     paddingBottom: 12,
     borderBottomWidth: 1,
     borderBottomColor: '#222',
-    marginTop: 10,
   },
   headerTitle: {
     color: '#fff',
