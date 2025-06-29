@@ -586,7 +586,7 @@ export default function CollectionScreen() {
                 
                 // Define corner shape parameters - each line gets progressively wider
                 const cornerShapeWidthPercents = [0.45, 0.65, 0.85, 1.0]; // As decimal values
-                const availableWidth = cardWidth - 16; // Account for left/right padding
+                const availableWidth = cardWidth - 24; // Account for container's horizontal padding (12px on each side)
                 
                 // Calculate approximate characters per line based on font size and width
                 const getCharsPerLine = (widthPercent: number, fontSize: number) => {
@@ -1372,6 +1372,7 @@ const styles = StyleSheet.create({
   },
   /* ---- Full-bleed card styles ---- */
   fullBleedCard: {
+    marginVertical: 16, // Add vertical spacing
     borderRadius: 16,
     overflow: 'hidden',
     backgroundColor: '#000',
@@ -1414,9 +1415,15 @@ const styles = StyleSheet.create({
   },
   cornerTextContainer: {
     position: 'absolute',
-    bottom: 8,
-    left: 8,
-    right: 8,
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.4)',
+    paddingHorizontal: 12,
+    paddingTop: 12,
+    paddingBottom: 16, // Give more space at the very bottom
+    borderTopLeftRadius: 12,
+    borderTopRightRadius: 12,
   },
   cornerTextLine: {
     fontFamily: 'Inter-Regular',
