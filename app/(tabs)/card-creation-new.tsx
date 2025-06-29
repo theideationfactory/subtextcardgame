@@ -46,6 +46,7 @@ export default function CardCreationNewScreen() {
   const [role, setRole] = useState('');
   const [context, setContext] = useState('TBD');
   const [cardImage, setCardImage] = useState('');
+  const [format, setFormat] = useState<'framed' | 'fullBleed'>('framed');
   
   // Get return parameters for navigation
   const returnTo = params.returnTo as string | undefined;
@@ -461,6 +462,7 @@ export default function CardCreationNewScreen() {
         role: role || 'General',
         context: context || 'Fantasy',
         image_url: cardImage,
+        format,
         frame_color: DEFAULT_FRAME_COLOR,
         user_id: currentSession.user.id,
         collection_id: collectionId,
@@ -866,18 +868,32 @@ export default function CardCreationNewScreen() {
             </View>
           </View>
 
-          <View style={styles.cardPreview}>
+          <View style={[styles.cardPreview, format === 'fullBleed' && styles.cardPreviewFullBleed]}>
             {isGenerating ? (
               <View style={styles.loadingContainer}>
                 <ActivityIndicator size="large" color="#fff" />
                 <Text style={styles.loadingText}>Generating Image...</Text>
               </View>
             ) : (
-              <Image
-                source={{ uri: cardImage || DEFAULT_IMAGE }}
-                style={styles.cardImage}
-                resizeMode="cover"
-              />
+              <>
+                <Image
+                  source={{ uri: cardImage || DEFAULT_IMAGE }}
+                  style={styles.cardImage}
+                  resizeMode="cover"
+                />
+                {format === 'fullBleed' && (
+                  <>
+                    {name ? (
+                      <Text style={styles.fullBleedName} numberOfLines={1}>{name}</Text>
+                    ) : null}
+                    {type ? <Text style={[styles.fullBleedCorner, styles.topLeft]}>{type}</Text> : null}
+                    {role ? <Text style={[styles.fullBleedCorner, styles.bottomLeft]}>{role}</Text> : null}
+                    {description ? (
+                      <Text style={styles.fullBleedDescription} numberOfLines={3}>{description}</Text>
+                    ) : null}
+                  </>
+                )}
+              </>
             )}
           </View>
 
@@ -904,6 +920,22 @@ export default function CardCreationNewScreen() {
               <Upload size={18} color="#6366f1" style={styles.buttonIcon} />
               <Text style={styles.uploadButtonText}>Upload</Text>
             </TouchableOpacity>
+          </View>
+
+          {/* Card Format Toggle */}
+          <View style={styles.formatToggleContainer}>
+            <Pressable
+              style={[styles.formatOption, format === 'framed' && styles.formatOptionSelected]}
+              onPress={() => setFormat('framed')}
+            >
+              <Text style={[styles.formatOptionText, format === 'framed' && styles.formatOptionTextSelected]}>Classic</Text>
+            </Pressable>
+            <Pressable
+              style={[styles.formatOption, format === 'fullBleed' && styles.formatOptionSelected]}
+              onPress={() => setFormat('fullBleed')}
+            >
+              <Text style={[styles.formatOptionText, format === 'fullBleed' && styles.formatOptionTextSelected]}>Full-bleed</Text>
+            </Pressable>
           </View>
 
           {error && <Text style={styles.errorText}>{error}</Text>}
@@ -1034,6 +1066,71 @@ const styles = StyleSheet.create({
   },
   buttonIcon: {
     marginRight: 8,
+  },
+  /* ---- Card Format Toggle ---- */
+  formatToggleContainer: {
+    flexDirection: 'row',
+    marginTop: 16,
+    borderWidth: 1,
+    borderColor: '#6366f1',
+    borderRadius: 8,
+    overflow: 'hidden',
+  },
+  formatOption: {
+    flex: 1,
+    paddingVertical: 8,
+    alignItems: 'center',
+    backgroundColor: 'transparent',
+  },
+  formatOptionSelected: {
+    backgroundColor: '#6366f1',
+  },
+  formatOptionText: {
+    color: '#6366f1',
+    fontSize: 14,
+    fontFamily: 'Inter-Bold',
+  },
+  formatOptionTextSelected: {
+    color: '#fff',
+  },
+  /* ---- Full-bleed preview overlay ---- */
+  cardPreviewFullBleed: {
+    borderWidth: 0,
+  },
+  fullBleedName: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    color: '#fff',
+    fontSize: 18,
+    fontFamily: 'Inter-Bold',
+    textShadowColor: 'rgba(0,0,0,0.7)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
+  },
+  fullBleedCorner: {
+    position: 'absolute',
+    color: '#fff',
+    fontSize: 12,
+    fontFamily: 'Inter-Bold',
+    textShadowColor: 'rgba(0,0,0,0.6)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
+  },
+  topLeft: { top: 8, left: 8 },
+  bottomLeft: { bottom: 8, left: 8 },
+  fullBleedDescription: {
+    position: 'absolute',
+    bottom: 8,
+    right: 8,
+    color: '#fff',
+    fontSize: 14,
+    fontFamily: 'Inter-Regular',
+    width: '60%',
+    textAlign: 'right',
+    textShadowColor: 'rgba(0,0,0,0.7)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
   },
   cardPreview: {
     height: 250,

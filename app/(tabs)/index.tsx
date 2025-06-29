@@ -71,8 +71,10 @@ export default function CollectionScreen() {
     frame_color?: string;
     name_color?: string;
     type_color?: string;
+    role_color?: string;
     description_color?: string;
     context_color?: string;
+    format?: "framed" | "fullBleed";
     user_id: string;
     collection_id?: string;
     collections?: any;
@@ -188,7 +190,7 @@ export default function CollectionScreen() {
           // Use optimized query without expensive joins
           const { data: personalCards, error: personalError } = await supabase
             .from('cards')
-            .select('id, name, description, type, role, context, image_url, frame_width, frame_color, name_color, type_color, description_color, context_color, user_id, collection_id')
+            .select('id, name, description, type, role, context, image_url, frame_width, frame_color, name_color, type_color, description_color, context_color, format, user_id, collection_id')
             .eq('user_id', user.id)
             .order('created_at', { ascending: false })
             .limit(50); // Add reasonable limit
@@ -218,7 +220,7 @@ export default function CollectionScreen() {
 
           let friendCardsQuery = supabase
             .from('cards')
-            .select('id, name, description, type, role, context, image_url, frame_width, frame_color, name_color, type_color, description_color, context_color, user_id, collection_id')
+            .select('id, name, description, type, role, context, image_url, frame_width, frame_color, name_color, type_color, description_color, context_color, format, user_id, collection_id')
             .in('user_id', friendIds)
             .order('created_at', { ascending: false })
             .limit(50);
@@ -253,7 +255,7 @@ export default function CollectionScreen() {
             // First try with is_public column (if migration has been run)
             const { data: publicCards, error: publicError } = await supabase
               .from('cards')
-              .select('id, name, description, type, role, context, image_url, frame_width, frame_color, name_color, type_color, description_color, context_color, user_id, collection_id')
+              .select('id, name, description, type, role, context, image_url, frame_width, frame_color, name_color, type_color, description_color, context_color, format, user_id, collection_id')
               .eq('is_public', true)
               .order('created_at', { ascending: false })
               .limit(50);
@@ -264,7 +266,7 @@ export default function CollectionScreen() {
                 console.log('is_public column not found, falling back to showing other users\' cards');
                 const { data: fallbackCards, error: fallbackError } = await supabase
                   .from('cards')
-                  .select('id, name, description, type, role, context, image_url, frame_width, frame_color, name_color, type_color, description_color, context_color, user_id, collection_id')
+                  .select('id, name, description, type, role, context, image_url, frame_width, frame_color, name_color, type_color, description_color, context_color, format, user_id, collection_id')
                   .neq('user_id', user.id)
                   .order('created_at', { ascending: false })
                   .limit(50);
@@ -284,7 +286,7 @@ export default function CollectionScreen() {
               console.log('Caught is_public column error in catch block, using fallback');
               const { data: fallbackCards, error: fallbackError } = await supabase
                 .from('cards')
-                .select('id, name, description, type, role, context, image_url, frame_width, frame_color, name_color, type_color, description_color, context_color, user_id, collection_id')
+                .select('id, name, description, type, role, context, image_url, frame_width, frame_color, name_color, type_color, description_color, context_color, format, user_id, collection_id')
                 .neq('user_id', user.id)
                 .order('created_at', { ascending: false })
                 .limit(50);
@@ -482,8 +484,174 @@ export default function CollectionScreen() {
     // Calculate font sizes based on scale factor
     const nameFontSize = Math.max(12, Math.round(24 * scaleFactor));
     const typeFontSize = Math.max(10, Math.round(16 * scaleFactor));
-    const descriptionFontSize = Math.max(9, Math.round(16 * scaleFactor));
+    const baseFontSize = Math.max(9, Math.round(16 * scaleFactor));
     const contextFontSize = Math.max(8, Math.round(14 * scaleFactor));
+    
+    // Calculate adaptive description font size based on text length
+    const getAdaptiveDescriptionFontSize = (text: string) => {
+      if (!text) return baseFontSize;
+      
+      const textLength = text.length;
+      let sizeFactor = 1.0;
+      
+      // Adjust size based on text length
+      if (textLength > 200) {
+        sizeFactor = 0.7; // Very long text - much smaller
+      } else if (textLength > 120) {
+        sizeFactor = 0.8; // Long text - smaller
+      } else if (textLength > 80) {
+        sizeFactor = 0.9; // Medium text - slightly smaller
+      }
+      // Short text (<=80 chars) uses full size (1.0)
+      
+      return Math.max(8, Math.round(baseFontSize * sizeFactor));
+    };
+    
+    const descriptionFontSize = getAdaptiveDescriptionFontSize(item.description);
+    
+    // Calculate number of lines based on text length and font size
+    const getNumberOfLines = (text: string, fontSize: number) => {
+      if (!text) return 3;
+      const textLength = text.length;
+      const baseLinesForScale = Math.max(3, Math.round(6 * scaleFactor));
+      
+      // More lines for smaller text to maintain readability
+      if (fontSize <= 10) {
+        return Math.min(baseLinesForScale + 2, 8); // Up to 8 lines for very small text
+      } else if (fontSize <= 12) {
+        return Math.min(baseLinesForScale + 1, 6); // Up to 6 lines for small text
+      }
+      return baseLinesForScale; // Standard lines for normal text
+    };
+    
+    const numberOfLines = getNumberOfLines(item.description, descriptionFontSize);
+    
+    // If the card uses the full-bleed format, render it with edge-to-edge art and text overlays
+    if (item.format === 'fullBleed') {
+      return (
+        <Pressable
+          style={[styles.fullBleedCard, { width: cardWidth, height: cardHeight }]}
+          onPress={() => {
+            setSelectedCard(item);
+            setShowActions(true);
+            setDeleteError('');
+          }}
+        >
+          <Image source={{ uri: item.image_url }} style={styles.fullBleedImage} resizeMode="cover" />
+
+
+
+          {item.type ? (
+            <Text
+              style={[
+                styles.fullBleedCorner,
+                styles.topRight, // Changed from topLeft
+                { fontSize: typeFontSize, color: item.type_color || '#FFFFFF' },
+              ]}
+            >
+              {item.type}
+            </Text>
+          ) : null}
+
+          {item.role ? (
+            <Text
+              style={[
+                styles.fullBleedCorner,
+                styles.topLeft, // Moved from bottomLeft
+                { fontSize: typeFontSize, color: item.role_color || '#FFFFFF' },
+              ]}
+            >
+              {item.role}
+            </Text>
+          ) : null}
+
+          {item.description ? (
+            <View style={styles.cornerTextContainer}>
+              {item.name ? (
+                <Text
+                  style={[
+                    styles.fullBleedName,
+                    { fontSize: nameFontSize, color: item.name_color || '#FFFFFF' },
+                  ]}
+                  numberOfLines={2} // Allow wrapping for longer titles
+                >
+                  {item.name}
+                </Text>
+              ) : null}
+              {(() => {
+                // Corner-shaped text layout algorithm
+                const words = item.description.split(' ');
+                const lineHeight = Math.max(12, Math.round(descriptionFontSize * 1.4));
+                const maxLines = Math.min(numberOfLines, 4);
+                
+                // Define corner shape parameters - each line gets progressively wider
+                const cornerShapeWidthPercents = [0.45, 0.65, 0.85, 1.0]; // As decimal values
+                const availableWidth = cardWidth - 16; // Account for left/right padding
+                
+                // Calculate approximate characters per line based on font size and width
+                const getCharsPerLine = (widthPercent: number, fontSize: number) => {
+                  const baseCharsPerFullWidth = Math.floor(cardWidth / (fontSize * 0.6)); // Rough estimate
+                  return Math.floor(baseCharsPerFullWidth * widthPercent);
+                };
+                
+                // Break text into corner-shaped lines
+                const lines: string[] = [];
+                let remainingText = item.description;
+                
+                for (let lineIndex = 0; lineIndex < maxLines && remainingText.length > 0; lineIndex++) {
+                  const widthPercent = cornerShapeWidthPercents[lineIndex] || 1.0;
+                  const charsPerLine = getCharsPerLine(widthPercent, descriptionFontSize);
+                  
+                  if (remainingText.length <= charsPerLine) {
+                    // Last line - use all remaining text
+                    lines.push(remainingText.trim());
+                    break;
+                  } else {
+                    // Find the best break point (prefer word boundaries)
+                    let breakPoint = charsPerLine;
+                    const textToBreak = remainingText.substring(0, charsPerLine + 20); // Look ahead a bit
+                    const lastSpaceInRange = textToBreak.lastIndexOf(' ', charsPerLine);
+                    
+                    if (lastSpaceInRange > charsPerLine * 0.7) {
+                      // Good word boundary found
+                      breakPoint = lastSpaceInRange;
+                    }
+                    
+                    lines.push(remainingText.substring(0, breakPoint).trim());
+                    remainingText = remainingText.substring(breakPoint).trim();
+                  }
+                }
+                
+                return lines.map((line, index) => (
+                  <View
+                    key={index}
+                    style={{
+                      width: Math.floor(availableWidth * (cornerShapeWidthPercents[index] || 1.0)),
+                      marginLeft: index === 0 ? 0 : index * 8, // Stagger each line slightly to the right
+                    }}
+                  >
+                    <Text
+                      style={[
+                        styles.cornerTextLine,
+                        {
+                          fontSize: descriptionFontSize,
+                          lineHeight: lineHeight,
+                          color: item.description_color || '#FFFFFF',
+                        },
+                      ]}
+                    >
+                      {line}
+                    </Text>
+                  </View>
+                ));
+              })()
+              }
+            </View>
+          ) : null}
+
+        </Pressable>
+      );
+    }
     
     // Calculate padding based on scale factor
     const contentPadding = Math.max(4, Math.round(8 * scaleFactor));
@@ -497,7 +665,11 @@ export default function CollectionScreen() {
             height: cardHeight,
           }
         ]}
-        onPress={() => handleEdit(item)}
+        onPress={() => {
+          setSelectedCard(item);
+          setShowActions(true);
+          setDeleteError('');
+        }}
       >
         <LinearGradient
           colors={cardColors}
@@ -601,11 +773,11 @@ export default function CollectionScreen() {
                     styles.cardDescription, 
                     { 
                       fontSize: descriptionFontSize,
-                      lineHeight: Math.max(14, Math.round(24 * scaleFactor)),
+                      lineHeight: Math.max(12, Math.round(descriptionFontSize * 1.4)),
                       color: item.description_color || '#FFFFFF' 
                     }
                   ]}
-                  numberOfLines={Math.max(3, Math.round(6 * scaleFactor))}
+                  numberOfLines={numberOfLines}
                 >
                   {item.description}
                 </Text>
@@ -629,22 +801,7 @@ export default function CollectionScreen() {
               )}
             </View>
 
-            {/* Settings button - absolute positioned */}
-            <TouchableOpacity
-              style={[
-                styles.settingsButton,
-                { 
-                  padding: Math.max(3, Math.round(5 * scaleFactor)),
-                }
-              ]}
-              onPress={() => {
-                setSelectedCard(item);
-                setShowActions(true);
-                setDeleteError('');
-              }}
-            >
-              <Settings2 size={Math.max(12, Math.round(20 * scaleFactor))} color="#fff" />
-            </TouchableOpacity>
+
           </View>
         </LinearGradient>
       </Pressable>
@@ -1212,5 +1369,61 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontFamily: 'Inter-Regular',
     fontSize: 16,
+  },
+  /* ---- Full-bleed card styles ---- */
+  fullBleedCard: {
+    borderRadius: 16,
+    overflow: 'hidden',
+    backgroundColor: '#000',
+  },
+  fullBleedImage: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    width: '100%',
+    height: '100%',
+  },
+  fullBleedName: {
+    fontFamily: 'Inter-Bold',
+    textShadowColor: 'rgba(0,0,0,0.7)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
+    marginBottom: 6, // Space between title and description
+    textAlign: 'left',
+  },
+  fullBleedCorner: {
+    position: 'absolute',
+    fontFamily: 'Inter-Bold',
+    textShadowColor: 'rgba(0,0,0,0.6)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
+  },
+  topLeft: { top: 8, left: 8 },
+  topRight: { top: 8, right: 8 },
+  bottomLeft: { bottom: 8, left: 8 },
+  fullBleedDescription: {
+    position: 'absolute',
+    bottom: 8,
+    left: 8,
+    right: 8,
+    fontFamily: 'Inter-Regular',
+    textAlign: 'left',
+    textShadowColor: 'rgba(0,0,0,0.7)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
+  },
+  cornerTextContainer: {
+    position: 'absolute',
+    bottom: 8,
+    left: 8,
+    right: 8,
+  },
+  cornerTextLine: {
+    fontFamily: 'Inter-Regular',
+    textAlign: 'left',
+    textShadowColor: 'rgba(0,0,0,0.7)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
+    marginBottom: 2,
   },
 });
