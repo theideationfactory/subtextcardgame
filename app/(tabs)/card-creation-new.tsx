@@ -14,15 +14,17 @@ import {
   FlatList,
   KeyboardAvoidingView,
   Pressable,
+  Alert,
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
+import * as ImagePicker from 'expo-image-picker';
 import { useFonts, Inter_400Regular, Inter_700Bold } from '@expo-google-fonts/inter';
 import * as SplashScreen from 'expo-splash-screen';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import debounce from 'lodash/debounce';
-import { ArrowLeft, Wand2, ChevronDown, ChevronUp, Lock, Users, Globe2, Check, Plus, Edit, PlusCircle } from 'lucide-react-native';
+import { ArrowLeft, Wand2, ChevronDown, ChevronUp, Lock, Users, Globe2, Check, Plus, Edit, PlusCircle, Upload } from 'lucide-react-native';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -247,6 +249,45 @@ export default function CardCreationNewScreen() {
     } finally {
       setIsGenerating(false);
       setAuthChecking(false);
+    }
+  };
+
+  const uploadImage = async () => {
+    try {
+      // Request permissions
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert(
+          'Permission Required',
+          'Sorry, we need camera roll permissions to upload images.'
+        );
+        return;
+      }
+
+      // Launch image picker
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1], // Square aspect ratio for cards
+        quality: 0.8,
+        base64: false,
+      });
+
+      if (!result.canceled && result.assets && result.assets[0]) {
+        const imageUri = result.assets[0].uri;
+        setCardImage(imageUri);
+        setError('');
+        
+        // Clear image description since we're using uploaded image
+        setImageDescription('');
+        
+        if (Platform.OS !== 'web') {
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+        }
+      }
+    } catch (err) {
+      console.error('Image upload error:', err);
+      setError('Failed to upload image. Please try again.');
     }
   };
 
@@ -840,20 +881,30 @@ export default function CardCreationNewScreen() {
             )}
           </View>
 
-          <TouchableOpacity 
-            style={[styles.generateButton, (!name || !imageDescription || isGenerating) && styles.generateButtonDisabled]} 
-            onPress={generateImage}
-            disabled={!name || !imageDescription || isGenerating}
-          >
-            {isGenerating ? (
-              <ActivityIndicator color="#fff" size="small" />
-            ) : (
-              <>
-                <Wand2 size={18} color="#fff" style={styles.buttonIcon} />
-                <Text style={styles.generateButtonText}>Generate Image</Text>
-              </>
-            )}
-          </TouchableOpacity>
+          <View style={styles.imageButtonsContainer}>
+            <TouchableOpacity 
+              style={[styles.generateButton, (!name || !imageDescription || isGenerating) && styles.generateButtonDisabled]} 
+              onPress={generateImage}
+              disabled={!name || !imageDescription || isGenerating}
+            >
+              {isGenerating ? (
+                <ActivityIndicator color="#fff" size="small" />
+              ) : (
+                <>
+                  <Wand2 size={18} color="#fff" style={styles.buttonIcon} />
+                  <Text style={styles.generateButtonText}>Generate</Text>
+                </>
+              )}
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={styles.uploadButton}
+              onPress={uploadImage}
+            >
+              <Upload size={18} color="#6366f1" style={styles.buttonIcon} />
+              <Text style={styles.uploadButtonText}>Upload</Text>
+            </TouchableOpacity>
+          </View>
 
           {error && <Text style={styles.errorText}>{error}</Text>}
           {errorDetails && <Text style={styles.errorDetailsText}>{errorDetails}</Text>}
@@ -886,7 +937,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingTop: Platform.OS === 'ios' ? 50 : 20,
+    paddingTop: Platform.OS === 'ios' ? 40 : 20,
     paddingBottom: 12,
     borderBottomWidth: 1,
     borderBottomColor: '#222',
@@ -938,14 +989,30 @@ const styles = StyleSheet.create({
     height: 100,
     textAlignVertical: 'top',
   },
+  imageButtonsContainer: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 12,
+  },
   generateButton: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#6366f1',
     padding: 12,
     borderRadius: 8,
-    marginTop: 12,
+  },
+  uploadButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'transparent',
+    borderWidth: 2,
+    borderColor: '#6366f1',
+    padding: 12,
+    borderRadius: 8,
   },
   descriptionButton: {
     backgroundColor: '#2563eb',
@@ -955,6 +1022,12 @@ const styles = StyleSheet.create({
   },
   generateButtonText: {
     color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+    fontFamily: 'Inter-Bold',
+  },
+  uploadButtonText: {
+    color: '#6366f1',
     fontSize: 16,
     fontWeight: 'bold',
     fontFamily: 'Inter-Bold',
