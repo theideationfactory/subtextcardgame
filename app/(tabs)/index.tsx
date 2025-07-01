@@ -527,21 +527,38 @@ export default function CollectionScreen() {
     const descriptionFontSize = getAdaptiveDescriptionFontSize(item.description, item.format);
     
     // Calculate number of lines based on text length and font size
-    const getNumberOfLines = (text: string, fontSize: number) => {
+    const getNumberOfLines = (text: string, fontSize: number, format: 'fullBleed' | 'framed' | undefined) => {
       if (!text) return 3;
       const textLength = text.length;
       const baseLinesForScale = Math.max(3, Math.round(6 * scaleFactor));
       
-      // More lines for smaller text to maintain readability
-      if (fontSize <= 10) {
-        return Math.min(baseLinesForScale + 2, 8); // Up to 8 lines for very small text
-      } else if (fontSize <= 12) {
-        return Math.min(baseLinesForScale + 1, 6); // Up to 6 lines for small text
+      if (format === 'fullBleed') {
+        // For full-bleed cards, simulate the corner-shaped layout
+        const cornerShapeWidthPercents = [0.45, 0.65, 0.85, 1.0];
+        const baseCharsPerFullWidth = Math.floor(cardWidth / (fontSize * 0.6));
+        
+        let remainingChars = textLength;
+        let lineCount = 0;
+        const maxLines = 4;
+        
+        for (let i = 0; i < maxLines && remainingChars > 0; i++) {
+          const widthPercent = cornerShapeWidthPercents[i] || 1.0;
+          const charsThisLine = Math.floor(baseCharsPerFullWidth * widthPercent);
+          remainingChars -= charsThisLine;
+          lineCount++;
+        }
+        
+        return Math.max(baseLinesForScale, lineCount);
+      } else {
+        // For framed cards, use simpler calculation
+        const containerWidth = 320;
+        const charsPerLine = containerWidth / fontSize;
+        const estimatedLines = Math.ceil(textLength / charsPerLine);
+        return Math.max(baseLinesForScale, estimatedLines);
       }
-      return baseLinesForScale; // Standard lines for normal text
     };
-    
-    const numberOfLines = getNumberOfLines(item.description, descriptionFontSize);
+
+    const numberOfLines = getNumberOfLines(item.description, descriptionFontSize, item.format);
 
     // Height for gradient overlay: match text block (title + description) but cap.
     const textBlockHeight = nameFontSize + (descriptionFontSize * numberOfLines) + Math.round(24 * scaleFactor);
@@ -612,7 +629,7 @@ export default function CollectionScreen() {
                 // Corner-shaped text layout algorithm
                 const words = item.description.split(' ');
                 const lineHeight = Math.max(12, Math.round(descriptionFontSize * 1.4));
-                const maxLines = Math.min(numberOfLines, 4);
+                const maxLines = numberOfLines; // Allow as many lines as calculated
                 
                 // Define corner shape parameters - each line gets progressively wider
                 const cornerShapeWidthPercents = [0.45, 0.65, 0.85, 1.0]; // As decimal values
