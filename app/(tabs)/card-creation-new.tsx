@@ -17,13 +17,24 @@ import {
   Alert,
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
-import * as ImagePicker from 'expo-image-picker';
+// import * as ImagePicker from 'expo-image-picker';
 import { useFonts, Inter_400Regular, Inter_700Bold } from '@expo-google-fonts/inter';
 import * as SplashScreen from 'expo-splash-screen';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import debounce from 'lodash/debounce';
+// Custom debounce implementation to avoid lodash dependency
+const debounce = (func: Function, wait: number) => {
+  let timeout: NodeJS.Timeout;
+  return function executedFunction(...args: any[]) {
+    const later = () => {
+      clearTimeout(timeout);
+      func(...args);
+    };
+    clearTimeout(timeout);
+    timeout = setTimeout(later, wait);
+  };
+};
 import { ArrowLeft, Wand2, ChevronDown, ChevronUp, Lock, Users, Globe2, Check, Plus, Edit, PlusCircle, Upload } from 'lucide-react-native';
 
 SplashScreen.preventAutoHideAsync();
@@ -254,6 +265,9 @@ export default function CardCreationNewScreen() {
   };
 
   const uploadImage = async () => {
+    // Temporarily disabled due to native module issues
+    Alert.alert('Feature Unavailable', 'Image upload is temporarily disabled. Please use the Generate Image feature instead.');
+    /*
     try {
       // Request permissions
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -290,6 +304,7 @@ export default function CardCreationNewScreen() {
       console.error('Image upload error:', err);
       setError('Failed to upload image. Please try again.');
     }
+    */
   };
 
   const handleGenerateDescription = async () => {

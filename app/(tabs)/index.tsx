@@ -486,28 +486,45 @@ export default function CollectionScreen() {
     const typeFontSize = Math.max(10, Math.round(16 * scaleFactor));
     const baseFontSize = Math.max(9, Math.round(16 * scaleFactor));
     const contextFontSize = Math.max(8, Math.round(14 * scaleFactor));
+        
     
     // Calculate adaptive description font size based on text length
-    const getAdaptiveDescriptionFontSize = (text: string) => {
+    const getAdaptiveDescriptionFontSize = (text: string, format: 'fullBleed' | 'framed' | undefined) => {
       if (!text) return baseFontSize;
-      
+
       const textLength = text.length;
       let sizeFactor = 1.0;
-      
-      // Adjust size based on text length
-      if (textLength > 200) {
-        sizeFactor = 0.7; // Very long text - much smaller
-      } else if (textLength > 120) {
-        sizeFactor = 0.8; // Long text - smaller
-      } else if (textLength > 80) {
-        sizeFactor = 0.9; // Medium text - slightly smaller
+
+      if (format === 'framed') {
+        // Framed cards: dynamic scaling – allow slight enlarging for very short text
+        if (textLength < 20) {
+          sizeFactor = 1.25; // enlarge 25%
+        } else if (textLength < 40) {
+          sizeFactor = 1.15; // enlarge 15%
+        } else if (textLength > 200) {
+          sizeFactor = 0.8;
+        } else if (textLength > 120) {
+          sizeFactor = 0.9;
+        } else if (textLength > 80) {
+          sizeFactor = 0.95;
+        }
+      } else {
+        // Full-bleed or default cards: more aggressive shrinking
+        if (textLength > 200) {
+          sizeFactor = 0.7;
+        } else if (textLength > 120) {
+          sizeFactor = 0.8;
+        } else if (textLength > 80) {
+          sizeFactor = 0.9;
+        }
       }
-      // Short text (<=80 chars) uses full size (1.0)
-      
-      return Math.max(8, Math.round(baseFontSize * sizeFactor));
+
+      // Clamp to reasonable upper bound to avoid absurdly large text
+      const maxFontSize = Math.round(baseFontSize * 1.3);
+      return Math.min(Math.max(8, Math.round(baseFontSize * sizeFactor)), maxFontSize);
     };
     
-    const descriptionFontSize = getAdaptiveDescriptionFontSize(item.description);
+    const descriptionFontSize = getAdaptiveDescriptionFontSize(item.description, item.format);
     
     // Calculate number of lines based on text length and font size
     const getNumberOfLines = (text: string, fontSize: number) => {
@@ -525,6 +542,10 @@ export default function CollectionScreen() {
     };
     
     const numberOfLines = getNumberOfLines(item.description, descriptionFontSize);
+
+    // Height for gradient overlay: match text block (title + description) but cap.
+    const textBlockHeight = nameFontSize + (descriptionFontSize * numberOfLines) + Math.round(24 * scaleFactor);
+    const overlayHeight = Math.min(Math.round(cardHeight * 0.45), Math.max(50, textBlockHeight + Math.round(8 * scaleFactor)));
     
     // If the card uses the full-bleed format, render it with edge-to-edge art and text overlays
     if (item.format === 'fullBleed') {
@@ -538,6 +559,15 @@ export default function CollectionScreen() {
           }}
         >
           <Image source={{ uri: item.image_url }} style={styles.fullBleedImage} resizeMode="cover" />
+
+          {/* Horizontal gradient overlay */}
+          <LinearGradient
+            colors={[ 'rgba(0,0,0,0.75)', 'rgba(0,0,0,0)' ]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={[styles.fullBleedGradient, { height: overlayHeight }]}
+            pointerEvents="none"
+          />
 
 
 
@@ -1418,12 +1448,15 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.4)',
     paddingHorizontal: 12,
     paddingTop: 12,
-    paddingBottom: 16, // Give more space at the very bottom
-    borderTopLeftRadius: 12,
-    borderTopRightRadius: 12,
+    paddingBottom: 16,
+  },
+  fullBleedGradient: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
   },
   cornerTextLine: {
     fontFamily: 'Inter-Regular',
@@ -1432,5 +1465,5 @@ const styles = StyleSheet.create({
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 3,
     marginBottom: 2,
-  },
+  }
 });
