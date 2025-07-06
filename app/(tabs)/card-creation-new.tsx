@@ -17,12 +17,12 @@ import {
   Alert,
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
-// import * as ImagePicker from 'expo-image-picker';
+import * as ImagePicker from 'expo-image-picker';
 import { useFonts, Inter_400Regular, Inter_700Bold } from '@expo-google-fonts/inter';
 import * as SplashScreen from 'expo-splash-screen';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 // Custom debounce implementation to avoid lodash dependency
 const debounce = (func: Function, wait: number) => {
   let timeout: NodeJS.Timeout;
@@ -113,6 +113,20 @@ export default function CardCreationNewScreen() {
 
   // Get auth context at component level
   const { refreshSession } = useAuth();
+
+
+
+  // Reset form state when the screen is focused for creating a new card
+  useFocusEffect(
+    useCallback(() => {
+      // We only reset if we are not in edit mode.
+      // This ensures that when a user navigates away and back,
+      // they get a fresh form instead of the old state.
+      if (!isEditing) {
+        resetForm();
+      }
+    }, [isEditing])
+  );
 
   // Use useEffect to properly set the state values from params
   useEffect(() => {
@@ -265,9 +279,6 @@ export default function CardCreationNewScreen() {
   };
 
   const uploadImage = async () => {
-    // Temporarily disabled due to native module issues
-    Alert.alert('Feature Unavailable', 'Image upload is temporarily disabled. Please use the Generate Image feature instead.');
-    /*
     try {
       // Request permissions
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -290,21 +301,71 @@ export default function CardCreationNewScreen() {
 
       if (!result.canceled && result.assets && result.assets[0]) {
         const imageUri = result.assets[0].uri;
-        setCardImage(imageUri);
+        
+        // Set loading state
+        setIsGenerating(true);
         setError('');
         
-        // Clear image description since we're using uploaded image
-        setImageDescription('');
-        
-        if (Platform.OS !== 'web') {
-          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+        try {
+          // Get current session
+          const currentSession = await refreshSession();
+          
+          if (!currentSession || !currentSession.access_token) {
+            throw new Error('You must be logged in to upload images');
+          }
+
+          // Convert image to blob for upload
+          const response = await fetch(imageUri);
+          const blob = await response.blob();
+          
+          // Generate unique filename
+          const timestamp = Date.now();
+          const fileName = `${currentSession.user.id}/uploaded_${timestamp}.jpg`;
+          
+          // Upload to Supabase Storage (same bucket as AI-generated images)
+          const { data: uploadData, error: uploadError } = await supabase.storage
+            .from('card_images')
+            .upload(fileName, blob, {
+              contentType: 'image/jpeg',
+              cacheControl: '3600',
+              upsert: true
+            });
+
+          if (uploadError) {
+            console.error('Upload error:', uploadError);
+            throw new Error(`Failed to upload image: ${uploadError.message}`);
+          }
+
+          // Get the public URL
+          const { data: { publicUrl } } = supabase.storage
+            .from('card_images')
+            .getPublicUrl(fileName);
+
+          if (!publicUrl) {
+            throw new Error('Failed to get public URL for uploaded image');
+          }
+
+          // Set the uploaded image URL
+          setCardImage(publicUrl);
+          
+          // Clear image description since we're using uploaded image
+          setImageDescription('');
+          
+          if (Platform.OS !== 'web') {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+          }
+          
+        } catch (uploadErr) {
+          console.error('Image upload error:', uploadErr);
+          setError(uploadErr instanceof Error ? uploadErr.message : 'Failed to upload image. Please try again.');
+        } finally {
+          setIsGenerating(false);
         }
       }
     } catch (err) {
-      console.error('Image upload error:', err);
-      setError('Failed to upload image. Please try again.');
+      console.error('Image picker error:', err);
+      setError('Failed to access image library. Please try again.');
     }
-    */
   };
 
   const handleGenerateDescription = async () => {
@@ -406,10 +467,25 @@ export default function CardCreationNewScreen() {
     setRole('');
     setContext('TBD');
     setCardImage('');
+    setFormat('framed');
     setVisibility(['personal']);
+    setImageStyle('fantasy');
+    
+    // Reset loading/error/success states
+    setIsGenerating(false);
+    setIsGeneratingDescription(false);
+    setIsGeneratingImageDescription(false);
+    setIsCreating(false);
     setError('');
     setErrorDetails('');
     setSuccessMessage('');
+
+    // Reset UI states
+    setShowVisibility(false);
+    setShowTypeDropdown(false);
+    setShowRoleDropdown(false);
+    setShowContextDropdown(false);
+    setShowArtStyleDropdown(false);
   };
 
   const handleSave = async () => {
