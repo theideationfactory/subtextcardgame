@@ -23,6 +23,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 // Custom debounce implementation to avoid lodash dependency
 const debounce = (func: Function, wait: number) => {
   let timeout: NodeJS.Timeout;
@@ -84,8 +85,8 @@ export default function CardCreationNewScreen() {
   const [showContextDropdown, setShowContextDropdown] = useState(false);
   const [showArtStyleDropdown, setShowArtStyleDropdown] = useState(false);
   
-  // Dropdown options
-  const typeOptions = ['Intention', 'Context', 'Impact', 'Accuracy', 'Agenda', 'Needs', 'Emotion', 'Role'];
+  // Dropdown options - loaded from AsyncStorage to include custom phenomena types
+  const [typeOptions, setTypeOptions] = useState(['Intention', 'Context', 'Impact', 'Accuracy', 'Agenda', 'Needs', 'Emotion', 'Role']);
   // Map of detail options for each Phenomena
   const subOptionsMap: Record<string, string[]> = {
     Intention: ['Impact', 'Request', 'Protect', 'Connect'],
@@ -114,7 +115,51 @@ export default function CardCreationNewScreen() {
   // Get auth context at component level
   const { refreshSession } = useAuth();
 
+  const resetForm = () => {
+    setName('');
+    setDescription('');
+    setImageDescription('');
+    setType('Intention');
+    setRole('');
+    setContext('TBD');
+    setCardImage('');
+    setFormat('framed');
+    setVisibility(['personal']);
+    setImageStyle('fantasy');
+    
+    // Reset loading/error/success states
+    setIsGenerating(false);
+    setIsGeneratingDescription(false);
+    setIsGeneratingImageDescription(false);
+    setIsCreating(false);
+    setError('');
+    setErrorDetails('');
+    setSuccessMessage('');
 
+    // Reset UI states
+    setShowVisibility(false);
+    setShowTypeDropdown(false);
+    setShowRoleDropdown(false);
+    setShowContextDropdown(false);
+    setShowArtStyleDropdown(false);
+  };
+
+  // Load phenomena types from AsyncStorage
+  const loadPhenomenaTypes = async () => {
+    try {
+      const storedPhenomena = await AsyncStorage.getItem('@phenomena_types');
+      if (storedPhenomena) {
+        const parsedPhenomena = JSON.parse(storedPhenomena);
+        console.log('Loaded custom phenomena types:', parsedPhenomena);
+        setTypeOptions(parsedPhenomena);
+      } else {
+        console.log('No custom phenomena types found, using defaults');
+      }
+    } catch (error) {
+      console.error('Error loading phenomena types:', error);
+      // Keep default types if loading fails
+    }
+  };
 
   // Reset form state when the screen is focused for creating a new card
   useFocusEffect(
@@ -201,6 +246,18 @@ export default function CardCreationNewScreen() {
     
     checkAuthStatus();
   }, []);
+
+  // Load phenomena types on component mount
+  useEffect(() => {
+    loadPhenomenaTypes();
+  }, []);
+
+  // Also reload phenomena types when screen is focused (in case they were updated in deck creation)
+  useFocusEffect(
+    useCallback(() => {
+      loadPhenomenaTypes();
+    }, [])
+  );
 
   if (!fontsLoaded) {
     return null;
@@ -459,34 +516,7 @@ export default function CardCreationNewScreen() {
     }
   };
 
-  const resetForm = () => {
-    setName('');
-    setDescription('');
-    setImageDescription('');
-    setType('Intention');
-    setRole('');
-    setContext('TBD');
-    setCardImage('');
-    setFormat('framed');
-    setVisibility(['personal']);
-    setImageStyle('fantasy');
-    
-    // Reset loading/error/success states
-    setIsGenerating(false);
-    setIsGeneratingDescription(false);
-    setIsGeneratingImageDescription(false);
-    setIsCreating(false);
-    setError('');
-    setErrorDetails('');
-    setSuccessMessage('');
 
-    // Reset UI states
-    setShowVisibility(false);
-    setShowTypeDropdown(false);
-    setShowRoleDropdown(false);
-    setShowContextDropdown(false);
-    setShowArtStyleDropdown(false);
-  };
 
   const handleSave = async () => {
     if (!name) {
