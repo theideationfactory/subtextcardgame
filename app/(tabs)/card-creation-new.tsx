@@ -169,8 +169,13 @@ export default function CardCreationNewScreen() {
       // they get a fresh form instead of the old state.
       if (!isEditing) {
         resetForm();
+        
+        // After resetting, check if we have a preselected type to restore
+        if (params.preselected_type) {
+          setType(params.preselected_type.toString());
+        }
       }
-    }, [isEditing])
+    }, [isEditing, params.preselected_type])
   );
 
   // Use useEffect to properly set the state values from params
@@ -225,6 +230,15 @@ export default function CardCreationNewScreen() {
       console.log('Card data loaded successfully for editing');
     }
   }, [params.id, params.name, params.description, params.type, params.role, params.context, params.image_url]);
+
+  // Handle preselected phenomena type for new cards
+  useEffect(() => {
+    if (params.preselected_type && !params.id) {
+      // Only set preselected type for new cards (not editing)
+      const preselectedType = params.preselected_type.toString();
+      setType(preselectedType);
+    }
+  }, [params.preselected_type, params.id]);
 
   // Check auth status on component mount
   useEffect(() => {

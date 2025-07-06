@@ -3,13 +3,14 @@ import { useCallback, useEffect, useState } from 'react';
 import { useFonts, Inter_400Regular, Inter_700Bold } from '@expo-google-fonts/inter';
 import * as SplashScreen from 'expo-splash-screen';
 import { useRouter } from 'expo-router';
-import { Settings2, CreditCard as Edit3, Trash2, Swords, Shield, Sparkles, Users, Globe as Globe2, Lock, Wallet } from 'lucide-react-native';
+import { Settings2, CreditCard as Edit3, Trash2, Swords, Shield, Sparkles, Users, Globe as Globe2, Lock, Wallet, Plus } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import { Spacer } from '@/components/Spacer';
 import { isIPad, isTablet, isIPadMini } from '@/utils/deviceDimensions';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const COLLECTION_TYPES = [
   {
@@ -106,6 +107,10 @@ export default function CollectionScreen() {
   const [walletAddress, setWalletAddress] = useState('');
   const [selectedType, setSelectedType] = useState<CollectionType>('personal');
   const [showTypeMenu, setShowTypeMenu] = useState(false);
+  const [phenomenaTypes, setPhenomenaTypes] = useState<string[]>(['All']);
+  const [selectedPhenomena, setSelectedPhenomena] = useState<string>('All');
+  const [showPhenomenaMenu, setShowPhenomenaMenu] = useState(false);
+  const [allCards, setAllCards] = useState<Card[]>([]);
   const { height: screenHeight } = useWindowDimensions();
   const router = useRouter();
   
@@ -196,7 +201,7 @@ export default function CollectionScreen() {
             .limit(50); // Add reasonable limit
 
           if (personalError) throw personalError;
-          setCards(personalCards as Card[] ?? []);
+          setAllCards(personalCards as Card[] ?? []);
           break;
 
         case 'friends':
@@ -214,7 +219,7 @@ export default function CollectionScreen() {
           );
 
           if (friendIds.length === 0) {
-            setCards([]);
+            setAllCards([]);
             break;
           }
 
@@ -247,7 +252,7 @@ export default function CollectionScreen() {
           const { data: friendCards, error: friendCardsError } = await friendCardsQuery;
 
           if (friendCardsError) throw friendCardsError;
-          setCards(friendCards as Card[] || []);
+          setAllCards(friendCards as Card[] || []);
           break;
 
         case 'public':
@@ -272,13 +277,13 @@ export default function CollectionScreen() {
                   .limit(50);
 
                 if (fallbackError) throw fallbackError;
-                setCards(fallbackCards as Card[] ?? []);
+                setAllCards(fallbackCards as Card[] ?? []);
                 break; // Important: break here to avoid throwing the error
               } else {
                 throw publicError;
               }
             } else {
-              setCards(publicCards as Card[] ?? []);
+              setAllCards(publicCards as Card[] ?? []);
             }
           } catch (publicErr: any) {
             // Check if this is the column not found error one more time
@@ -292,7 +297,7 @@ export default function CollectionScreen() {
                 .limit(50);
 
               if (fallbackError) throw fallbackError;
-              setCards(fallbackCards as Card[] ?? []);
+              setAllCards(fallbackCards as Card[] ?? []);
             } else {
               console.error('Public cards query error:', publicErr);
               throw publicErr;
@@ -314,11 +319,50 @@ export default function CollectionScreen() {
       fetchCards(false);
     }
   }, [user, fetchCards]);
+
+  // Load phenomena types on component mount
+  useEffect(() => {
+    loadPhenomenaTypes();
+  }, []);
   
   const onRefresh = useCallback(() => {
     setRefreshing(true);
     fetchCards(true);
   }, [fetchCards]);
+
+  // Load phenomena types from AsyncStorage
+  const loadPhenomenaTypes = async () => {
+    try {
+      const storedPhenomena = await AsyncStorage.getItem('@phenomena_types');
+      if (storedPhenomena) {
+        const parsedPhenomena = JSON.parse(storedPhenomena);
+        setPhenomenaTypes(['All', ...parsedPhenomena]);
+      } else {
+        // Default phenomena types if none stored
+        const defaultTypes = ['Intention', 'Context', 'Impact', 'Accuracy', 'Agenda', 'Needs', 'Emotion', 'Role'];
+        setPhenomenaTypes(['All', ...defaultTypes]);
+      }
+    } catch (error) {
+      console.error('Error loading phenomena types:', error);
+      // Fallback to default types
+      const defaultTypes = ['Intention', 'Context', 'Impact', 'Accuracy', 'Agenda', 'Needs', 'Emotion', 'Role'];
+      setPhenomenaTypes(['All', ...defaultTypes]);
+    }
+  };
+
+  // Filter cards based on selected phenomena type
+  const filterCardsByPhenomena = useCallback((cardsToFilter: Card[]) => {
+    if (selectedPhenomena === 'All') {
+      return cardsToFilter;
+    }
+    return cardsToFilter.filter(card => card.type === selectedPhenomena);
+  }, [selectedPhenomena]);
+
+  // Update filtered cards when phenomena selection changes
+  useEffect(() => {
+    const filteredCards = filterCardsByPhenomena(allCards);
+    setCards(filteredCards);
+  }, [selectedPhenomena, allCards, filterCardsByPhenomena]);
 
   const handleDelete = async (cardId: string) => {
     if (!cardId) {
@@ -340,7 +384,7 @@ export default function CollectionScreen() {
         throw deleteError;
       }
 
-      setCards(prevCards => prevCards.filter(card => card.id !== cardId));
+      setAllCards(prevCards => prevCards.filter(card => card.id !== cardId));
       setShowActions(false);
       setSelectedCard(null);
       
@@ -954,10 +998,47 @@ export default function CollectionScreen() {
           )}
         </View>
 
-        {/* Decks dropdown placeholder */}
-        <TouchableOpacity style={[styles.topBarButton, styles.buttonDisabled]} disabled>
-          <Text style={styles.topBarButtonText}>Decks</Text>
-        </TouchableOpacity>
+        {/* Phenomena filter dropdown */}
+        <View style={styles.dropdownButtonContainer}>
+          <TouchableOpacity 
+            style={styles.topBarButton}
+            onPress={() => {
+              setShowPhenomenaMenu(!showPhenomenaMenu);
+              if (Platform.OS !== 'web') {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              }
+            }}
+          >
+            <Text style={styles.topBarButtonText}>
+              {selectedPhenomena === 'All' ? 'All Decks' : selectedPhenomena}
+            </Text>
+          </TouchableOpacity>
+          
+          {showPhenomenaMenu && (
+            <View style={styles.dropdownMenu}>
+              {phenomenaTypes.map((phenomena) => (
+                <TouchableOpacity
+                  key={phenomena}
+                  style={styles.dropdownItem}
+                  onPress={() => {
+                    setSelectedPhenomena(phenomena);
+                    setShowPhenomenaMenu(false);
+                    if (Platform.OS !== 'web') {
+                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                    }
+                  }}
+                >
+                  <Text style={[
+                    styles.dropdownItemText,
+                    selectedPhenomena === phenomena && { color: '#6366f1' }
+                  ]}>
+                    {phenomena === 'All' ? 'All Decks' : phenomena}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
+        </View>
 
         {/* Search box placeholder */}
         <View style={[styles.searchBox, styles.buttonDisabled]}>
@@ -967,7 +1048,16 @@ export default function CollectionScreen() {
 
       {/* No column selector UI - automatically set based on device type */}
       
-      <FlatList
+      <TouchableOpacity 
+        style={{ flex: 1 }}
+        activeOpacity={1}
+        onPress={() => {
+          if (showPhenomenaMenu) {
+            setShowPhenomenaMenu(false);
+          }
+        }}
+      >
+        <FlatList
         data={cards}
         renderItem={renderCard}
         keyExtractor={(item) => item.id}
@@ -990,14 +1080,32 @@ export default function CollectionScreen() {
             {selectedType === 'personal' && (
               <TouchableOpacity 
                 style={styles.createButton}
-                onPress={() => router.push('/create')}
+                onPress={() => {
+                  // Navigate directly to card creation with pre-selected phenomena
+                  if (selectedPhenomena === 'All') {
+                    router.push('/create');
+                  } else {
+                    router.push({
+                      pathname: '/card-creation-new',
+                      params: {
+                        preselected_type: selectedPhenomena
+                      }
+                    });
+                  }
+                }}
               >
-                <Text style={styles.createButtonText}>Create Your First Card</Text>
+                <Text style={styles.createButtonText}>
+                  {selectedPhenomena === 'All' 
+                    ? 'Create Your First Card' 
+                    : `Create Your First ${selectedPhenomena} Card`
+                  }
+                </Text>
               </TouchableOpacity>
             )}
           </View>
         }
-      />
+        />
+      </TouchableOpacity>
 
       <Modal
         visible={showActions}
@@ -1072,6 +1180,32 @@ export default function CollectionScreen() {
           </View>
         </Pressable>
       </Modal>
+
+      {/* Floating Plus Button for Quick Card Creation */}
+      {selectedType === 'personal' && (
+        <TouchableOpacity
+          style={styles.floatingButton}
+          onPress={() => {
+            // Same smart navigation logic as the "Create Your First Card" button
+            if (selectedPhenomena === 'All') {
+              router.push('/create');
+            } else {
+              router.push({
+                pathname: '/card-creation-new',
+                params: {
+                  preselected_type: selectedPhenomena
+                }
+              });
+            }
+            
+            if (Platform.OS !== 'web') {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+            }
+          }}
+        >
+          <Plus size={24} color="#fff" />
+        </TouchableOpacity>
+      )}
     </LinearGradient>
   );
 }
@@ -1482,5 +1616,24 @@ const styles = StyleSheet.create({
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 3,
     marginBottom: 2,
+  },
+  floatingButton: {
+    position: 'absolute',
+    bottom: 20,
+    right: 20,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#6366f1',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
   }
 });
