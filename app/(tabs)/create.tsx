@@ -7,13 +7,14 @@ import {
 } from 'react-native';
 import { useFonts, Inter_400Regular, Inter_700Bold } from '@expo-google-fonts/inter';
 import * as SplashScreen from 'expo-splash-screen';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Wand2, PlusCircle, Layers } from 'lucide-react-native';
 
 SplashScreen.preventAutoHideAsync();
 
 export default function CreateScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams();
 
   const [fontsLoaded] = useFonts({
     'Inter-Regular': Inter_400Regular,
@@ -34,7 +35,20 @@ export default function CreateScreen() {
       <View style={styles.optionsContainer}>
         <Pressable 
           style={styles.optionCard}
-          onPress={() => router.push('/(tabs)/card-creation-new')}
+          onPress={() => {
+            // Forward any parameters from spread screen to card creation
+            if (params.returnTo && params.zone) {
+              router.push({
+                pathname: '/(tabs)/card-creation-new',
+                params: {
+                  returnTo: params.returnTo,
+                  zone: params.zone
+                }
+              });
+            } else {
+              router.push('/(tabs)/card-creation-new');
+            }
+          }}
         >
           <View style={styles.optionIconContainer}>
             <PlusCircle size={32} color="#6366f1" />

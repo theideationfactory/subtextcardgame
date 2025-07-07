@@ -41,7 +41,7 @@ import {
   Mail, // Added for Inbox button
   Send, // Added for Send button
 } from 'lucide-react-native';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
 import { Spacer } from '@/components/Spacer';
 import { hasDynamicIsland } from '@/utils/deviceDimensions';
@@ -234,7 +234,7 @@ export default function SpreadScreen() {
   const [selectedCardForFullView, setSelectedCardForFullView] = useState<any>(null);
   const [successMessage, setSuccessMessage] = useState('');
   const [cardToRemove, setCardToRemove] = useState<{card: any, zone: string} | null>(null);
-  const [autoAddCard, setAutoAddCard] = useState<string | null>(null);
+  const [autoAddCardData, setAutoAddCardData] = useState<string | null>(null);
   const [autoAddZone, setAutoAddZone] = useState<string | null>(null);
 
   const [fontsLoaded] = useFonts({
@@ -243,35 +243,47 @@ export default function SpreadScreen() {
   });
 
   // Handle auto-adding a card when returning from create screen
+  // This effect handles the auto-add card data passed from the creation screen
   useEffect(() => {
-    if (params.autoAddCard && params.autoAddZone) {
-      const cardId = Array.isArray(params.autoAddCard) ? params.autoAddCard[0] : params.autoAddCard;
+    if (params.autoAddCardData && params.autoAddZone) {
+      const cardData = Array.isArray(params.autoAddCardData) ? params.autoAddCardData[0] : params.autoAddCardData;
       const zone = Array.isArray(params.autoAddZone) ? params.autoAddZone[0] : params.autoAddZone;
       
-      setAutoAddCard(cardId);
+      setAutoAddCardData(cardData);
       setAutoAddZone(zone);
       
       // Clear the params to prevent re-adding on re-render
       router.setParams({});
     }
-  }, [params.autoAddCard, params.autoAddZone]);
+  }, [params.autoAddCardData, params.autoAddZone]);
   
-  // Try to find and add the auto-add card when cards are loaded
+  // This effect adds the card from the parsed data directly to the zone
   useEffect(() => {
-    if (autoAddCard && autoAddZone && cards.length > 0) {
-      const cardToAdd = cards.find(card => card.id === autoAddCard);
-      if (cardToAdd) {
+    if (autoAddCardData && autoAddZone) {
+      try {
+        const cardToAdd = JSON.parse(autoAddCardData);
+        console.log('Successfully parsed card to add:', cardToAdd.name);
+
         setZoneCards(prev => ({
           ...prev,
           [autoAddZone]: [...(prev[autoAddZone] || []), cardToAdd]
         }));
+
         setSuccessMessage('Card added to spread!');
         setTimeout(() => setSuccessMessage(''), 3000);
+
+        // Reset state after adding the card
+        setAutoAddCardData(null);
+        setAutoAddZone(null);
+
+      } catch (error) {
+        console.error('Failed to parse auto-add card data:', error);
+        // Clear state even if parsing fails to prevent retries
+        setAutoAddCardData(null);
+        setAutoAddZone(null);
       }
-      setAutoAddCard(null);
-      setAutoAddZone(null);
     }
-  }, [autoAddCard, autoAddZone, cards]);
+  }, [autoAddCardData, autoAddZone]);
 
   useEffect(() => {
     const initializeScreen = async () => {
@@ -306,6 +318,17 @@ export default function SpreadScreen() {
         });
     }
   }, [showGallery, activeScope]);
+
+  // Refresh cards when screen comes into focus (e.g., returning from card creation)
+  useFocusEffect(
+    useCallback(() => {
+      // Only refresh if we have auto-add parameters or if cards might be stale
+      if (params.autoAddCard || params.autoAddZone) {
+        console.log('Refreshing cards due to auto-add parameters');
+        fetchCards();
+      }
+    }, [params.autoAddCard, params.autoAddZone, fetchCards])
+  );
 
   useEffect(() => {
     const loadDraftIfNeeded = async () => {
@@ -760,6 +783,15 @@ export default function SpreadScreen() {
     });
   };
 
+  const handleCreateCardFromGallery = () => {
+    const currentZone = activeZone;
+    setShowGallery(false); // Close the modal
+    router.push({
+      pathname: '/(tabs)/card-creation-new',
+      params: { returnTo: 'spread', zone: currentZone }
+    });
+  };
+
   const removeCardFromZone = async (cardId: string, zoneName: string) => {
     // Update local state first
     setZoneCards(prev => {
@@ -933,7 +965,7 @@ export default function SpreadScreen() {
 
           <TouchableOpacity 
             style={styles.createCardButton}
-            onPress={handleCreateCard}
+            onPress={handleCreateCardFromGallery}
           >
             <PlusCircle size={20} color="#fff" style={styles.createCardIcon} />
             <Text style={styles.createCardText}>Create New Card</Text>

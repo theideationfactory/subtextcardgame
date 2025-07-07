@@ -621,14 +621,41 @@ export default function CollectionScreen() {
         >
           <Image source={{ uri: item.image_url }} style={styles.fullBleedImage} resizeMode="cover" />
 
-          {/* Horizontal gradient overlay */}
-          <LinearGradient
-            colors={[ 'rgba(0,0,0,0.75)', 'rgba(0,0,0,0)' ]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={[styles.fullBleedGradient, { height: overlayHeight }]}
-            pointerEvents="none"
-          />
+          {/* Adaptive gradient overlay */}
+          {(() => {
+            // Calculate adaptive gradient height based on content
+            const titleLines = item.name ? Math.ceil(item.name.length / 20) : 0; // Rough estimate of title lines
+            const titleHeight = titleLines * nameFontSize * 1.2; // Line height factor
+            const descriptionLines = Math.min(4, Math.ceil(item.description.length / 30)); // Estimate description lines
+            const descriptionHeight = descriptionLines * descriptionFontSize * 1.4;
+            const padding = 28; // Top and bottom padding
+            const spacing = 6; // Space between title and description
+            
+            // Calculate total content height
+            const totalContentHeight = titleHeight + descriptionHeight + padding + spacing;
+            
+            // Ensure gradient covers at least the content area plus some buffer
+            const adaptiveGradientHeight = Math.max(totalContentHeight + 20, cardHeight * 0.4);
+            
+            // Calculate gradient start position (where title should begin)
+            const gradientStartFromBottom = totalContentHeight;
+            
+            return (
+              <LinearGradient
+                colors={[ 'rgba(0,0,0,0)', 'rgba(0,0,0,0.3)', 'rgba(0,0,0,0.75)' ]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 0, y: 1 }}
+                style={[
+                  styles.fullBleedGradient, 
+                  { 
+                    height: adaptiveGradientHeight,
+                    bottom: 0
+                  }
+                ]}
+                pointerEvents="none"
+              />
+            );
+          })()}
 
 
 

@@ -620,24 +620,30 @@ export default function CardCreationNewScreen() {
           router.replace('/');
         }, 1500);
       } else {
+        console.log('Creating new card with data:', cardData);
         const { data: newCard, error: insertError } = await supabase
           .from('cards')
           .insert(cardData)
           .select()
           .single();
 
-        if (insertError) throw insertError;
+        if (insertError) {
+          console.error('Card creation error:', insertError);
+          throw insertError;
+        }
         
+        console.log('Card created successfully:', newCard);
         resetForm();
         
         setSuccessMessage('Card created successfully!');
         setTimeout(() => {
           setSuccessMessage('');
           if (returnTo === 'spread' && returnZone) {
+            console.log('Navigating back to spread with card ID:', newCard?.id, 'and zone:', returnZone);
             router.replace({
               pathname: '/spread',
               params: { 
-                autoAddCard: newCard?.id,
+                autoAddCardData: JSON.stringify(newCard),
                 autoAddZone: returnZone
               }
             });
