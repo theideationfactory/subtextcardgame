@@ -13,6 +13,7 @@ import {
   TextInput,
   Platform,
   SafeAreaView,
+  Pressable,
 } from 'react-native';
 import { useFonts, Inter_400Regular, Inter_700Bold } from '@expo-google-fonts/inter';
 import { createClient } from '@supabase/supabase-js';
@@ -95,6 +96,13 @@ const SPREADS: Record<SpreadType, {
     color: '#FF9800',
     icon: RotateCcw,
     zones: [
+      {
+        name: 'context',
+        title: 'Context',
+        color: '#FF9800',
+        icon: Book,
+        description: 'Events and circumstances that inform your perspective',
+      },
       {
         name: 'their_moves',
         title: 'Their Moves',
@@ -236,6 +244,7 @@ export default function SpreadScreen() {
   const [cardToRemove, setCardToRemove] = useState<{card: any, zone: string} | null>(null);
   const [autoAddCardData, setAutoAddCardData] = useState<string | null>(null);
   const [autoAddZone, setAutoAddZone] = useState<string | null>(null);
+  const [wordsRemembered, setWordsRemembered] = useState({ self: '', other: '', situation: '' });
 
   const [fontsLoaded] = useFonts({
     'Inter-Regular': Inter_400Regular,
@@ -467,7 +476,10 @@ export default function SpreadScreen() {
       console.log('Card IDs in shared draft zoneCards:', JSON.stringify(draft.draft_data.zoneCards));
     }
 
-      if (draft?.draft_data?.type && draft?.draft_data?.zoneCards) {
+      if (draft?.draft_data) {
+        if (draft.draft_data.wordsRemembered) {
+          setWordsRemembered(draft.draft_data.wordsRemembered);
+        }
         console.log('Setting spread type to:', draft.draft_data.type);
         setSelectedSpread(draft.draft_data.type);
         setSpreadName(draft.name || SPREADS[draft.draft_data.type as SpreadType].name);
@@ -528,6 +540,7 @@ export default function SpreadScreen() {
       const draftData = {
         type: selectedSpread,
         zoneCards: zoneCardIds,
+        wordsRemembered,
       };
 
       console.log('Prepared draft data:', JSON.stringify(draftData, null, 2));
@@ -1030,6 +1043,9 @@ export default function SpreadScreen() {
             <View style={styles.headerLeft}>
               <Icon size={16} color={zone.color} />
               <Text style={styles.dropZoneTitle}>{zone.title}</Text>
+              <Pressable style={styles.addButton} onPress={() => handleAddCard(zone.id)}>
+                <Plus size={16} color={zone.color} />
+              </Pressable>
             </View>
             <View style={styles.headerRight}>
               {isFullscreen && (
@@ -1234,6 +1250,16 @@ export default function SpreadScreen() {
               ))}
             </ScrollView>
           )}
+          <View style={styles.wordsRememberedContainer}>
+            <TextInput
+              style={styles.wordsRememberedInput}
+              placeholder="Words Remembered..."
+              placeholderTextColor="#999"
+              value={wordsRemembered[zone.name]}
+              onChangeText={(text) => setWordsRemembered(prev => ({ ...prev, [zone.name]: text }))}
+              multiline
+            />
+          </View>
         </LinearGradient>
       </View>
     );
@@ -1584,8 +1610,20 @@ const styles = StyleSheet.create({
   },
   simpleModalButton: {
     flex: 1,
-    padding: 16,
-    alignItems: 'center',
+    minHeight: 150, // Minimum height for the drop zone
+  },
+  wordsRememberedContainer: {
+    padding: 10,
+    backgroundColor: '#222',
+    borderTopWidth: 1,
+    borderTopColor: '#444',
+  },
+  wordsRememberedInput: {
+    backgroundColor: '#333',
+    color: '#fff',
+    padding: 10,
+    borderRadius: 5,
+    textAlignVertical: 'top',
   },
   simpleModalButtonText: {
     color: '#0a84ff',
