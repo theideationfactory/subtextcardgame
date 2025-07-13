@@ -378,34 +378,55 @@ export default function CardCreationNewScreen() {
         setError('');
         
         try {
-          // Get current session
+          // Get current session with better error handling
           const currentSession = await refreshSession();
           
-          if (!currentSession || !currentSession.access_token) {
-            throw new Error('You must be logged in to upload images');
+          if (!currentSession?.user?.id) {
+            throw new Error('Authentication required. Please log in again.');
           }
 
-          // Convert image to blob for upload
-          const response = await fetch(imageUri);
-          const blob = await response.blob();
-          
+          console.log('Starting image upload for user:', currentSession.user.id);
+
           // Generate unique filename
           const timestamp = Date.now();
-          const fileName = `${currentSession.user.id}/uploaded_${timestamp}.jpg`;
+
+          // Create file object for React Native upload (no blob conversion needed)
+          const fileExtension = imageUri.split('.').pop() || 'jpg';
+          const mimeType = `image/${fileExtension === 'jpg' ? 'jpeg' : fileExtension}`;
           
-          // Upload to Supabase Storage (same bucket as AI-generated images)
+          // For React Native, create a file-like object
+          const file = {
+            uri: imageUri,
+            type: mimeType,
+            name: `uploaded_${timestamp}.${fileExtension}`,
+          } as any;
+          const fileName = `${currentSession.user.id}/uploaded_${timestamp}.${fileExtension}`;
+          
+          console.log('Uploading file:', fileName, 'with type:', mimeType);
+          
+          // Upload to Supabase Storage with better error handling
           const { data: uploadData, error: uploadError } = await supabase.storage
             .from('card_images')
-            .upload(fileName, blob, {
-              contentType: 'image/jpeg',
+            .upload(fileName, file, {
+              contentType: mimeType,
               cacheControl: '3600',
               upsert: true
             });
 
           if (uploadError) {
-            console.error('Upload error:', uploadError);
-            throw new Error(`Failed to upload image: ${uploadError.message}`);
+            console.error('Supabase upload error:', uploadError);
+            
+            // Handle specific error types
+            if (uploadError.message?.includes('JWT')) {
+              throw new Error('Authentication expired. Please log in again.');
+            } else if (uploadError.message?.includes('policy')) {
+              throw new Error('Permission denied. Please check your account settings.');
+            } else {
+              throw new Error(`Upload failed: ${uploadError.message}`);
+            }
           }
+
+          console.log('Upload successful:', uploadData);
 
           // Get the public URL
           const { data: { publicUrl } } = supabase.storage
@@ -413,8 +434,10 @@ export default function CardCreationNewScreen() {
             .getPublicUrl(fileName);
 
           if (!publicUrl) {
-            throw new Error('Failed to get public URL for uploaded image');
+            throw new Error('Failed to generate public URL for uploaded image');
           }
+
+          console.log('Generated public URL:', publicUrl);
 
           // Set the uploaded image URL
           setCardImage(publicUrl);
@@ -422,13 +445,32 @@ export default function CardCreationNewScreen() {
           // Clear image description since we're using uploaded image
           setImageDescription('');
           
+          // Show success feedback
           if (Platform.OS !== 'web') {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
           }
           
+          console.log('Image upload completed successfully');
+          
         } catch (uploadErr) {
           console.error('Image upload error:', uploadErr);
-          setError(uploadErr instanceof Error ? uploadErr.message : 'Failed to upload image. Please try again.');
+          
+          // Provide more specific error messages
+          let errorMessage = 'Failed to upload image. Please try again.';
+          
+          if (uploadErr instanceof Error) {
+            if (uploadErr.message.includes('Authentication') || uploadErr.message.includes('JWT')) {
+              errorMessage = 'Please log in again and try uploading.';
+            } else if (uploadErr.message.includes('Permission') || uploadErr.message.includes('policy')) {
+              errorMessage = 'Upload permission denied. Please contact support.';
+            } else if (uploadErr.message.includes('network') || uploadErr.message.includes('fetch')) {
+              errorMessage = 'Network error. Please check your connection and try again.';
+            } else {
+              errorMessage = uploadErr.message;
+            }
+          }
+          
+          setError(errorMessage);
         } finally {
           setIsGenerating(false);
         }
@@ -436,6 +478,7 @@ export default function CardCreationNewScreen() {
     } catch (err) {
       console.error('Image picker error:', err);
       setError('Failed to access image library. Please try again.');
+      setIsGenerating(false);
     }
   };
 

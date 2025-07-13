@@ -3,7 +3,7 @@
 // @ts-ignore: Deno-specific import
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3?deno-std=0.177.0';
 // @ts-ignore: Deno-specific import
-import OpenAI from 'npm:openai@4.24.1';
+import OpenAI from 'npm:openai@4.37.2';
 
 // @ts-ignore: Deno namespace
 declare const Deno: {
@@ -122,16 +122,15 @@ Deno.serve(async (req: Request) => {
       console.log('Full prompt being sent to OpenAI:', prompt.substring(0, 100) + '...');  
       
       const response = await openai.images.generate({
-        model: "dall-e-3",
-        prompt: prompt,
+        model: "gpt-image-1",
+        prompt,
         n: 1,
         size: "1024x1024",
-        quality: "standard",
-        style: openaiStyleParam, // Now dynamically set based on the selected style
+        quality: "high",
         response_format: "url"
       });
-      
-      console.log(`OpenAI request sent with style parameter: ${openaiStyleParam}`);
+
+      console.log('OpenAI image generation request sent with model gpt-image-1');
 
       if (!response.data?.[0]?.url) {
         throw new Error('No image URL in OpenAI response');
