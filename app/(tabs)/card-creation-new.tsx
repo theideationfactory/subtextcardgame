@@ -85,6 +85,13 @@ export default function CardCreationNewScreen() {
   const [showContextDropdown, setShowContextDropdown] = useState(false);
   const [showArtStyleDropdown, setShowArtStyleDropdown] = useState(false);
   
+  // Chat functionality states
+  const [showChat, setShowChat] = useState(false);
+  const [chatMessages, setChatMessages] = useState<Array<{id: string, role: 'user' | 'assistant', content: string, imageUrl?: string}>>([]);
+  const [chatInput, setChatInput] = useState('');
+  const [isChatLoading, setIsChatLoading] = useState(false);
+  const [currentResponseId, setCurrentResponseId] = useState<string | null>(null);
+  
   // Dropdown options - loaded from AsyncStorage to include custom phenomena types
   const [typeOptions, setTypeOptions] = useState(['Intention', 'Context', 'Impact', 'Accuracy', 'Agenda', 'Needs', 'Emotion', 'Role']);
   // Map of detail options for each Phenomena
@@ -349,6 +356,99 @@ export default function CardCreationNewScreen() {
     }
   };
 
+  // Chat functionality functions
+  const initializeChat = () => {
+    if (cardImage) {
+      const initialMessage = {
+        id: Date.now().toString(),
+        role: 'assistant' as const,
+        content: "I've generated your card image! How would you like to refine or modify it? You can ask me to adjust colors, style, composition, or any other aspect.",
+        imageUrl: cardImage
+      };
+      setChatMessages([initialMessage]);
+      setShowChat(true);
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    }
+  };
+
+  const sendChatMessage = async () => {
+    if (!chatInput.trim() || isChatLoading) return;
+
+    const userMessage = {
+      id: Date.now().toString(),
+      role: 'user' as const,
+      content: chatInput.trim()
+    };
+
+    setChatMessages(prev => [...prev, userMessage]);
+    setChatInput('');
+    setIsChatLoading(true);
+
+    try {
+      const currentSession = await refreshSession();
+      
+      if (!currentSession || !currentSession.access_token) {
+        throw new Error('You must be logged in to use chat');
+      }
+
+      const response = await fetch(
+        `${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/chat-image-generation`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${currentSession.access_token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            message: chatInput.trim(),
+            cardImageUrl: cardImage,
+            cardName: name,
+            originalDescription: imageDescription || name,
+            imageStyle: imageStyle
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to process chat message');
+      }
+
+      const data = await response.json();
+      
+      const assistantMessage = {
+        id: (Date.now() + 1).toString(),
+        role: 'assistant' as const,
+        content: data.message || "I've updated your image based on your request.",
+        imageUrl: data.imageUrl
+      };
+
+      setChatMessages(prev => [...prev, assistantMessage]);
+      
+      if (data.imageUrl) {
+        setCardImage(data.imageUrl);
+      }
+
+    } catch (err) {
+      console.error('Chat error:', err);
+      const errorMessage = {
+        id: (Date.now() + 1).toString(),
+        role: 'assistant' as const,
+        content: `Sorry, I encountered an error: ${err instanceof Error ? err.message : 'Unknown error'}. Please try again.`
+      };
+      setChatMessages(prev => [...prev, errorMessage]);
+    } finally {
+      setIsChatLoading(false);
+    }
+  };
+
+  const closeChat = () => {
+    setShowChat(false);
+    setChatMessages([]);
+    setCurrentResponseId(null);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  };
+
   const uploadImage = async () => {
     try {
       // Request permissions
@@ -365,7 +465,7 @@ export default function CardCreationNewScreen() {
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,
-        aspect: [1, 1], // Square aspect ratio for cards
+        // No aspect ratio constraint - allow original proportions
         quality: 0.8,
         base64: false,
       });
@@ -1106,6 +1206,16 @@ export default function CardCreationNewScreen() {
             </TouchableOpacity>
           </View>
 
+          {/* Chat Button - appears after image generation */}
+          {cardImage && (
+            <TouchableOpacity 
+              style={styles.chatButton}
+              onPress={initializeChat}
+            >
+              <Text style={styles.chatButtonText}>💬 Refine with AI Chat</Text>
+            </TouchableOpacity>
+          )}
+
           {/* Card Format Toggle */}
           <View style={styles.formatToggleContainer}>
             <Pressable
@@ -1139,6 +1249,66 @@ export default function CardCreationNewScreen() {
           </TouchableOpacity>
         </View>
       </ScrollView>
+
+      {/* Chat Modal */}
+      <Modal
+        visible={showChat}
+        animationType="slide"
+        presentationStyle="pageSheet"
+      >
+        <View style={styles.chatContainer}>
+          <View style={styles.chatHeader}>
+            <Text style={styles.chatTitle}>Refine Your Image</Text>
+            <TouchableOpacity onPress={closeChat} style={styles.chatCloseButton}>
+              <Text style={styles.chatCloseText}>✕</Text>
+            </TouchableOpacity>
+          </View>
+          
+          <ScrollView style={styles.chatMessages} showsVerticalScrollIndicator={false}>
+            {chatMessages.map((message) => (
+              <View key={message.id} style={[
+                styles.chatMessage,
+                message.role === 'user' ? styles.userMessage : styles.assistantMessage
+              ]}>
+                {message.imageUrl && (
+                  <Image source={{ uri: message.imageUrl }} style={styles.chatImage} />
+                )}
+                <Text style={[
+                  styles.chatMessageText,
+                  message.role === 'user' ? styles.userMessageText : styles.assistantMessageText
+                ]}>
+                  {message.content}
+                </Text>
+              </View>
+            ))}
+            {isChatLoading && (
+              <View style={[styles.chatMessage, styles.assistantMessage]}>
+                <ActivityIndicator color="#6366f1" size="small" />
+                <Text style={styles.assistantMessageText}>Thinking...</Text>
+              </View>
+            )}
+          </ScrollView>
+          
+          <View style={styles.chatInputContainer}>
+            <TextInput
+              style={styles.chatInput}
+              value={chatInput}
+              onChangeText={setChatInput}
+              placeholder="Ask me to adjust colors, style, composition..."
+              placeholderTextColor="#666"
+              multiline
+              maxLength={500}
+            />
+            <TouchableOpacity 
+              style={[styles.chatSendButton, (!chatInput.trim() || isChatLoading) && styles.chatSendButtonDisabled]}
+              onPress={sendChatMessage}
+              disabled={!chatInput.trim() || isChatLoading}
+            >
+              <Text style={styles.chatSendButtonText}>Send</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </KeyboardAvoidingView>
   );
 }
@@ -1448,6 +1618,115 @@ const styles = StyleSheet.create({
   visibilityTextSelected: {
     color: '#fff',
     fontWeight: 'bold',
+    fontFamily: 'Inter-Bold',
+  },
+  chatButton: {
+    backgroundColor: '#22c55e',
+    padding: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginTop: 12,
+    marginBottom: 8,
+  },
+  chatButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontFamily: 'Inter-Bold',
+  },
+  chatContainer: {
+    flex: 1,
+    backgroundColor: '#000',
+  },
+  chatHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingTop: Platform.OS === 'ios' ? 50 : 20,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#222',
+  },
+  chatTitle: {
+    color: '#fff',
+    fontSize: 18,
+    fontFamily: 'Inter-Bold',
+  },
+  chatCloseButton: {
+    padding: 8,
+  },
+  chatCloseText: {
+    color: '#fff',
+    fontSize: 18,
+    fontFamily: 'Inter-Bold',
+  },
+  chatMessages: {
+    flex: 1,
+    paddingHorizontal: 16,
+  },
+  chatMessage: {
+    marginVertical: 8,
+    padding: 12,
+    borderRadius: 12,
+    maxWidth: '80%',
+  },
+  userMessage: {
+    backgroundColor: '#6366f1',
+    alignSelf: 'flex-end',
+  },
+  assistantMessage: {
+    backgroundColor: '#222',
+    alignSelf: 'flex-start',
+  },
+  chatMessageText: {
+    fontSize: 16,
+    fontFamily: 'Inter-Regular',
+    lineHeight: 22,
+  },
+  userMessageText: {
+    color: '#fff',
+  },
+  assistantMessageText: {
+    color: '#fff',
+  },
+  chatImage: {
+    width: 200,
+    height: 200,
+    borderRadius: 8,
+    marginBottom: 8,
+  },
+  chatInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#222',
+    backgroundColor: '#000',
+  },
+  chatInput: {
+    flex: 1,
+    backgroundColor: '#111',
+    color: '#fff',
+    padding: 12,
+    borderRadius: 20,
+    marginRight: 8,
+    maxHeight: 100,
+    fontSize: 16,
+    fontFamily: 'Inter-Regular',
+  },
+  chatSendButton: {
+    backgroundColor: '#6366f1',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 20,
+  },
+  chatSendButtonDisabled: {
+    backgroundColor: '#333',
+  },
+  chatSendButtonText: {
+    color: '#fff',
+    fontSize: 16,
     fontFamily: 'Inter-Bold',
   },
 });
