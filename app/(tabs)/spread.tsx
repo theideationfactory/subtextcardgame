@@ -46,6 +46,7 @@ import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
 import { Spacer } from '@/components/Spacer';
 import { hasDynamicIsland } from '@/utils/deviceDimensions';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Define the types for our data structures
 interface Card {
@@ -236,6 +237,9 @@ export default function SpreadScreen() {
   const [expandedCardId, setExpandedCardId] = useState<string | null>(null);
   const [galleryLoading, setGalleryLoading] = useState(false);
   const [gallerySearchQuery, setGallerySearchQuery] = useState('');
+  const [phenomenaTypes, setPhenomenaTypes] = useState<string[]>(['All']);
+  const [selectedPhenomena, setSelectedPhenomena] = useState<string>('All');
+  const [showPhenomenaMenu, setShowPhenomenaMenu] = useState(false);
   const [activeScope, setActiveScope] = useState('Personal');
   const [filteredCards, setFilteredCards] = useState<any[]>([]);
   const [showFullCardView, setShowFullCardView] = useState(false);
@@ -312,12 +316,30 @@ export default function SpreadScreen() {
   }, []); // Run only once on mount
 
   // This effect reacts to gallery visibility and scope changes to fetch the correct cards.
+  // Load phenomena types when gallery opens
   useEffect(() => {
+    const loadPhenomenaTypes = async () => {
+      try {
+        const stored = await AsyncStorage.getItem('@phenomena_types');
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          setPhenomenaTypes(['All', ...parsed]);
+        }
+      } catch (err) {
+        console.error('Error loading phenomena types:', err);
+      }
+    };
+
     if (showGallery) {
+      loadPhenomenaTypes();
       setGalleryLoading(true);
-      fetchCards(0, 20, false, activeScope)
+      fetchCards(0, 100, false, activeScope)
         .then(scopedCards => {
-          setFilteredCards(scopedCards);
+          // Apply initial phenomena filter
+          const initiallyFiltered = scopedCards.filter(card =>
+            (selectedPhenomena === 'All' || card.type === selectedPhenomena)
+          );
+          setFilteredCards(initiallyFiltered);
           setGalleryLoading(false);
         })
         .catch(err => {
@@ -381,6 +403,18 @@ export default function SpreadScreen() {
       });
     }
   }, [cards, showGallery]);
+
+  // Update filtered cards when selectedPhenomena changes
+  useEffect(() => {
+    if (showGallery) {
+      const filtered = cards.filter(card => {
+        const matchesSearch = card.name.toLowerCase().includes(gallerySearchQuery.toLowerCase());
+        const matchesPhenomena = selectedPhenomena === 'All' || card.type === selectedPhenomena;
+        return matchesSearch && matchesPhenomena;
+      });
+      setFilteredCards(filtered);
+    }
+  }, [selectedPhenomena]);
 
   const toggleFullscreen = (zoneName: string) => {
     if (fullscreenZone === zoneName) {
@@ -1006,6 +1040,39 @@ export default function SpreadScreen() {
               </TouchableOpacity>
             </View>
 
+            {/* Phenomena (Deck) Dropdown */}
+            <View style={{ marginTop: 12 }}>
+              <TouchableOpacity
+                style={styles.dropdownButton}
+                onPress={() => setShowPhenomenaMenu(prev => !prev)}
+              >
+                <Text style={styles.dropdownButtonText}>{selectedPhenomena}</Text>
+              </TouchableOpacity>
+              {showPhenomenaMenu && (
+                <View style={styles.dropdownMenu}>
+                  {phenomenaTypes.map(type => (
+                    <TouchableOpacity
+                      key={type}
+                      style={styles.dropdownItem}
+                      onPress={() => {
+                        setSelectedPhenomena(type);
+                        setShowPhenomenaMenu(false);
+
+                        const filtered = cards.filter(card => {
+                          const matchesSearch = card.name.toLowerCase().includes(gallerySearchQuery.toLowerCase());
+                          const matchesPhenomena = type === 'All' || card.type === type;
+                          return matchesSearch && matchesPhenomena;
+                        });
+                        setFilteredCards(filtered);
+                      }}
+                    >
+                      <Text style={styles.dropdownItemText}>{type}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
+            </View>
+
             <TextInput
               style={styles.gallerySearchInput}
               placeholder="Search cards"
@@ -1013,7 +1080,11 @@ export default function SpreadScreen() {
               value={gallerySearchQuery}
               onChangeText={(text) => {
                 setGallerySearchQuery(text);
-                const filtered = cards.filter((card) => card.name.toLowerCase().includes(text.toLowerCase()));
+                const filtered = cards.filter(card => {
+                  const matchesSearch = card.name.toLowerCase().includes(text.toLowerCase());
+                  const matchesPhenomena = selectedPhenomena === 'All' || card.type === selectedPhenomena;
+                  return matchesSearch && matchesPhenomena;
+                });
                 setFilteredCards(filtered);
               }}
             />
@@ -2112,6 +2183,37 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderRadius: 12,
     marginTop: 16,
+  },
+  dropdownButton: {
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderRadius: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+  },
+  dropdownButtonText: {
+    color: '#fff',
+    fontFamily: 'Inter-Bold',
+    fontSize: 14,
+  },
+  dropdownMenu: {
+    position: 'absolute',
+    top: 44,
+    left: 0,
+    right: 0,
+    backgroundColor: '#1a1a1a',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+    zIndex: 2000,
+  },
+  dropdownItem: {
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+  },
+  dropdownItemText: {
+    color: '#fff',
+    fontFamily: 'Inter-Regular',
+    fontSize: 14,
   },
   gallerySearchInput: {
     backgroundColor: '#2a2a2a',
