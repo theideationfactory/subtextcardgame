@@ -3,7 +3,7 @@
 // @ts-ignore: Deno-specific import
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3?deno-std=0.177.0';
 // @ts-ignore: Deno-specific import
-import OpenAI from 'npm:openai@4.37.2';
+import OpenAI from 'npm:openai@4.24.1';
 
 // @ts-ignore: Deno namespace
 declare const Deno: {
@@ -62,9 +62,7 @@ Deno.serve(async (req: Request) => {
     }
 
     const body = await req.json().catch(() => ({}));
-    const { name, description, style = 'fantasy' } = body;
-    
-    console.log('Received style parameter:', style);
+    const { name, description, size = '1024x1024', quality = 'standard' } = body;
 
     if (!name || !description) {
       return new Response(
@@ -82,147 +80,36 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // Clean and format the description
-    const sanitizedDesc = description.trim().replace(/[^\w\s.,!?-]/g, '');
-
-    // Create a more direct and effective prompt for DALL-E 3
-    let prompt = '';
-    let openaiStyleParam = 'vivid'; // Default OpenAI style parameter
+    // Create literal prompt from description only
+    const prompt = description.trim().replace(/[^\w\s.,!?-]/g, '');
+    console.log('Generated prompt:', prompt);
     
-    console.log('Using art style:', style);
-    
-    // Simplified style approach
-    switch(style) {
-      case 'fantasy':
-        prompt = `A high-quality fantasy illustration for a trading card game showing ${sanitizedDesc}. The image should have rich colors, dramatic lighting, and a magical atmosphere. No text or card frames.`;
-        break;
-      case 'photorealistic':
-        prompt = `A photorealistic image for a trading card game showing ${sanitizedDesc}. The image should look like a professional photograph with natural lighting, realistic details, and cinematic composition. No text or card frames.`;
-        openaiStyleParam = 'natural'; // Use natural for photorealistic
-        break;
-      case 'anime':
-        prompt = `A high-quality anime-style illustration for a trading card game showing ${sanitizedDesc}. Use bold lines, vibrant colors, and stylized anime aesthetics. No text or card frames.`;
-        break;
-      case 'digital':
-        prompt = `A modern digital art illustration for a trading card game showing ${sanitizedDesc}. Use contemporary digital art techniques with bold colors, creative effects, and a polished finish. No text or card frames.`;
-        break;
-      default:
-        prompt = `A high-quality fantasy illustration for a trading card game showing ${sanitizedDesc}. The image should have rich colors, dramatic lighting, and a magical atmosphere. No text or card frames.`;
-    }
-    
-    // Add a universal suffix to ensure quality and card-appropriate composition
-    prompt += ' The artwork should be centered, well-composed, and suitable for a premium trading card game with a single clear subject.';
-    
-    console.log('Art style selected:', style);
-    console.log('Using prompt approach:', style || 'fantasy (fallback)');
-
+    const abortSignal = AbortSignal.timeout(45_000);
+    let imgResp;
     try {
-      // Note: 'style' here is OpenAI's parameter (vivid or natural), not our custom art style
-      // Our custom art style is implemented through different prompt templates above
-      console.log('Full prompt being sent to OpenAI:', prompt.substring(0, 100) + '...');  
-      
-      const response = await openai.images.generate({
-        model: "gpt-image-1",
-        prompt,
-        n: 1,
-        size: "1024x1024",
-        quality: "high",
-        response_format: "url"
-      });
-
-      console.log('OpenAI image generation request sent with model gpt-image-1');
-
-      if (!response.data?.[0]?.url) {
-        throw new Error('No image URL in OpenAI response');
-      }
-
-      // Download the image from OpenAI
-      const imageResponse = await fetch(response.data[0].url);
-      if (!imageResponse.ok) {
-        throw new Error('Failed to download image from OpenAI');
-      }
-
-      const imageBlob = await imageResponse.blob();
-      const fileName = `${user.id}/${Date.now()}-${name.toLowerCase().replace(/[^a-z0-9]/g, '-')}.png`;
-
-      // Check if bucket exists
-      const { data: buckets } = await supabase
-        .storage
-        .listBuckets();
-
-      // @ts-ignore: bucket type
-const bucketExists = buckets?.some((bucket) => bucket.name === BUCKET_NAME);
-
-      if (!bucketExists) {
-        const { error: createBucketError } = await supabase
-          .storage
-          .createBucket(BUCKET_NAME, {
-            public: true,
-            allowedMimeTypes: ['image/png', 'image/jpeg'],
-            fileSizeLimit: 5242880, // 5MB
-          });
-
-        if (createBucketError) {
-          throw new Error(`Failed to create bucket: ${createBucketError.message}`);
-        }
-      }
-
-      // Ensure user folder exists
-      const userFolder = `${user.id}/`;
-      await supabase
-        .storage
-        .from(BUCKET_NAME)
-        .upload(userFolder, new Blob(['']), {
-          upsert: true
-        });
-
-      // Upload the image
-      const { data: uploadData, error: uploadError } = await supabase
-        .storage
-        .from(BUCKET_NAME)
-        .upload(fileName, imageBlob, {
-          contentType: 'image/png',
-          cacheControl: '3600',
-          upsert: true
-        });
-
-      if (uploadError) {
-        console.error('Upload error:', uploadError);
-        throw new Error(`Failed to upload image: ${uploadError.message}`);
-      }
-
-      // Get the public URL
-      const { data: { publicUrl } } = supabase
-        .storage
-        .from(BUCKET_NAME)
-        .getPublicUrl(fileName);
-
-      if (!publicUrl) {
-        throw new Error('Failed to get public URL for uploaded image');
-      }
-
-      return new Response(
-        JSON.stringify({ imageUrl: publicUrl }),
+      imgResp = await openai.images.generate(
         {
-          headers: {
-            ...corsHeaders,
-            'Content-Type': 'application/json',
-          },
+          model: "dall-e-3",
+          prompt,
+          style: "natural", // reduce vivid, keep things literal
+          response_format: "b64_json", // request base64 format for processing
+          n: 1,
+          size,
+          quality,
+          user: user.id,
         },
+        { signal: abortSignal },
       );
-    } catch (openaiError) {
-      // @ts-ignore: openaiError type
-      console.error('OpenAI API error:', openaiError);
-      
-      // @ts-ignore: openaiError type
-      if (openaiError && openaiError.status === 400) {
+    } catch (err: any) {
+      console.error('OpenAI API error:', err);
+      if (err?.status === 403) {
         return new Response(
           JSON.stringify({ 
-            error: 'The image could not be generated. Please try a simpler description.',
-            details: 'Avoid specific names, brands, or potentially inappropriate content.'
+            error: 'OpenAI access denied',
+            details: 'Please verify your OpenAI API key and organization settings.'
           }),
           {
-            status: 400,
+            status: 403,
             headers: {
               ...corsHeaders,
               'Content-Type': 'application/json',
@@ -230,9 +117,109 @@ const bucketExists = buckets?.some((bucket) => bucket.name === BUCKET_NAME);
           },
         );
       }
-      
-      throw openaiError;
+      return new Response(
+        JSON.stringify({ 
+          error: 'OpenAI request failed',
+          details: err.message || String(err)
+        }),
+        {
+          status: 502,
+          headers: {
+            ...corsHeaders,
+            'Content-Type': 'application/json',
+          },
+        },
+      );
     }
+
+    console.log('OpenAI response received:', {
+      dataLength: imgResp.data?.length,
+      hasB64Json: !!imgResp.data?.[0]?.b64_json,
+      b64Length: imgResp.data?.[0]?.b64_json?.length
+    });
+    
+    if (!imgResp.data?.[0]?.b64_json) {
+      console.error('OpenAI response structure:', JSON.stringify(imgResp, null, 2));
+      throw new Error('No image data in OpenAI response');
+    }
+
+    // Convert base64 to binary data
+    const base64Data = imgResp.data[0].b64_json;
+    const binaryString = atob(base64Data);
+    const bytes = new Uint8Array(binaryString.length);
+    for (let i = 0; i < binaryString.length; i++) {
+      bytes[i] = binaryString.charCodeAt(i);
+    }
+    const imageBlob = new Blob([bytes], { type: 'image/png' });
+    const fileName = `${user.id}/${Date.now()}-${name.toLowerCase().replace(/[^a-z0-9]/g, '-')}.png`;
+
+    // Check if bucket exists
+    const { data: buckets } = await supabase
+      .storage
+      .listBuckets();
+
+    // @ts-ignore: bucket type
+    const bucketExists = buckets?.some((bucket) => bucket.name === BUCKET_NAME);
+
+    if (!bucketExists) {
+      const { error: createBucketError } = await supabase
+        .storage
+        .createBucket(BUCKET_NAME, {
+          public: true,
+          allowedMimeTypes: ['image/png', 'image/jpeg'],
+          fileSizeLimit: 5242880, // 5MB
+        });
+
+      if (createBucketError) {
+        throw new Error(`Failed to create bucket: ${createBucketError.message}`);
+      }
+    }
+
+    // Ensure user folder exists
+    const userFolder = `${user.id}/`;
+    await supabase
+      .storage
+      .from(BUCKET_NAME)
+      .upload(userFolder, new Blob(['']), {
+        upsert: true
+      });
+
+    // Upload the image
+    const { data: uploadData, error: uploadError } = await supabase
+      .storage
+      .from(BUCKET_NAME)
+      .upload(fileName, imageBlob, {
+        contentType: 'image/png',
+        cacheControl: '3600',
+        upsert: true
+      });
+
+    if (uploadError) {
+      console.error('Upload error:', uploadError);
+      throw new Error(`Failed to upload image: ${uploadError.message}`);
+    }
+
+    // Get the public URL
+    const { data: { publicUrl } } = supabase
+      .storage
+      .from(BUCKET_NAME)
+      .getPublicUrl(fileName);
+
+    if (!publicUrl) {
+      throw new Error('Failed to get public URL for uploaded image');
+    }
+
+    console.log('Successfully generated and uploaded image:', publicUrl);
+    
+    return new Response(
+      JSON.stringify({ imageUrl: publicUrl }),
+      {
+        headers: {
+          ...corsHeaders,
+          'Content-Type': 'application/json',
+        },
+      },
+    );
   } catch (error) {
     // @ts-ignore: error type
     console.error('Image generation error:', error);

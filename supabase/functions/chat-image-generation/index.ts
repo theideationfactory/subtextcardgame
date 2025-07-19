@@ -37,7 +37,6 @@ serve(async (req) => {
       responseId, 
       cardName, 
       originalDescription, 
-      imageStyle,
       cardImageUrl
     } = await req.json()
 
@@ -55,14 +54,14 @@ serve(async (req) => {
     let messages: any[] = [
       {
         role: "system",
-        content: `You are an AI assistant helping users refine their card images. The user has generated an image for a card named "${cardName}" with the description "${originalDescription}" in ${imageStyle} style. 
+        content: `You are an AI assistant helping users refine their card images. The user has generated an image for a card named "${cardName}" with the description "${originalDescription}". 
 
 When the user asks for changes, you should:
 1. Look at the current image they show you
 2. Generate a new image that incorporates their feedback
 3. Provide a brief explanation of what you changed
 
-Always be helpful and creative in interpreting their requests for image modifications. When generating new images, use the style: ${imageStyle}.`
+Always be helpful in interpreting their requests for image modifications. When generating new images, keep the prompt literal and direct based on exactly what the user asks for.`
       }
     ]
 
@@ -141,8 +140,8 @@ Always be helpful and creative in interpreting their requests for image modifica
       const toolCall = chatResult.choices[0].message.tool_calls[0]
       if (toolCall.function.name === 'generate_image') {
         const functionArgs = JSON.parse(toolCall.function.arguments)
-        // Use literal prompt style as requested - just the prompt and style
-        const imagePrompt = `${functionArgs.prompt}, ${imageStyle}`
+        // Use literal prompt as requested
+        const imagePrompt = functionArgs.prompt
 
         console.log('Generating image with prompt:', imagePrompt)
 
@@ -156,6 +155,7 @@ Always be helpful and creative in interpreting their requests for image modifica
           body: JSON.stringify({
             model: "dall-e-3",
             prompt: imagePrompt,
+            style: "natural", // reduce vivid, keep things literal
             n: 1,
             size: "1024x1024",
             quality: "standard",

@@ -18,30 +18,24 @@ import * as Haptics from 'expo-haptics';
 
 const { width } = Dimensions.get('window');
 
-// Art style options
-const artStyleOptions = [
-  'Fantasy (MTG-inspired)',
-  'Photorealistic',
-  'Anime',
-  'Digital Art',
-];
+
 
 // Mock card data for image prompts (should be passed in real flow)
 const MOCK_CARD_IMAGE_DATA = {
   '1': {
     name: 'Emotional Deflection',
     imagePrompt: 'A person holding up a mirror that reflects emotions in different directions',
-    artStyle: 'Fantasy (MTG-inspired)'
+
   },
   '2': {
     name: 'Boundary Setting',
     imagePrompt: 'A person drawing a glowing line in the sand between themselves and others',
-    artStyle: 'Fantasy (MTG-inspired)'
+
   },
   '3': {
     name: 'Empathetic Listening',
     imagePrompt: 'A person with large ears and a warm expression leaning forward attentively',
-    artStyle: 'Fantasy (MTG-inspired)'
+
   },
 };
 
@@ -68,7 +62,7 @@ export default function AICardFlowStep4() {
           selected[id] = {
             name: `Card ${id}`,
             imagePrompt: '',
-            artStyle: 'Fantasy (MTG-inspired)'
+        
           };
         }
       });
@@ -111,19 +105,7 @@ export default function AICardFlowStep4() {
     }));
   };
 
-  const handleArtStyleSelect = (style: string) => {
-    if (!currentCardId || !cardImageData[currentCardId]) return;
-    setCardImageData(prev => ({
-      ...prev,
-      [currentCardId]: {
-        ...prev[currentCardId],
-        artStyle: style
-      }
-    }));
-    if (Platform.OS !== 'web') {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    }
-  };
+
 
   const handleContinue = () => {
     if (Platform.OS !== 'web') {
@@ -216,31 +198,7 @@ export default function AICardFlowStep4() {
                     {currentCard.imagePrompt.length}/200
                   </Text>
                 </View>
-                <View style={styles.editorSection}>
-                  <Text style={styles.editorLabel}>Art Style</Text>
-                  <View style={styles.artStyleRow}>
-                    {artStyleOptions.map(style => (
-                      <TouchableOpacity
-                        key={style}
-                        style={[
-                          styles.artStyleOption,
-                          currentCard.artStyle === style && styles.artStyleOptionSelected
-                        ]}
-                        onPress={() => handleArtStyleSelect(style)}
-                      >
-                        <Text
-                          style={[
-                            styles.artStyleOptionText,
-                            currentCard.artStyle === style && styles.artStyleOptionTextSelected
-                          ]}
-                        >
-                          {style}
-                        </Text>
-                        {currentCard.artStyle === style && <Check size={16} color="#10b981" style={styles.artStyleCheck} />}
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                </View>
+
               </View>
             )}
             <TouchableOpacity
@@ -414,36 +372,7 @@ const styles = StyleSheet.create({
     textAlign: 'right',
     marginTop: 4,
   },
-  artStyleRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginTop: 8,
-  },
-  artStyleOption: {
-    backgroundColor: '#23234a',
-    borderRadius: 8,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    marginRight: 8,
-    marginBottom: 8,
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  artStyleOptionSelected: {
-    backgroundColor: '#10b981',
-  },
-  artStyleOptionText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  artStyleOptionTextSelected: {
-    color: '#121212',
-  },
-  artStyleCheck: {
-    marginLeft: 6,
-  },
+
   continueButton: {
     backgroundColor: '#6366f1',
     borderRadius: 12,

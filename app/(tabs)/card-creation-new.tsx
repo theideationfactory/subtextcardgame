@@ -77,13 +77,12 @@ export default function CardCreationNewScreen() {
   const [visibility, setVisibility] = useState<string[]>(['personal']);
   const [showVisibility, setShowVisibility] = useState(false);
 
-  const [imageStyle, setImageStyle] = useState('fantasy'); // Ensure this state exists
+
   
   // Dropdown states
   const [showTypeDropdown, setShowTypeDropdown] = useState(false);
   const [showRoleDropdown, setShowRoleDropdown] = useState(false);
   const [showContextDropdown, setShowContextDropdown] = useState(false);
-  const [showArtStyleDropdown, setShowArtStyleDropdown] = useState(false);
   
   // Chat functionality states
   const [showChat, setShowChat] = useState(false);
@@ -107,12 +106,7 @@ export default function CardCreationNewScreen() {
 
   const roleOptions = useMemo(() => subOptionsMap[type] || [], [type]);
   const contextOptions = ['TBD', 'Self', 'Family', 'Friendship', 'Therapy', 'Peer', 'Work', 'Art', 'Politics'];
-  const artStyleOptions = [
-    { id: 'fantasy', label: 'Fantasy (MTG-inspired)' },
-    { id: 'photorealistic', label: 'Photorealistic' },
-    { id: 'anime', label: 'Anime' },
-    { id: 'digital', label: 'Digital Art' }
-  ];
+
 
   const [fontsLoaded] = useFonts({
     'Inter-Regular': Inter_400Regular,
@@ -132,7 +126,7 @@ export default function CardCreationNewScreen() {
     setCardImage('');
     setFormat('framed');
     setVisibility(['personal']);
-    setImageStyle('fantasy');
+
     
     // Reset loading/error/success states
     setIsGenerating(false);
@@ -148,7 +142,6 @@ export default function CardCreationNewScreen() {
     setShowTypeDropdown(false);
     setShowRoleDropdown(false);
     setShowContextDropdown(false);
-    setShowArtStyleDropdown(false);
   };
 
   // Load phenomena types from AsyncStorage
@@ -320,7 +313,7 @@ export default function CardCreationNewScreen() {
           body: JSON.stringify({
             name,
             description: imageDescription,
-            style: imageStyle,
+
             userId: currentSession.user.id
           }),
         }
@@ -404,7 +397,7 @@ export default function CardCreationNewScreen() {
             cardImageUrl: cardImage,
             cardName: name,
             originalDescription: imageDescription || name,
-            imageStyle: imageStyle
+
           }),
         }
       );
@@ -895,51 +888,7 @@ export default function CardCreationNewScreen() {
               )}
             </TouchableOpacity>
             
-            <Text style={styles.label}>Art Style</Text>
-            <TouchableOpacity 
-              style={styles.dropdownSelector}
-              onPress={() => setShowArtStyleDropdown(true)}
-            >
-              <Text style={styles.dropdownText}>
-                {artStyleOptions.find(option => option.id === imageStyle)?.label || 'Select art style'}
-              </Text>
-              <ChevronDown size={20} color="#666" />
-            </TouchableOpacity>
-            
-            <Modal
-              visible={showArtStyleDropdown}
-              transparent={true}
-              animationType="fade"
-              onRequestClose={() => setShowArtStyleDropdown(false)}
-            >
-              <TouchableOpacity 
-                style={styles.modalOverlay}
-                activeOpacity={1}
-                onPress={() => setShowArtStyleDropdown(false)}
-              >
-                <View style={styles.dropdownModal}>
-                  <FlatList
-                    data={artStyleOptions}
-                    keyExtractor={(item) => item.id}
-                    renderItem={({ item }) => (
-                      <TouchableOpacity
-                        style={styles.dropdownItem}
-                        onPress={() => {
-                          setImageStyle(item.id);
-                          setShowArtStyleDropdown(false);
-                          if (Platform.OS !== 'web') {
-                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                          }
-                        }}
-                      >
-                        <Text style={styles.dropdownItemText}>{item.label}</Text>
-                        {imageStyle === item.id && <Check size={20} color="#6366f1" />}
-                      </TouchableOpacity>
-                    )}
-                  />
-                </View>
-              </TouchableOpacity>
-            </Modal>
+
           </View>
 
           <View style={styles.inputGroup}>

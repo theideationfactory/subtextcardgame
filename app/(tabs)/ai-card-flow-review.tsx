@@ -42,7 +42,7 @@ export default function AICardFlowReview() {
       role: 'Protector',
       context: 'Therapy',
       imagePrompt: 'A person holding up a mirror that reflects emotions in different directions',
-      artStyle: 'Fantasy (MTG-inspired)'
+
     },
     '2': {
       name: 'Boundary Setting',
@@ -51,7 +51,7 @@ export default function AICardFlowReview() {
       role: 'Gatekeeper',
       context: 'Self',
       imagePrompt: 'A person drawing a glowing line in the sand between themselves and others',
-      artStyle: 'Photorealistic'
+
     },
     '3': {
       name: 'Empathetic Listening',
@@ -60,7 +60,7 @@ export default function AICardFlowReview() {
       role: 'Confessor',
       context: 'Friendship',
       imagePrompt: 'A person with large ears and a warm expression leaning forward attentively',
-      artStyle: 'Anime'
+
     }
   };
   
@@ -177,7 +177,7 @@ export default function AICardFlowReview() {
         <View style={styles.cardImagePrompt}>
           <Text style={styles.cardImagePromptLabel}>Image Prompt:</Text>
           <Text style={styles.cardImagePromptText}>{card.imagePrompt}</Text>
-          <Text style={styles.cardArtStyle}>Art Style: {card.artStyle}</Text>
+
         </View>
       </View>
     );
@@ -417,11 +417,7 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     marginBottom: 8,
   },
-  cardArtStyle: {
-    color: '#10b981',
-    fontSize: 14,
-    fontWeight: '500',
-  },
+
   emptyState: {
     alignItems: 'center',
     justifyContent: 'center',
