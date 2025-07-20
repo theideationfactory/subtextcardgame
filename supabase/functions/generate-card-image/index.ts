@@ -62,7 +62,7 @@ Deno.serve(async (req: Request) => {
     }
 
     const body = await req.json().catch(() => ({}));
-    const { name, description, size = '1024x1024', quality = 'standard' } = body;
+    const { name, description, size = '1024x1024', quality = 'auto' } = body;
 
     if (!name || !description) {
       return new Response(
@@ -84,15 +84,13 @@ Deno.serve(async (req: Request) => {
     const prompt = description.trim().replace(/[^\w\s.,!?-]/g, '');
     console.log('Generated prompt:', prompt);
     
-    const abortSignal = AbortSignal.timeout(45_000);
+    const abortSignal = AbortSignal.timeout(120_000); // 2 minutes for gpt-image-1
     let imgResp;
     try {
       imgResp = await openai.images.generate(
         {
-          model: "dall-e-3",
+          model: "gpt-image-1",
           prompt,
-          style: "natural", // reduce vivid, keep things literal
-          response_format: "b64_json", // request base64 format for processing
           n: 1,
           size,
           quality,

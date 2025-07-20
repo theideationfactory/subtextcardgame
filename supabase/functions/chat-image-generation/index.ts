@@ -145,7 +145,7 @@ Always be helpful in interpreting their requests for image modifications. When g
 
         console.log('Generating image with prompt:', imagePrompt)
 
-        // Generate the image using DALL-E
+        // Generate the image using GPT Image 1
         const imageResponse = await fetch('https://api.openai.com/v1/images/generations', {
           method: 'POST',
           headers: {
@@ -153,12 +153,11 @@ Always be helpful in interpreting their requests for image modifications. When g
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            model: "dall-e-3",
+            model: "gpt-image-1",
             prompt: imagePrompt,
-            style: "natural", // reduce vivid, keep things literal
             n: 1,
             size: "1024x1024",
-            quality: "standard",
+            quality: "auto", // auto quality for best results
           }),
         })
 
@@ -169,11 +168,10 @@ Always be helpful in interpreting their requests for image modifications. When g
         }
 
         const imageResult = await imageResponse.json()
-        const imageUrl = imageResult.data[0].url
+        const imageBase64 = imageResult.data[0].b64_json
 
-        // Download and store the image
-        const imageBlob = await fetch(imageUrl).then(r => r.blob())
-        const imageBuffer = await imageBlob.arrayBuffer()
+        // Convert base64 to buffer for upload
+        const imageBuffer = Uint8Array.from(atob(imageBase64), c => c.charCodeAt(0))
         
         // Generate a unique filename (matching existing structure)
         const timestamp = Date.now()
