@@ -76,6 +76,7 @@ export default function CollectionScreen() {
     description_color?: string;
     context_color?: string;
     format?: "framed" | "fullBleed";
+    background_gradient?: string;
     user_id: string;
     collection_id?: string;
     collections?: any;
@@ -195,7 +196,7 @@ export default function CollectionScreen() {
           // Use optimized query without expensive joins
           const { data: personalCards, error: personalError } = await supabase
             .from('cards')
-            .select('id, name, description, type, role, context, image_url, frame_width, frame_color, name_color, type_color, description_color, context_color, format, user_id, collection_id')
+            .select('id, name, description, type, role, context, image_url, frame_width, frame_color, name_color, type_color, description_color, context_color, format, background_gradient, user_id, collection_id')
             .eq('user_id', user.id)
             .order('created_at', { ascending: false })
             .limit(50); // Add reasonable limit
@@ -225,7 +226,7 @@ export default function CollectionScreen() {
 
           let friendCardsQuery = supabase
             .from('cards')
-            .select('id, name, description, type, role, context, image_url, frame_width, frame_color, name_color, type_color, description_color, context_color, format, user_id, collection_id')
+            .select('id, name, description, type, role, context, image_url, frame_width, frame_color, name_color, type_color, description_color, context_color, format, background_gradient, user_id, collection_id')
             .in('user_id', friendIds)
             .order('created_at', { ascending: false })
             .limit(50);
@@ -260,7 +261,7 @@ export default function CollectionScreen() {
             // First try with is_public column (if migration has been run)
             const { data: publicCards, error: publicError } = await supabase
               .from('cards')
-              .select('id, name, description, type, role, context, image_url, frame_width, frame_color, name_color, type_color, description_color, context_color, format, user_id, collection_id')
+              .select('id, name, description, type, role, context, image_url, frame_width, frame_color, name_color, type_color, description_color, context_color, format, background_gradient, user_id, collection_id')
               .eq('is_public', true)
               .order('created_at', { ascending: false })
               .limit(50);
@@ -271,7 +272,7 @@ export default function CollectionScreen() {
                 console.log('is_public column not found, falling back to showing other users\' cards');
                 const { data: fallbackCards, error: fallbackError } = await supabase
                   .from('cards')
-                  .select('id, name, description, type, role, context, image_url, frame_width, frame_color, name_color, type_color, description_color, context_color, format, user_id, collection_id')
+                  .select('id, name, description, type, role, context, image_url, frame_width, frame_color, name_color, type_color, description_color, context_color, format, background_gradient, user_id, collection_id')
                   .neq('user_id', user.id)
                   .order('created_at', { ascending: false })
                   .limit(50);
@@ -291,7 +292,7 @@ export default function CollectionScreen() {
               console.log('Caught is_public column error in catch block, using fallback');
               const { data: fallbackCards, error: fallbackError } = await supabase
                 .from('cards')
-                .select('id, name, description, type, role, context, image_url, frame_width, frame_color, name_color, type_color, description_color, context_color, format, user_id, collection_id')
+                .select('id, name, description, type, role, context, image_url, frame_width, frame_color, name_color, type_color, description_color, context_color, format, background_gradient, user_id, collection_id')
                 .neq('user_id', user.id)
                 .order('created_at', { ascending: false })
                 .limit(50);
@@ -517,7 +518,25 @@ export default function CollectionScreen() {
   };
 
   const renderCard = ({ item }: { item: Card }) => {
+    // Frame colors are always based on card type
     const cardColors = getCardTypeColor(item.type);
+    
+    // Parse background gradient for card background (separate from frame)
+    const getBackgroundGradient = (): [string, string] | null => {
+      if (item.background_gradient) {
+        try {
+          const gradient = JSON.parse(item.background_gradient);
+          if (Array.isArray(gradient) && gradient.length >= 2) {
+            return [gradient[0], gradient[1]];
+          }
+        } catch (error) {
+          console.error('Error parsing background gradient:', error);
+        }
+      }
+      return null; // No background gradient
+    };
+    
+    const backgroundGradient = getBackgroundGradient();
     
     // Get card dimensions based on the 2.5:3.5 ratio
     const { cardWidth, cardHeight, imageHeight } = getCardDimensions();
@@ -801,126 +820,249 @@ export default function CollectionScreen() {
             }
           ]}
         >
-          <View 
-            style={[
-              styles.cardContent,
-              { 
-                padding: contentPadding,
-                height: '100%',
-              }
-            ]}
-          >
-            {/* Top section - Card name */}
-            <View style={styles.cardNameContainer}>
-              <Text 
-                style={[
-                  styles.cardName, 
-                  { 
-                    fontSize: nameFontSize,
-                    color: item.name_color || '#FFFFFF' 
-                  }
-                ]}
-                numberOfLines={1}
-              >
-                {item.name}
-              </Text>
-            </View>
-
-            {/* Middle section - Card image (50% of card height) */}
-            <View 
+          {/* Card Content with conditional background */}
+          {backgroundGradient ? (
+            <LinearGradient
+              colors={backgroundGradient as [string, string, ...string[]]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
               style={[
-                styles.artContainer,
-                { height: imageHeight }
+                styles.cardContent,
+                { 
+                  padding: contentPadding,
+                  height: '100%',
+                }
               ]}
             >
-              <Image
-                source={{ uri: item.image_url }}
-                style={styles.cardArt}
-                resizeMode="cover"
-              />
-            </View>
+              {/* Top section - Card name */}
+              <View style={styles.cardNameContainer}>
+                <Text 
+                  style={[
+                    styles.cardName, 
+                    { 
+                      fontSize: nameFontSize,
+                      color: item.name_color || '#FFFFFF' 
+                    }
+                  ]}
+                  numberOfLines={1}
+                >
+                  {item.name}
+                </Text>
+              </View>
 
-            {/* Bottom section - Type line and description (50% of card height) */}
-            <View style={{ flex: 1 }}>
-              {/* Type line */}
-              <View style={[styles.typeLine, { marginTop: contentPadding }]}>
-                <View style={styles.typeContainer}>
-                  <Text 
-                    style={[
-                      styles.typeText, 
-                      { 
-                        fontSize: typeFontSize,
-                        color: item.type_color || '#FFFFFF' 
-                      }
-                    ]}
-                  >
-                    {item.type}
-                  </Text>
-                </View>
-                
-                {item.role && (
-                  <View style={styles.roleContainer}>
-                    {getCardRoleIcon(item.role)}
+              {/* Middle section - Card image (50% of card height) */}
+              <View 
+                style={[
+                  styles.artContainer,
+                  { height: imageHeight }
+                ]}
+              >
+                <Image
+                  source={{ uri: item.image_url }}
+                  style={styles.cardArt}
+                  resizeMode="cover"
+                />
+              </View>
+
+              {/* Bottom section - Type line and description (50% of card height) */}
+              <View style={{ flex: 1 }}>
+                {/* Type line */}
+                <View style={[styles.typeLine, { marginTop: contentPadding }]}>
+                  <View style={styles.typeContainer}>
                     <Text 
                       style={[
-                        styles.roleText, 
+                        styles.typeText, 
                         { 
-                          fontSize: Math.max(8, Math.round(14 * scaleFactor)),
-                          color: '#FFFFFF' 
+                          fontSize: typeFontSize,
+                          color: item.type_color || '#FFFFFF' 
                         }
                       ]}
                     >
-                      {item.role}
+                      {item.type}
+                    </Text>
+                  </View>
+                  
+                  {item.role && (
+                    <View style={styles.roleContainer}>
+                      {getCardRoleIcon(item.role)}
+                      <Text 
+                        style={[
+                          styles.roleText, 
+                          { 
+                            fontSize: Math.max(8, Math.round(14 * scaleFactor)),
+                            color: '#FFFFFF' 
+                          }
+                        ]}
+                      >
+                        {item.role}
+                      </Text>
+                    </View>
+                  )}
+                </View>
+
+                {/* Description - directly below type line */}
+                <View 
+                  style={[
+                    styles.textBox,
+                    { 
+                      marginTop: contentPadding / 2,
+                      flex: 1,
+                    }
+                  ]}
+                >
+                  <Text 
+                    style={[
+                      styles.cardDescription, 
+                      { 
+                        fontSize: descriptionFontSize,
+                        lineHeight: Math.max(12, Math.round(descriptionFontSize * 1.4)),
+                        color: item.description_color || '#FFFFFF' 
+                      }
+                    ]}
+                    numberOfLines={numberOfLines}
+                  >
+                    {item.description}
+                  </Text>
+                </View>
+
+                {/* Context - at the bottom of the card */}
+                {item.context && (
+                  <View style={[styles.contextContainer, { marginTop: contentPadding / 2 }]}>
+                    <Text 
+                      style={[
+                        styles.contextText, 
+                        { 
+                          fontSize: contextFontSize,
+                          color: item.context_color || '#CCCCCC' 
+                        }
+                      ]}
+                    >
+                      {item.context}
                     </Text>
                   </View>
                 )}
               </View>
-
-              {/* Description - directly below type line */}
-              <View 
-                style={[
-                  styles.textBox,
-                  { 
-                    marginTop: contentPadding / 2,
-                    flex: 1,
-                  }
-                ]}
-              >
+            </LinearGradient>
+          ) : (
+            <View 
+              style={[
+                styles.cardContent,
+                { 
+                  padding: contentPadding,
+                  height: '100%',
+                }
+              ]}
+            >
+              {/* Top section - Card name */}
+              <View style={styles.cardNameContainer}>
                 <Text 
                   style={[
-                    styles.cardDescription, 
+                    styles.cardName, 
                     { 
-                      fontSize: descriptionFontSize,
-                      lineHeight: Math.max(12, Math.round(descriptionFontSize * 1.4)),
-                      color: item.description_color || '#FFFFFF' 
+                      fontSize: nameFontSize,
+                      color: item.name_color || '#FFFFFF' 
                     }
                   ]}
-                  numberOfLines={numberOfLines}
+                  numberOfLines={1}
                 >
-                  {item.description}
+                  {item.name}
                 </Text>
               </View>
 
-              {/* Context - at the bottom of the card */}
-              {item.context && (
-                <View style={[styles.contextContainer, { marginTop: contentPadding / 2 }]}>
+              {/* Middle section - Card image (50% of card height) */}
+              <View 
+                style={[
+                  styles.artContainer,
+                  { height: imageHeight }
+                ]}
+              >
+                <Image
+                  source={{ uri: item.image_url }}
+                  style={styles.cardArt}
+                  resizeMode="cover"
+                />
+              </View>
+
+              {/* Bottom section - Type line and description (50% of card height) */}
+              <View style={{ flex: 1 }}>
+                {/* Type line */}
+                <View style={[styles.typeLine, { marginTop: contentPadding }]}>
+                  <View style={styles.typeContainer}>
+                    <Text 
+                      style={[
+                        styles.typeText, 
+                        { 
+                          fontSize: typeFontSize,
+                          color: item.type_color || '#FFFFFF' 
+                        }
+                      ]}
+                    >
+                      {item.type}
+                    </Text>
+                  </View>
+                  
+                  {item.role && (
+                    <View style={styles.roleContainer}>
+                      {getCardRoleIcon(item.role)}
+                      <Text 
+                        style={[
+                          styles.roleText, 
+                          { 
+                            fontSize: Math.max(8, Math.round(14 * scaleFactor)),
+                            color: '#FFFFFF' 
+                          }
+                        ]}
+                      >
+                        {item.role}
+                      </Text>
+                    </View>
+                  )}
+                </View>
+
+                {/* Description - directly below type line */}
+                <View 
+                  style={[
+                    styles.textBox,
+                    { 
+                      marginTop: contentPadding / 2,
+                      flex: 1,
+                    }
+                  ]}
+                >
                   <Text 
                     style={[
-                      styles.contextText, 
+                      styles.cardDescription, 
                       { 
-                        fontSize: contextFontSize,
-                        color: item.context_color || '#CCCCCC' 
+                        fontSize: descriptionFontSize,
+                        lineHeight: Math.max(12, Math.round(descriptionFontSize * 1.4)),
+                        color: item.description_color || '#FFFFFF' 
                       }
                     ]}
+                    numberOfLines={numberOfLines}
                   >
-                    {item.context}
+                    {item.description}
                   </Text>
                 </View>
-              )}
+
+                {/* Context - at the bottom of the card */}
+                {item.context && (
+                  <View style={[styles.contextContainer, { marginTop: contentPadding / 2 }]}>
+                    <Text 
+                      style={[
+                        styles.contextText, 
+                        { 
+                          fontSize: contextFontSize,
+                          color: item.context_color || '#CCCCCC' 
+                        }
+                      ]}
+                    >
+                      {item.context}
+                    </Text>
+                  </View>
+                )}
+              </View>
             </View>
-
-
-          </View>
+          )}
         </LinearGradient>
       </Pressable>
     );

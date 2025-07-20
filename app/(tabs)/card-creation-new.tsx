@@ -18,6 +18,7 @@ import {
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useFonts, Inter_400Regular, Inter_700Bold } from '@expo-google-fonts/inter';
 import * as SplashScreen from 'expo-splash-screen';
 import { useAuth } from '@/contexts/AuthContext';
@@ -45,6 +46,15 @@ SplashScreen.preventAutoHideAsync();
 const DEFAULT_IMAGE = 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=1000&auto=format&fit=crop';
 const DEFAULT_FRAME_COLOR = '#808080'; // Medium gray
 
+// Background gradient options
+const GRADIENT_OPTIONS = [
+  { name: 'Classic Black', colors: ['#1a1a1a', '#000000'] },
+  { name: 'Purple Mystic', colors: ['#6366f1', '#8b5cf6'] },
+  { name: 'Ocean Depths', colors: ['#0ea5e9', '#06b6d4'] },
+  { name: 'Sunset Glow', colors: ['#f59e0b', '#ef4444'] },
+  { name: 'Forest Magic', colors: ['#10b981', '#059669'] }
+];
+
 export default function CardCreationNewScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
@@ -59,6 +69,7 @@ export default function CardCreationNewScreen() {
   const [context, setContext] = useState('TBD');
   const [cardImage, setCardImage] = useState('');
   const [format, setFormat] = useState<'framed' | 'fullBleed'>('framed');
+  const [backgroundGradient, setBackgroundGradient] = useState<string[]>(['#1a1a1a', '#000000']); // Default black gradient
   
   // Get return parameters for navigation
   const returnTo = params.returnTo as string | undefined;
@@ -192,10 +203,10 @@ export default function CardCreationNewScreen() {
       // Load visibility settings
       const loadVisibilitySettings = async () => {
         try {
-          // Fetch the card from the database to get the actual visibility settings
+          // Fetch the card from the database to get the actual visibility settings and background gradient
           const { data: cardData, error } = await supabase
             .from('cards')
-            .select('is_public, is_shared_with_friends')
+            .select('is_public, is_shared_with_friends, background_gradient')
             .eq('id', params.id)
             .single();
           
@@ -218,6 +229,18 @@ export default function CardCreationNewScreen() {
             
             console.log('Setting visibility to:', visibilitySettings);
             setVisibility(visibilitySettings);
+            
+            // Load background gradient if it exists
+            if (cardData.background_gradient) {
+              try {
+                const gradient = JSON.parse(cardData.background_gradient);
+                setBackgroundGradient(gradient);
+                console.log('Loaded background gradient:', gradient);
+              } catch (err) {
+                console.error('Error parsing background gradient:', err);
+                // Keep default gradient if parsing fails
+              }
+            }
           }
         } catch (err) {
           console.error('Failed to load visibility settings:', err);
@@ -735,6 +758,10 @@ export default function CardCreationNewScreen() {
         image_url: cardImage,
         format,
         frame_color: DEFAULT_FRAME_COLOR,
+        // Only save background gradient if user selected something other than default black
+        ...(JSON.stringify(backgroundGradient) !== JSON.stringify(['#1a1a1a', '#000000']) && {
+          background_gradient: JSON.stringify(backgroundGradient)
+        }),
         user_id: currentSession.user.id,
         collection_id: collectionId,
         is_public: isPublic,
@@ -1034,6 +1061,38 @@ export default function CardCreationNewScreen() {
                 </View>
               </TouchableOpacity>
             </Modal>
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Background Color</Text>
+            <View style={styles.gradientOptionsContainer}>
+              {GRADIENT_OPTIONS.map((gradient, index) => (
+                <TouchableOpacity
+                  key={index}
+                  style={[
+                    styles.gradientOption,
+                    JSON.stringify(backgroundGradient) === JSON.stringify(gradient.colors) && styles.gradientOptionSelected
+                  ]}
+                  onPress={() => {
+                    setBackgroundGradient(gradient.colors);
+                    if (Platform.OS !== 'web') {
+                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                    }
+                  }}
+                >
+                  <LinearGradient
+                    colors={gradient.colors as [string, string, ...string[]]}
+                    style={styles.gradientPreview}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                  />
+                  <Text style={styles.gradientName}>{gradient.name}</Text>
+                  {JSON.stringify(backgroundGradient) === JSON.stringify(gradient.colors) && (
+                    <Check size={20} color="#6366f1" style={styles.gradientCheck} />
+                  )}
+                </TouchableOpacity>
+              ))}
+            </View>
           </View>
 
           <View style={styles.inputGroup}>
@@ -1677,5 +1736,42 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontFamily: 'Inter-Bold',
+  },
+  /* ---- Gradient Selector ---- */
+  gradientOptionsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+    marginTop: 8,
+  },
+  gradientOption: {
+    width: '48%',
+    backgroundColor: '#111',
+    borderRadius: 12,
+    padding: 12,
+    borderWidth: 2,
+    borderColor: 'transparent',
+    alignItems: 'center',
+  },
+  gradientOptionSelected: {
+    borderColor: '#6366f1',
+    backgroundColor: '#1a1a2e',
+  },
+  gradientPreview: {
+    width: 60,
+    height: 40,
+    borderRadius: 8,
+    marginBottom: 8,
+  },
+  gradientName: {
+    color: '#fff',
+    fontSize: 14,
+    fontFamily: 'Inter-Regular',
+    textAlign: 'center',
+  },
+  gradientCheck: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
   },
 });
