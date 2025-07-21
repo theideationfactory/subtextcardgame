@@ -538,6 +538,14 @@ export default function CollectionScreen() {
     
     const backgroundGradient = getBackgroundGradient();
     
+    // Check if this is a "black" card (no gradient or Classic Black gradient)
+    // These cards should keep their original black text backgrounds
+    const isBlackCard = !backgroundGradient || 
+      (backgroundGradient[0] === '#1a1a1a' && backgroundGradient[1] === '#000000');
+    
+    // Conditional text background color
+    const textBackgroundColor = isBlackCard ? undefined : 'transparent';
+    
     // Get card dimensions based on the 2.5:3.5 ratio
     const { cardWidth, cardHeight, imageHeight } = getCardDimensions();
     
@@ -831,11 +839,15 @@ export default function CollectionScreen() {
                 { 
                   padding: contentPadding,
                   height: '100%',
+                  backgroundColor: textBackgroundColor, // Conditional background
                 }
               ]}
             >
               {/* Top section - Card name */}
-              <View style={styles.cardNameContainer}>
+              <View style={[
+                styles.cardNameContainer,
+                { backgroundColor: textBackgroundColor } // Conditional background
+              ]}>
                 <Text 
                   style={[
                     styles.cardName, 
@@ -867,7 +879,13 @@ export default function CollectionScreen() {
               {/* Bottom section - Type line and description (50% of card height) */}
               <View style={{ flex: 1 }}>
                 {/* Type line */}
-                <View style={[styles.typeLine, { marginTop: contentPadding }]}>
+                <View style={[
+                  styles.typeLine, 
+                  { 
+                    marginTop: contentPadding,
+                    backgroundColor: textBackgroundColor // Conditional background
+                  }
+                ]}>
                   <View style={styles.typeContainer}>
                     <Text 
                       style={[
@@ -907,6 +925,7 @@ export default function CollectionScreen() {
                     { 
                       marginTop: contentPadding / 2,
                       flex: 1,
+                      backgroundColor: textBackgroundColor // Conditional background
                     }
                   ]}
                 >
@@ -927,7 +946,13 @@ export default function CollectionScreen() {
 
                 {/* Context - at the bottom of the card */}
                 {item.context && (
-                  <View style={[styles.contextContainer, { marginTop: contentPadding / 2 }]}>
+                  <View style={[
+                    styles.contextContainer, 
+                    { 
+                      marginTop: contentPadding / 2,
+                      backgroundColor: textBackgroundColor // Conditional background
+                    }
+                  ]}>
                     <Text 
                       style={[
                         styles.contextText, 
