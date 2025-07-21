@@ -529,10 +529,20 @@ export default function SpreadScreen() {
 
         const restoredZoneCards: Record<string, any[]> = {};
         Object.entries(draft.draft_data.zoneCards).forEach(([zoneName, cardIds]: [string, any]) => {
-          restoredZoneCards[zoneName] = (cardIds as string[])
-            .map((id: string) => cardsById[id])
-            .filter(Boolean);
+          console.log(`Processing zone ${zoneName} with card IDs:`, cardIds);
+          
+          const zoneCards = (cardIds as string[]).map((id: string) => {
+            const card = cardsById[id];
+            if (!card) {
+              console.warn(`Card ${id} not found in cardsById map for zone ${zoneName}`);
+            }
+            return card;
+          }).filter(Boolean);
+          
+          restoredZoneCards[zoneName] = zoneCards;
+          console.log(`Zone ${zoneName} restored with ${zoneCards.length} of ${cardIds.length} cards`);
         });
+        
         setZoneCards(restoredZoneCards);
         console.log('Draft state restored successfully');
       } else {

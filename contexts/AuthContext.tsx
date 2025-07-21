@@ -137,9 +137,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
 
         // Now do the final query with all working columns
-        const filterCondition = `user_id.eq.${user.id},is_public.eq.true`;
-      console.log(`fetchCards: Final query with columns: ${workingColumns} using filter: .or(${filterCondition})`);
-                const query = supabase
+        console.log(`fetchCards: Final query with columns: ${workingColumns}`);
+        const query = supabase
           .from('cards')
           .select(workingColumns);
 
@@ -148,13 +147,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         } else if (scope === 'Public') {
           query.eq('is_public', true);
         } else if (scope === 'Friends') {
-                    const friendsConditions = [`shared_with_user_ids.cs.{${user.id}}`];
+          // Check for cards shared with the current user
+          const friendsConditions = [`shared_with_user_ids.cs.{"${user.id}"}`];
           if (workingColumns.includes('is_shared_with_friends')) {
             friendsConditions.push('is_shared_with_friends.eq.true');
           }
           query.or(friendsConditions.join(','));
         } else {
-          query.or(`user_id.eq.${user.id},is_public.eq.true,shared_with_user_ids.cs.{${user.id}}`);
+          // Default: get user's own cards, public cards, and cards shared with them
+          // Correct array containment syntax: cs.{"value"} for UUID arrays
+          query.or(`user_id.eq.${user.id},is_public.eq.true,shared_with_user_ids.cs.{"${user.id}"}`);
         }
 
         query
