@@ -48,11 +48,11 @@ const DEFAULT_FRAME_COLOR = '#808080'; // Medium gray
 
 // Background gradient options
 const GRADIENT_OPTIONS = [
-  { name: 'Classic Black', colors: ['#1a1a1a', '#000000'] },
-  { name: 'Purple Mystic', colors: ['#6366f1', '#8b5cf6'] },
-  { name: 'Ocean Depths', colors: ['#0ea5e9', '#06b6d4'] },
-  { name: 'Sunset Glow', colors: ['#f59e0b', '#ef4444'] },
-  { name: 'Forest Magic', colors: ['#10b981', '#059669'] }
+  { name: 'Shadow Storm', colors: ['#6b7280', '#000000'] },
+  { name: 'Deep Violet', colors: ['#8b5cf6', '#1e1b4b'] },
+  { name: 'Abyss Blue', colors: ['#3b82f6', '#0c1e33'] },
+  { name: 'Molten Fire', colors: ['#dc2626', '#7f1d1d'] },
+  { name: 'Dark Forest', colors: ['#16a34a', '#14532d'] }
 ];
 
 export default function CardCreationNewScreen() {
@@ -358,7 +358,6 @@ export default function CardCreationNewScreen() {
       }
 
       setCardImage(data.imageUrl);
-      setImageDescription('');
     } catch (err) {
       console.error('Image generation error:', err);
       if (err instanceof Error) {
@@ -557,9 +556,6 @@ export default function CardCreationNewScreen() {
 
           // Set the uploaded image URL
           setCardImage(publicUrl);
-          
-          // Clear image description since we're using uploaded image
-          setImageDescription('');
           
           // Show success feedback
           if (Platform.OS !== 'web') {
