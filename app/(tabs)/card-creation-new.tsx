@@ -125,7 +125,7 @@ export default function CardCreationNewScreen() {
   });
 
   // Get auth context at component level
-  const { refreshSession } = useAuth();
+  const { refreshSession, user } = useAuth();
 
   const resetForm = () => {
     setName('');
@@ -155,19 +155,54 @@ export default function CardCreationNewScreen() {
     setShowContextDropdown(false);
   };
 
-  // Load phenomena types from AsyncStorage
+  // Load phenomena types from database, fallback to AsyncStorage
   const loadPhenomenaTypes = async () => {
+    try {
+      if (!user) {
+        console.log('No user found, using default phenomena types');
+        return;
+      }
+
+      // First try to load from database
+      const { data: userData, error: dbError } = await supabase
+        .from('users')
+        .select('custom_phenomena_types')
+        .eq('id', user.id)
+        .single();
+
+      if (dbError) {
+        console.error('Error loading phenomena types from database:', dbError);
+        // Fall back to AsyncStorage
+        await loadFromAsyncStorage();
+        return;
+      }
+
+      if (userData?.custom_phenomena_types) {
+        console.log('Loaded custom phenomena types from database:', userData.custom_phenomena_types);
+        setTypeOptions(userData.custom_phenomena_types);
+      } else {
+        // If no database data, try AsyncStorage
+        await loadFromAsyncStorage();
+      }
+    } catch (error) {
+      console.error('Error loading phenomena types:', error);
+      // Fall back to AsyncStorage
+      await loadFromAsyncStorage();
+    }
+  };
+
+  const loadFromAsyncStorage = async () => {
     try {
       const storedPhenomena = await AsyncStorage.getItem('@phenomena_types');
       if (storedPhenomena) {
         const parsedPhenomena = JSON.parse(storedPhenomena);
-        console.log('Loaded custom phenomena types:', parsedPhenomena);
+        console.log('Loaded custom phenomena types from AsyncStorage:', parsedPhenomena);
         setTypeOptions(parsedPhenomena);
       } else {
         console.log('No custom phenomena types found, using defaults');
       }
     } catch (error) {
-      console.error('Error loading phenomena types:', error);
+      console.error('Error loading from AsyncStorage:', error);
       // Keep default types if loading fails
     }
   };

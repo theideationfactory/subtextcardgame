@@ -5,12 +5,15 @@ import { useRouter } from 'expo-router';
 import { ArrowLeft, Plus, Trash2, Check } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/contexts/AuthContext';
 
 const PHENOMENA_STORAGE_KEY = '@phenomena_types';
 const DEFAULT_PHENOMENA = ['Intention', 'Context', 'Impact', 'Accuracy', 'Agenda', 'Needs', 'Emotion', 'Role'];
 
 export default function DeckCreationScreen() {
   const router = useRouter();
+  const { user } = useAuth();
   const [fontsLoaded] = useFonts({
     'Inter-Regular': Inter_400Regular,
     'Inter-Bold': Inter_700Bold,
@@ -27,23 +30,94 @@ export default function DeckCreationScreen() {
 
   const loadPhenomenaTypes = async () => {
     try {
+      if (!user) {
+        setIsLoading(false);
+        return;
+      }
+
+      // First try to load from database
+      const { data: userData, error: dbError } = await supabase
+        .from('users')
+        .select('custom_phenomena_types')
+        .eq('id', user.id)
+        .single();
+
+      if (dbError) {
+        console.error('Error loading phenomena types from database:', dbError);
+        // Fall back to AsyncStorage
+        await loadFromAsyncStorage();
+        return;
+      }
+
+      if (userData?.custom_phenomena_types) {
+        setPhenomenaTypes(userData.custom_phenomena_types);
+      } else {
+        // If no database data, try to migrate from AsyncStorage
+        await migrateFromAsyncStorage();
+      }
+    } catch (error) {
+      console.error('Error loading phenomena types:', error);
+      // Fall back to AsyncStorage
+      await loadFromAsyncStorage();
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const loadFromAsyncStorage = async () => {
+    try {
       const saved = await AsyncStorage.getItem(PHENOMENA_STORAGE_KEY);
       if (saved) {
         const parsed = JSON.parse(saved);
         setPhenomenaTypes(parsed);
       }
     } catch (error) {
-      console.error('Error loading phenomena types:', error);
-    } finally {
-      setIsLoading(false);
+      console.error('Error loading from AsyncStorage:', error);
+    }
+  };
+
+  const migrateFromAsyncStorage = async () => {
+    try {
+      const saved = await AsyncStorage.getItem(PHENOMENA_STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        setPhenomenaTypes(parsed);
+        // Save to database
+        await savePhenomenaTypes(parsed);
+        // Clear AsyncStorage after successful migration
+        await AsyncStorage.removeItem(PHENOMENA_STORAGE_KEY);
+      }
+    } catch (error) {
+      console.error('Error migrating from AsyncStorage:', error);
     }
   };
 
   const savePhenomenaTypes = async (types: string[]) => {
     try {
-      await AsyncStorage.setItem(PHENOMENA_STORAGE_KEY, JSON.stringify(types));
+      if (!user) {
+        console.error('No user found for saving phenomena types');
+        return;
+      }
+
+      // Save to database
+      const { error } = await supabase
+        .from('users')
+        .update({ custom_phenomena_types: types })
+        .eq('id', user.id);
+
+      if (error) {
+        console.error('Error saving phenomena types to database:', error);
+        // Fall back to AsyncStorage
+        await AsyncStorage.setItem(PHENOMENA_STORAGE_KEY, JSON.stringify(types));
+      }
     } catch (error) {
       console.error('Error saving phenomena types:', error);
+      // Fall back to AsyncStorage
+      try {
+        await AsyncStorage.setItem(PHENOMENA_STORAGE_KEY, JSON.stringify(types));
+      } catch (storageError) {
+        console.error('Error saving to AsyncStorage:', storageError);
+      }
     }
   };
 

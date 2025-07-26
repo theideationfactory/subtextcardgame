@@ -331,8 +331,44 @@ export default function CollectionScreen() {
     fetchCards(true);
   }, [fetchCards]);
 
-  // Load phenomena types from AsyncStorage
+  // Load phenomena types from database, fallback to AsyncStorage
   const loadPhenomenaTypes = async () => {
+    try {
+      if (!user) {
+        // Use default types if no user
+        const defaultTypes = ['Intention', 'Context', 'Impact', 'Accuracy', 'Agenda', 'Needs', 'Emotion', 'Role'];
+        setPhenomenaTypes(['All', ...defaultTypes]);
+        return;
+      }
+
+      // First try to load from database
+      const { data: userData, error: dbError } = await supabase
+        .from('users')
+        .select('custom_phenomena_types')
+        .eq('id', user.id)
+        .single();
+
+      if (dbError) {
+        console.error('Error loading phenomena types from database:', dbError);
+        // Fall back to AsyncStorage
+        await loadFromAsyncStorage();
+        return;
+      }
+
+      if (userData?.custom_phenomena_types) {
+        setPhenomenaTypes(['All', ...userData.custom_phenomena_types]);
+      } else {
+        // If no database data, try AsyncStorage
+        await loadFromAsyncStorage();
+      }
+    } catch (error) {
+      console.error('Error loading phenomena types:', error);
+      // Fall back to AsyncStorage
+      await loadFromAsyncStorage();
+    }
+  };
+
+  const loadFromAsyncStorage = async () => {
     try {
       const storedPhenomena = await AsyncStorage.getItem('@phenomena_types');
       if (storedPhenomena) {
@@ -344,7 +380,7 @@ export default function CollectionScreen() {
         setPhenomenaTypes(['All', ...defaultTypes]);
       }
     } catch (error) {
-      console.error('Error loading phenomena types:', error);
+      console.error('Error loading from AsyncStorage:', error);
       // Fallback to default types
       const defaultTypes = ['Intention', 'Context', 'Impact', 'Accuracy', 'Agenda', 'Needs', 'Emotion', 'Role'];
       setPhenomenaTypes(['All', ...defaultTypes]);
