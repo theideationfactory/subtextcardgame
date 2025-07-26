@@ -84,17 +84,7 @@ export default function CollectionScreen() {
 
   const { width: screenWidth } = useWindowDimensions();
 
-  const getNumColumns = () => {
-    // Always use 1 column for phones, even large ones
-    if (!isTablet()) {
-      return 1;
-    }
-    // Use more columns for larger screens (tablets), but cap at 2
-    const potentialCols = Math.max(1, Math.floor(screenWidth / 200)); // Adjust 200 based on desired min card width
-    return Math.min(potentialCols, 2); // Cap at 2 columns for tablets
-  };
-
-  const [numColumns, setNumColumns] = useState(getNumColumns());
+  // Horizontal scrolling doesn't need column management
   const [cards, setCards] = useState<Card[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -116,64 +106,14 @@ export default function CollectionScreen() {
   const { height: screenHeight } = useWindowDimensions();
   const router = useRouter();
   
-  // Calculate scaling factor based on number of columns
+  // Calculate scaling factor for horizontal scrolling based on device
   const getScaleFactor = () => {
-    switch (numColumns) {
-      case 1: return 1.0;      // 100% - original size
-      case 2: return 0.7;      // 70% - moderately reduced
-      case 3: return 0.5;      // 50% - half size
-      case 4: return 0.35;     // 35% - very compact
-      default: return 1.0;
-    }
+    // For horizontal scrolling, use consistent scaling based on device type
+    // Tablets can handle larger text, phones need slightly smaller
+    return isTablet() ? 1.0 : 0.85;
   };
   
-  // Function to determine column count based on device and orientation
-  const getColumnCount = useCallback(() => {
-    // Get current dimensions
-    const { width, height } = Dimensions.get('window');
-    
-    // Always use 1 column for phones
-    if (!isTablet()) {
-      return 1;
-    }
-    
-    // For tablets: explicitly check if width > height for landscape orientation
-    const isLandscape = width > height;
-    
-    // Use 3 columns in landscape, 2 in portrait for tablets
-    const columnCount = isLandscape ? 3 : 2;
-    
-    // Log detailed device info for debugging
-    console.log('Device orientation info:', {
-      isTablet: isTablet(),
-      isIPad: isIPad(),
-      isIPadMini: isIPadMini(),
-      screenWidth: width,
-      screenHeight: height,
-      isLandscape: isLandscape,
-      columnCount: columnCount
-    });
-    
-    return columnCount;
-  }, []);
-  
-  // Function to update column count when dimensions change
-  const updateColumnCount = useCallback(() => {
-    const newColumnCount = getColumnCount();
-    setNumColumns(newColumnCount);
-  }, [getColumnCount]);
-  
-  // Set up orientation detection and column adjustment
-  useEffect(() => {
-    // Set initial column count
-    updateColumnCount();
-    
-    // Add event listener for dimension changes
-    const dimensionsSubscription = Dimensions.addEventListener('change', updateColumnCount);
-    
-    // Clean up event listener on unmount
-    return () => dimensionsSubscription.remove();
-  }, [updateColumnCount]);
+  // Horizontal scrolling doesn't need orientation management
 
   const [fontsLoaded] = useFonts({
     'Inter-Regular': Inter_400Regular,
@@ -552,13 +492,36 @@ export default function CollectionScreen() {
   // Calculate scaling factor based on number of columns
   const scaleFactor = getScaleFactor();
   
-  // Calculate card dimensions based on traditional trading card ratio (2.5:3.5)
+  // Calculate card dimensions to fit completely on screen
   const getCardDimensions = () => {
-    // Base width depends on screen width and number of columns
-    const cardWidth = (screenWidth / numColumns) - (24 * numColumns); // Account for margins
+    // Calculate available height (subtract space for top controls and bottom tab bar)
+    // Top controls: collection type buttons (~60px) + phenomena filter (~60px) + padding
+    // Bottom tab bar: (~80px)
+    // Additional padding and margins: (~40px)
+    const reservedHeight = 240;
+    const availableHeight = screenHeight - reservedHeight;
     
-    // Calculate height based on the 2.5:3.5 ratio (7:5 height:width)
-    const cardHeight = cardWidth * (3.5 / 2.5);
+    // Calculate available width (subtract horizontal padding)
+    const horizontalPadding = 32; // 16px on each side
+    const availableWidth = screenWidth - horizontalPadding;
+    
+    // Calculate card dimensions based on 2.5:3.5 aspect ratio
+    // Try height-constrained first
+    let cardHeight = availableHeight;
+    let cardWidth = cardHeight * (2.5 / 3.5);
+    
+    // If width exceeds available space, constrain by width instead
+    if (cardWidth > availableWidth) {
+      cardWidth = availableWidth;
+      cardHeight = cardWidth * (3.5 / 2.5);
+    }
+    
+    // Ensure minimum readable size
+    const minCardHeight = 400;
+    const minCardWidth = minCardHeight * (2.5 / 3.5);
+    
+    cardHeight = Math.max(minCardHeight, cardHeight);
+    cardWidth = Math.max(minCardWidth, cardWidth);
     
     // Image should take up approximately half the card height
     const imageHeight = cardHeight * 0.5;
@@ -1313,13 +1276,20 @@ export default function CollectionScreen() {
         data={cards}
         renderItem={renderCard}
         keyExtractor={(item) => item.id}
-        numColumns={numColumns} // Use state variable here
-        key={numColumns} // Force re-render when numColumns changes
-        contentContainerStyle={styles.listContent}
-        columnWrapperStyle={numColumns > 1 ? styles.columnWrapper : null} // Add spacing between columns
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#fff" />
-        }
+        horizontal={true}
+        showsHorizontalScrollIndicator={false}
+        showsVerticalScrollIndicator={false}
+        scrollEnabled={true}
+        pagingEnabled={true}
+        contentContainerStyle={styles.horizontalListContent}
+        style={styles.horizontalList}
+        ItemSeparatorComponent={() => <View style={{ width: 16 }} />}
+        bounces={false}
+        alwaysBounceVertical={false}
+        disableIntervalMomentum={true}
+        snapToInterval={getCardDimensions().cardWidth + 16}
+        snapToAlignment="start"
+        decelerationRate="fast"
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
             <Text style={styles.emptyText}>
@@ -1889,5 +1859,14 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 8,
-  }
+  },
+  horizontalListContent: {
+    paddingHorizontal: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexGrow: 1,
+  },
+  horizontalList: {
+    flex: 1,
+  },
 });
