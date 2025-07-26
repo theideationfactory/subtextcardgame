@@ -651,7 +651,7 @@ export default function CollectionScreen() {
     if (item.format === 'fullBleed') {
       return (
         <Pressable
-          style={[styles.fullBleedCard, { width: cardWidth, height: cardHeight }]}
+          style={[styles.fullBleedCard, { width: cardWidth, height: cardHeight, marginHorizontal: 16 }]}
           onPress={() => {
             setSelectedCard(item);
             setShowActions(true);
@@ -820,6 +820,7 @@ export default function CollectionScreen() {
           { 
             width: cardWidth,
             height: cardHeight,
+            marginHorizontal: 16,
           }
         ]}
         onPress={() => {
@@ -1280,15 +1281,14 @@ export default function CollectionScreen() {
         showsHorizontalScrollIndicator={false}
         showsVerticalScrollIndicator={false}
         scrollEnabled={true}
-        pagingEnabled={true}
+        pagingEnabled={false}
         contentContainerStyle={styles.horizontalListContent}
         style={styles.horizontalList}
-        ItemSeparatorComponent={() => <View style={{ width: 16 }} />}
         bounces={false}
         alwaysBounceVertical={false}
         disableIntervalMomentum={true}
-        snapToInterval={getCardDimensions().cardWidth + 16}
-        snapToAlignment="start"
+        snapToInterval={getCardDimensions().cardWidth + 32}
+        snapToAlignment="center"
         decelerationRate="fast"
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
@@ -1514,7 +1514,6 @@ const styles = StyleSheet.create({
     flexGrow: 1,
   },
   card: {
-    marginBottom: 24,
     borderRadius: 16,
     overflow: 'hidden',
     elevation: 10,
@@ -1777,7 +1776,6 @@ const styles = StyleSheet.create({
   },
   /* ---- Full-bleed card styles ---- */
   fullBleedCard: {
-    marginVertical: 16, // Add vertical spacing
     borderRadius: 16,
     overflow: 'hidden',
     backgroundColor: '#000',
@@ -1861,10 +1859,8 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
   horizontalListContent: {
-    paddingHorizontal: 16,
     alignItems: 'center',
     justifyContent: 'center',
-    flexGrow: 1,
   },
   horizontalList: {
     flex: 1,
