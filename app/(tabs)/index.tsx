@@ -112,6 +112,7 @@ export default function CollectionScreen() {
   const [selectedPhenomena, setSelectedPhenomena] = useState<string>('All');
   const [showPhenomenaMenu, setShowPhenomenaMenu] = useState(false);
   const [allCards, setAllCards] = useState<Card[]>([]);
+  const [searchQuery, setSearchQuery] = useState<string>('');
   const { height: screenHeight } = useWindowDimensions();
   const router = useRouter();
   
@@ -387,19 +388,31 @@ export default function CollectionScreen() {
     }
   };
 
-  // Filter cards based on selected phenomena type
-  const filterCardsByPhenomena = useCallback((cardsToFilter: Card[]) => {
-    if (selectedPhenomena === 'All') {
-      return cardsToFilter;
+  // Filter cards based on selected phenomena type and search query
+  const filterCards = useCallback((cardsToFilter: Card[]) => {
+    let filtered = cardsToFilter;
+    
+    // Filter by phenomena type
+    if (selectedPhenomena !== 'All') {
+      filtered = filtered.filter(card => card.type === selectedPhenomena);
     }
-    return cardsToFilter.filter(card => card.type === selectedPhenomena);
-  }, [selectedPhenomena]);
+    
+    // Filter by search query (card name)
+    if (searchQuery.trim()) {
+      const query = searchQuery.trim().toLowerCase();
+      filtered = filtered.filter(card => 
+        card.name.toLowerCase().includes(query)
+      );
+    }
+    
+    return filtered;
+  }, [selectedPhenomena, searchQuery]);
 
-  // Update filtered cards when phenomena selection changes
+  // Update filtered cards when phenomena selection or search query changes
   useEffect(() => {
-    const filteredCards = filterCardsByPhenomena(allCards);
+    const filteredCards = filterCards(allCards);
     setCards(filteredCards);
-  }, [selectedPhenomena, allCards, filterCardsByPhenomena]);
+  }, [selectedPhenomena, searchQuery, allCards, filterCards]);
 
   const handleDelete = async (cardId: string) => {
     if (!cardId) {
@@ -1270,9 +1283,18 @@ export default function CollectionScreen() {
           )}
         </View>
 
-        {/* Search box placeholder */}
-        <View style={[styles.searchBox, styles.buttonDisabled]}>
-          <Text style={styles.searchPlaceholder}>Search</Text>
+        {/* Search box */}
+        <View style={styles.searchContainer}>
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search cards..."
+            placeholderTextColor="#6b7280"
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            returnKeyType="search"
+            autoCapitalize="none"
+            autoCorrect={false}
+          />
         </View>
       </View>
 
@@ -1735,18 +1757,20 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter-Bold',
     fontSize: 14,
   },
-  searchBox: {
+  searchContainer: {
     flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 8,
-    borderRadius: 8,
-    backgroundColor: 'rgba(255,255,255,0.05)',
+    marginLeft: 8,
   },
-  searchPlaceholder: {
-    color: '#777',
+  searchInput: {
+    height: 40,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    color: '#fff',
     fontFamily: 'Inter-Regular',
     fontSize: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
   },
   dropdownButtonContainer: {
     position: 'relative',
