@@ -1,4 +1,4 @@
-import { View, Text, TextInput, StyleSheet, FlatList, Pressable, Image, Modal, TouchableOpacity, RefreshControl, useWindowDimensions, Platform, PlatformIOSStatic, Dimensions, Alert } from 'react-native';
+import { View, Text, TextInput, StyleSheet, FlatList, Pressable, Image, Modal, TouchableOpacity, RefreshControl, useWindowDimensions, Platform, PlatformIOSStatic, Dimensions, Alert, Animated } from 'react-native';
 import { useCallback, useEffect, useState } from 'react';
 import { useFonts, Inter_400Regular, Inter_700Bold } from '@expo-google-fonts/inter';
 import * as SplashScreen from 'expo-splash-screen';
@@ -104,6 +104,7 @@ export default function CollectionScreen() {
   const [allCards, setAllCards] = useState<Card[]>([]);
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [flippedCards, setFlippedCards] = useState<Set<string>>(new Set());
+  const [flipAnimations, setFlipAnimations] = useState<Map<string, Animated.Value>>(new Map());
   const { height: screenHeight } = useWindowDimensions();
   const router = useRouter();
   
@@ -573,16 +574,34 @@ export default function CollectionScreen() {
       lastTap = now;
     };
     
-    // Long press handler for card flip
+    // Long press handler for animated card flip
     const handleLongPress = () => {
-      setFlippedCards(prev => {
-        const newSet = new Set(prev);
-        if (newSet.has(item.id)) {
-          newSet.delete(item.id);
-        } else {
-          newSet.add(item.id);
-        }
-        return newSet;
+      // Get or create animation value for this card
+      let animValue = flipAnimations.get(item.id);
+      if (!animValue) {
+        animValue = new Animated.Value(0);
+        setFlipAnimations(prev => new Map(prev.set(item.id, animValue!)));
+      }
+      
+      const isCurrentlyFlipped = flippedCards.has(item.id);
+      const targetValue = isCurrentlyFlipped ? 0 : 1;
+      
+      // Start flip animation
+      Animated.timing(animValue!, {
+        toValue: targetValue,
+        duration: 600,
+        useNativeDriver: true,
+      }).start(() => {
+        // Update flip state after animation completes
+        setFlippedCards(prev => {
+          const newSet = new Set(prev);
+          if (isCurrentlyFlipped) {
+            newSet.delete(item.id);
+          } else {
+            newSet.add(item.id);
+          }
+          return newSet;
+        });
       });
       
       if (Platform.OS !== 'web') {
@@ -689,37 +708,28 @@ export default function CollectionScreen() {
     const textBlockHeight = nameFontSize + (descriptionFontSize * numberOfLines) + Math.round(24 * scaleFactor);
     const overlayHeight = Math.min(Math.round(cardHeight * 0.45), Math.max(50, textBlockHeight + Math.round(8 * scaleFactor)));
     
-    // Card back component
-    const renderCardBack = () => (
-      <Pressable
-        style={[styles.cardBack, { width: cardWidth, height: cardHeight, marginHorizontal: 16 }]}
-        onPress={handleDoubleTap}
-        onLongPress={handleLongPress}
-      >
-        <LinearGradient
-          colors={['#1e3a8a', '#000000']} // Dark blue to black
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.cardBackGradient}
-        >
-          <View style={styles.cardBackContent}>
-            <Text style={styles.cardBackTitle}>CARD BACK</Text>
-            <Text style={styles.cardBackSubtitle}>Long press to flip</Text>
-          </View>
-        </LinearGradient>
-      </Pressable>
-    );
+    // Get animation value for this card
+    const animValue = flipAnimations.get(item.id) || new Animated.Value(0);
     
-    // If card is flipped, show the back
-    if (isFlipped) {
-      return renderCardBack();
-    }
+    // Create interpolated rotation values
+    const frontRotateY = animValue.interpolate({
+      inputRange: [0, 1],
+      outputRange: ['0deg', '180deg'],
+    });
+    
+    const backRotateY = animValue.interpolate({
+      inputRange: [0, 1],
+      outputRange: ['180deg', '360deg'],
+    });
+    
+    // Card front component
+    const renderCardFront = () => {
     
     // If the card uses the full-bleed format, render it with edge-to-edge art and text overlays
     if (item.format === 'fullBleed') {
       return (
         <Pressable
-          style={[styles.fullBleedCard, { width: cardWidth, height: cardHeight, marginHorizontal: 16 }]}
+          style={[styles.fullBleedCard, { width: cardWidth, height: cardHeight }]}
           onPress={handleDoubleTap}
           onLongPress={handleLongPress}
         >
@@ -885,7 +895,6 @@ export default function CollectionScreen() {
           { 
             width: cardWidth,
             height: cardHeight,
-            marginHorizontal: 16,
           }
         ]}
         onPress={handleDoubleTap}
@@ -1165,6 +1174,60 @@ export default function CollectionScreen() {
           )}
         </LinearGradient>
       </Pressable>
+    );
+    }; // Close renderCardFront
+    
+    // Return animated card container
+    return (
+      <View style={{ 
+        width: cardWidth + 32, 
+        height: cardHeight,
+        justifyContent: 'center',
+        alignItems: 'center',
+      }}>
+        <Animated.View
+          style={[
+            { 
+              position: 'absolute',
+              width: cardWidth, 
+              height: cardHeight,
+              transform: [{ rotateY: frontRotateY }],
+              backfaceVisibility: 'hidden',
+            }
+          ]}
+        >
+          {renderCardFront()}
+        </Animated.View>
+        <Animated.View
+          style={[
+            { 
+              position: 'absolute',
+              width: cardWidth, 
+              height: cardHeight,
+              transform: [{ rotateY: backRotateY }],
+              backfaceVisibility: 'hidden',
+            }
+          ]}
+        >
+          <Pressable
+            style={styles.cardBackPressable}
+            onPress={handleDoubleTap}
+            onLongPress={handleLongPress}
+          >
+            <LinearGradient
+              colors={['#1e3a8a', '#000000']} // Dark blue to black
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.cardBackGradient}
+            >
+              <View style={styles.cardBackContent}>
+                <Text style={styles.cardBackTitle}>CARD BACK</Text>
+                <Text style={styles.cardBackSubtitle}>Long press to flip</Text>
+              </View>
+            </LinearGradient>
+          </Pressable>
+        </Animated.View>
+      </View>
     );
   };
 
@@ -1940,6 +2003,11 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  cardBackPressable: {
+    flex: 1,
+    width: '100%',
+    height: '100%',
   },
   cardBackContent: {
     alignItems: 'center',
