@@ -103,6 +103,7 @@ export default function CollectionScreen() {
   const [showPhenomenaMenu, setShowPhenomenaMenu] = useState(false);
   const [allCards, setAllCards] = useState<Card[]>([]);
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const [flippedCards, setFlippedCards] = useState<Set<string>>(new Set());
   const { height: screenHeight } = useWindowDimensions();
   const router = useRouter();
   
@@ -550,6 +551,47 @@ export default function CollectionScreen() {
     
     const backgroundGradient = getBackgroundGradient();
     
+    // Double tap detection for modal
+    let lastTap = 0;
+    const handleDoubleTap = () => {
+      const now = Date.now();
+      const DOUBLE_PRESS_DELAY = 300;
+      if (lastTap && (now - lastTap) < DOUBLE_PRESS_DELAY) {
+        // Double tap detected - show modal
+        setSelectedCard(item);
+        setShowActions(true);
+        setDeleteError('');
+        if (Platform.OS !== 'web') {
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+        }
+      } else {
+        // Single tap - reserved for future flip functionality
+        if (Platform.OS !== 'web') {
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        }
+      }
+      lastTap = now;
+    };
+    
+    // Long press handler for card flip
+    const handleLongPress = () => {
+      setFlippedCards(prev => {
+        const newSet = new Set(prev);
+        if (newSet.has(item.id)) {
+          newSet.delete(item.id);
+        } else {
+          newSet.add(item.id);
+        }
+        return newSet;
+      });
+      
+      if (Platform.OS !== 'web') {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+      }
+    };
+    
+    const isFlipped = flippedCards.has(item.id);
+    
     // Check if this is a "black" card (no gradient or Classic Black gradient)
     // These cards should keep their original black text backgrounds
     const isBlackCard = !backgroundGradient || 
@@ -647,16 +689,39 @@ export default function CollectionScreen() {
     const textBlockHeight = nameFontSize + (descriptionFontSize * numberOfLines) + Math.round(24 * scaleFactor);
     const overlayHeight = Math.min(Math.round(cardHeight * 0.45), Math.max(50, textBlockHeight + Math.round(8 * scaleFactor)));
     
+    // Card back component
+    const renderCardBack = () => (
+      <Pressable
+        style={[styles.cardBack, { width: cardWidth, height: cardHeight, marginHorizontal: 16 }]}
+        onPress={handleDoubleTap}
+        onLongPress={handleLongPress}
+      >
+        <LinearGradient
+          colors={['#1e3a8a', '#000000']} // Dark blue to black
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.cardBackGradient}
+        >
+          <View style={styles.cardBackContent}>
+            <Text style={styles.cardBackTitle}>CARD BACK</Text>
+            <Text style={styles.cardBackSubtitle}>Long press to flip</Text>
+          </View>
+        </LinearGradient>
+      </Pressable>
+    );
+    
+    // If card is flipped, show the back
+    if (isFlipped) {
+      return renderCardBack();
+    }
+    
     // If the card uses the full-bleed format, render it with edge-to-edge art and text overlays
     if (item.format === 'fullBleed') {
       return (
         <Pressable
           style={[styles.fullBleedCard, { width: cardWidth, height: cardHeight, marginHorizontal: 16 }]}
-          onPress={() => {
-            setSelectedCard(item);
-            setShowActions(true);
-            setDeleteError('');
-          }}
+          onPress={handleDoubleTap}
+          onLongPress={handleLongPress}
         >
           <Image source={{ uri: item.image_url }} style={styles.fullBleedImage} resizeMode="cover" />
 
@@ -823,11 +888,8 @@ export default function CollectionScreen() {
             marginHorizontal: 16,
           }
         ]}
-        onPress={() => {
-          setSelectedCard(item);
-          setShowActions(true);
-          setDeleteError('');
-        }}
+        onPress={handleDoubleTap}
+        onLongPress={handleLongPress}
       >
         <LinearGradient
           colors={cardColors}
@@ -1864,5 +1926,38 @@ const styles = StyleSheet.create({
   },
   horizontalList: {
     flex: 1,
+  },
+  cardBack: {
+    borderRadius: 16,
+    overflow: 'hidden',
+    elevation: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.44,
+    shadowRadius: 10.32,
+  },
+  cardBackGradient: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  cardBackContent: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cardBackTitle: {
+    fontFamily: 'Inter-Bold',
+    fontSize: 24,
+    color: '#ffffff',
+    textAlign: 'center',
+    marginBottom: 8,
+    letterSpacing: 2,
+  },
+  cardBackSubtitle: {
+    fontFamily: 'Inter-Regular',
+    fontSize: 14,
+    color: '#ffffff',
+    opacity: 0.7,
+    textAlign: 'center',
   },
 });
