@@ -74,6 +74,7 @@ export default function CardCreationNewScreen() {
   // Get return parameters for navigation
   const returnTo = params.returnTo as string | undefined;
   const returnZone = params.zone as string | undefined;
+  const shadowForCardId = params.shadowForCardId as string | undefined;
   
   const [isGenerating, setIsGenerating] = useState(false);
   const [isGeneratingDescription, setIsGeneratingDescription] = useState(false);
@@ -827,9 +828,28 @@ export default function CardCreationNewScreen() {
         }
         
         console.log('Card created successfully:', newCard);
+        
+        // If this card is being created as a shadow for another card, link them
+        if (shadowForCardId && newCard) {
+          console.log('Linking shadow card:', newCard.id, 'to original card:', shadowForCardId);
+          const { error: linkError } = await supabase
+            .from('cards')
+            .update({ shadow_card_id: newCard.id })
+            .eq('id', shadowForCardId)
+            .eq('user_id', currentSession.user.id);
+            
+          if (linkError) {
+            console.error('Error linking shadow card:', linkError);
+            // Don't throw error - the card was created successfully, just the linking failed
+          } else {
+            console.log('Shadow card linked successfully');
+          }
+        }
+        
         resetForm();
         
-        setSuccessMessage('Card created successfully!');
+        const successMsg = shadowForCardId ? 'Shadow card created and linked successfully!' : 'Card created successfully!';
+        setSuccessMessage(successMsg);
         setTimeout(() => {
           setSuccessMessage('');
           if (returnTo === 'spread' && returnZone) {

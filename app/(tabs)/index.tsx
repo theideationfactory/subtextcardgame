@@ -80,6 +80,8 @@ export default function CollectionScreen() {
     user_id: string;
     collection_id?: string;
     collections?: any;
+    shadow_card_id?: string;
+    shadow_card?: Card | Card[] | null;
   };
 
   const { width: screenWidth } = useWindowDimensions();
@@ -139,7 +141,15 @@ export default function CollectionScreen() {
           // Use optimized query without expensive joins
           const { data: personalCards, error: personalError } = await supabase
             .from('cards')
-            .select('id, name, description, type, role, context, image_url, frame_width, frame_color, name_color, type_color, description_color, context_color, format, background_gradient, user_id, collection_id')
+            .select(`
+              id, name, description, type, role, context, image_url, frame_width, frame_color, 
+              name_color, type_color, description_color, context_color, format, background_gradient, 
+              user_id, collection_id, shadow_card_id,
+              shadow_card:shadow_card_id(
+                id, name, description, type, role, context, image_url, frame_width, frame_color,
+                name_color, type_color, description_color, context_color, format, background_gradient
+              )
+            `)
             .eq('user_id', user.id)
             .order('created_at', { ascending: false })
             .limit(50); // Add reasonable limit
@@ -552,21 +562,21 @@ export default function CollectionScreen() {
     
     const backgroundGradient = getBackgroundGradient();
     
-    // Double tap detection for modal
+    // Double tap detection for modal (now accepts targetCard parameter)
     let lastTap = 0;
-    const handleDoubleTap = () => {
+    const handleDoubleTapCard = (targetCard: Card) => {
       const now = Date.now();
       const DOUBLE_PRESS_DELAY = 300;
       if (lastTap && (now - lastTap) < DOUBLE_PRESS_DELAY) {
-        // Double tap detected - show modal
-        setSelectedCard(item);
+        // Double tap detected - show modal for the tapped card (original or shadow)
+        setSelectedCard(targetCard);
         setShowActions(true);
         setDeleteError('');
         if (Platform.OS !== 'web') {
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
         }
       } else {
-        // Single tap - reserved for future flip functionality
+        // Single tap - reserved for future interactions
         if (Platform.OS !== 'web') {
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         }
@@ -730,7 +740,7 @@ export default function CollectionScreen() {
       return (
         <Pressable
           style={[styles.fullBleedCard, { width: cardWidth, height: cardHeight }]}
-          onPress={handleDoubleTap}
+          onPress={() => handleDoubleTapCard(item)}
           onLongPress={handleLongPress}
         >
           <Image source={{ uri: item.image_url }} style={styles.fullBleedImage} resizeMode="cover" />
@@ -897,7 +907,7 @@ export default function CollectionScreen() {
             height: cardHeight,
           }
         ]}
-        onPress={handleDoubleTap}
+        onPress={() => handleDoubleTapCard(item)}
         onLongPress={handleLongPress}
       >
         <LinearGradient
@@ -1211,20 +1221,328 @@ export default function CollectionScreen() {
         >
           <Pressable
             style={styles.cardBackPressable}
-            onPress={handleDoubleTap}
+            onPress={() => {
+              const targetCard = item.shadow_card && Array.isArray(item.shadow_card)
+                ? item.shadow_card[0]
+                : (item.shadow_card || item);
+              handleDoubleTapCard(targetCard as Card);
+            }}
             onLongPress={handleLongPress}
           >
-            <LinearGradient
-              colors={['#1e3a8a', '#000000']} // Dark blue to black
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.cardBackGradient}
-            >
-              <View style={styles.cardBackContent}>
-                <Text style={styles.cardBackTitle}>CARD BACK</Text>
-                <Text style={styles.cardBackSubtitle}>Long press to flip</Text>
-              </View>
-            </LinearGradient>
+            {(() => {
+              // Get shadow card - handle both single object and array responses from Supabase
+              const shadowCard = item.shadow_card 
+                ? (Array.isArray(item.shadow_card) ? item.shadow_card[0] : item.shadow_card)
+                : null;
+              
+              if (shadowCard) {
+                // Render the shadow card as a complete card using the same logic as renderCardFront
+                // but with the shadow card's data
+                const shadowItem = shadowCard;
+                
+                // Use the same card rendering logic but with shadow card data
+                const shadowBackgroundGradient = shadowItem.background_gradient 
+                  ? JSON.parse(shadowItem.background_gradient) 
+                  : null;
+                const shadowCardColors = shadowBackgroundGradient || ['#1a1a1a', '#000000'];
+                
+                // Check if this is a "black" card (no gradient or Classic Black gradient)
+                const shadowIsBlackCard = !shadowBackgroundGradient || 
+                  (shadowBackgroundGradient[0] === '#1a1a1a' && shadowBackgroundGradient[1] === '#000000');
+                
+                const shadowTextBackgroundColor = shadowIsBlackCard ? undefined : 'transparent';
+                
+                // Calculate font sizes based on scale factor (same as front card)
+                const shadowNameFontSize = Math.max(12, Math.round(24 * scaleFactor));
+                const shadowTypeFontSize = Math.max(10, Math.round(16 * scaleFactor));
+                const shadowBaseFontSize = Math.max(9, Math.round(16 * scaleFactor));
+                const shadowContextFontSize = Math.max(8, Math.round(14 * scaleFactor));
+                
+                // Get adaptive description font size for shadow card
+                const shadowDescriptionFontSize = getAdaptiveDescriptionFontSize(shadowItem.description || '', shadowItem.format);
+                
+                if (shadowItem.format === 'fullBleed') {
+                  // Render shadow card as full bleed (complete card rendering)
+                  const shadowOverlayHeight = Math.min(Math.round(cardHeight * 0.45), Math.max(50, shadowNameFontSize + (shadowDescriptionFontSize * 3) + Math.round(24 * scaleFactor)));
+                  
+                  return (
+                    <>
+                      <Image source={{ uri: shadowItem.image_url }} style={styles.fullBleedImage} resizeMode="cover" />
+                      
+                      <LinearGradient
+                        colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0.8)']}
+                        style={[styles.fullBleedGradient, { height: shadowOverlayHeight }]}
+                      >
+                        <View style={styles.fullBleedCorner}>
+                          <Text style={[
+                            styles.fullBleedName,
+                            {
+                              fontSize: shadowNameFontSize,
+                              color: shadowItem.name_color || '#FFFFFF',
+                            },
+                          ]}>
+                            {shadowItem.name}
+                          </Text>
+                          
+                          <Text style={[
+                            styles.fullBleedName,
+                            {
+                              fontSize: shadowTypeFontSize,
+                              color: shadowItem.type_color || '#FFFFFF',
+                            },
+                          ]}>
+                            {shadowItem.type}
+                          </Text>
+                          
+                          {shadowItem.description && (
+                            <Text style={[
+                              styles.fullBleedName,
+                              {
+                                fontSize: shadowDescriptionFontSize,
+                                color: shadowItem.description_color || '#FFFFFF',
+                              },
+                            ]}>
+                              {shadowItem.description}
+                            </Text>
+                          )}
+                        </View>
+                      </LinearGradient>
+                    </>
+                  );
+                } else {
+                  // Render shadow card as framed (complete card rendering matching front card)
+                  const shadowBorderWidth = Math.max(1, Math.round(shadowItem.frame_width || 2));
+                  const shadowContentPadding = Math.max(4, Math.round(8 * scaleFactor));
+                  const shadowImageHeight = Math.round(cardHeight * 0.5);
+                  
+                  return (
+                    <LinearGradient
+                      colors={shadowCardColors}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                      style={[
+                        styles.cardFrame,
+                        { 
+                          borderWidth: shadowBorderWidth,
+                          borderColor: shadowItem.frame_color || '#FFFFFF',
+                          height: '100%',
+                        }
+                      ]}
+                    >
+                      {/* Card Content with conditional background */}
+                      {shadowBackgroundGradient ? (
+                        <LinearGradient
+                          colors={shadowBackgroundGradient as [string, string, ...string[]]}
+                          start={{ x: 0, y: 0 }}
+                          end={{ x: 1, y: 1 }}
+                          style={[
+                            styles.cardContent,
+                            { 
+                              padding: shadowContentPadding,
+                              height: '100%',
+                              backgroundColor: shadowTextBackgroundColor,
+                            }
+                          ]}
+                        >
+                          {/* Top section - Card name */}
+                          <View style={[
+                            styles.cardNameContainer,
+                            { backgroundColor: shadowTextBackgroundColor }
+                          ]}>
+                            <Text 
+                              style={[
+                                styles.cardName, 
+                                { 
+                                  fontSize: shadowNameFontSize,
+                                  color: shadowItem.name_color || '#FFFFFF' 
+                                }
+                              ]}
+                              numberOfLines={1}
+                            >
+                              {shadowItem.name}
+                            </Text>
+                          </View>
+
+                          {/* Middle section - Card image */}
+                          <View 
+                            style={[
+                              styles.artContainer,
+                              { height: shadowImageHeight }
+                            ]}
+                          >
+                            <Image
+                              source={{ uri: shadowItem.image_url }}
+                              style={styles.cardArt}
+                              resizeMode="cover"
+                            />
+                          </View>
+
+                          {/* Bottom section - Type line and description */}
+                          <View style={{ flex: 1 }}>
+                            {/* Type line */}
+                            <View style={[
+                              styles.typeLine, 
+                              { 
+                                marginTop: shadowContentPadding,
+                                backgroundColor: shadowTextBackgroundColor
+                              }
+                            ]}>
+                              <View style={styles.typeContainer}>
+                                <Text 
+                                  style={[
+                                    styles.typeText, 
+                                    { 
+                                      fontSize: shadowTypeFontSize,
+                                      color: shadowItem.type_color || '#FFFFFF' 
+                                    }
+                                  ]}
+                                >
+                                  {shadowItem.type}
+                                </Text>
+                              </View>
+                            </View>
+                            
+                            {/* Description */}
+                            {shadowItem.description && (
+                              <Text 
+                                style={[
+                                  styles.cardDescription, 
+                                  { 
+                                    fontSize: shadowDescriptionFontSize,
+                                    color: shadowItem.description_color || '#FFFFFF',
+                                    backgroundColor: shadowTextBackgroundColor,
+                                    marginTop: shadowContentPadding
+                                  }
+                                ]}
+                                numberOfLines={3}
+                              >
+                                {shadowItem.description}
+                              </Text>
+                            )}
+                          </View>
+                        </LinearGradient>
+                      ) : (
+                        <View
+                          style={[
+                            styles.cardContent,
+                            { 
+                              padding: shadowContentPadding,
+                              height: '100%',
+                              backgroundColor: shadowTextBackgroundColor,
+                            }
+                          ]}
+                        >
+                          {/* Same content structure without gradient wrapper */}
+                          <View style={[
+                            styles.cardNameContainer,
+                            { backgroundColor: shadowTextBackgroundColor }
+                          ]}>
+                            <Text 
+                              style={[
+                                styles.cardName, 
+                                { 
+                                  fontSize: shadowNameFontSize,
+                                  color: shadowItem.name_color || '#FFFFFF' 
+                                }
+                              ]}
+                              numberOfLines={1}
+                            >
+                              {shadowItem.name}
+                            </Text>
+                          </View>
+
+                          <View 
+                            style={[
+                              styles.artContainer,
+                              { height: shadowImageHeight }
+                            ]}
+                          >
+                            <Image
+                              source={{ uri: shadowItem.image_url }}
+                              style={styles.cardArt}
+                              resizeMode="cover"
+                            />
+                          </View>
+
+                          <View style={{ flex: 1 }}>
+                            <View style={[
+                              styles.typeLine, 
+                              { 
+                                marginTop: shadowContentPadding,
+                                backgroundColor: shadowTextBackgroundColor
+                              }
+                            ]}>
+                              <View style={styles.typeContainer}>
+                                <Text 
+                                  style={[
+                                    styles.typeText, 
+                                    { 
+                                      fontSize: shadowTypeFontSize,
+                                      color: shadowItem.type_color || '#FFFFFF' 
+                                    }
+                                  ]}
+                                >
+                                  {shadowItem.type}
+                                </Text>
+                              </View>
+                            </View>
+                            
+                            {shadowItem.description && (
+                              <Text 
+                                style={[
+                                  styles.cardDescription, 
+                                  { 
+                                    fontSize: shadowDescriptionFontSize,
+                                    color: shadowItem.description_color || '#FFFFFF',
+                                    backgroundColor: shadowTextBackgroundColor,
+                                    marginTop: shadowContentPadding
+                                  }
+                                ]}
+                                numberOfLines={3}
+                              >
+                                {shadowItem.description}
+                              </Text>
+                            )}
+                          </View>
+                        </View>
+                      )}
+                    </LinearGradient>
+                  );
+                }
+              } else {
+                // Show default card back with Add Shadow button
+                return (
+                  <LinearGradient
+                    colors={['#1e3a8a', '#000000']} // Dark blue to black
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={styles.cardBackGradient}
+                  >
+                    <View style={styles.cardBackContent}>
+                      <Text style={styles.cardBackTitle}>CARD BACK</Text>
+                      <Text style={styles.cardBackSubtitle}>Long press to flip</Text>
+                      
+                      <TouchableOpacity
+                        style={styles.addShadowButton}
+                        onPress={() => {
+                          router.push({
+                            pathname: '/card-creation-new',
+                            params: {
+                              shadowForCardId: item.id,
+                              returnTo: '/(tabs)'
+                            }
+                          });
+                        }}
+                      >
+                        <Plus size={16} color="#ffffff" style={{ marginRight: 6 }} />
+                        <Text style={styles.addShadowButtonText}>Add Shadow</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </LinearGradient>
+                );
+              }
+            })()
+            }
           </Pressable>
         </Animated.View>
       </View>
@@ -2027,5 +2345,60 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     opacity: 0.7,
     textAlign: 'center',
+  },
+  addShadowButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    marginTop: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+  },
+  addShadowButtonText: {
+    fontFamily: 'Inter-Regular',
+    fontSize: 14,
+    color: '#ffffff',
+    fontWeight: '500',
+  },
+  shadowCardOverlay: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  shadowCardContent: {
+    alignItems: 'flex-start',
+  },
+  shadowCardFramedContent: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+  },
+  shadowCardName: {
+    fontFamily: 'Inter-Bold',
+    fontSize: 18,
+    color: '#ffffff',
+    textAlign: 'center',
+    marginBottom: 8,
+    textShadowColor: 'rgba(0,0,0,0.7)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
+  },
+  shadowCardDescription: {
+    fontFamily: 'Inter-Regular',
+    fontSize: 14,
+    color: '#ffffff',
+    textAlign: 'center',
+    lineHeight: 20,
+    textShadowColor: 'rgba(0,0,0,0.7)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
   },
 });
