@@ -1262,51 +1262,161 @@ export default function CollectionScreen() {
                 const shadowDescriptionFontSize = getAdaptiveDescriptionFontSize(shadowItem.description || '', shadowItem.format);
                 
                 if (shadowItem.format === 'fullBleed') {
-                  // Render shadow card as full bleed (complete card rendering)
-                  const shadowOverlayHeight = Math.min(Math.round(cardHeight * 0.45), Math.max(50, shadowNameFontSize + (shadowDescriptionFontSize * 3) + Math.round(24 * scaleFactor)));
-                  
+                  // Render shadow card as full bleed with same layout as normal full bleed
                   return (
                     <>
                       <Image source={{ uri: shadowItem.image_url }} style={styles.fullBleedImage} resizeMode="cover" />
-                      
-                      <LinearGradient
-                        colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0.8)']}
-                        style={[styles.fullBleedGradient, { height: shadowOverlayHeight }]}
-                      >
-                        <View style={styles.fullBleedCorner}>
-                          <Text style={[
-                            styles.fullBleedName,
-                            {
-                              fontSize: shadowNameFontSize,
-                              color: shadowItem.name_color || '#FFFFFF',
-                            },
-                          ]}>
-                            {shadowItem.name}
-                          </Text>
-                          
-                          <Text style={[
-                            styles.fullBleedName,
-                            {
-                              fontSize: shadowTypeFontSize,
-                              color: shadowItem.type_color || '#FFFFFF',
-                            },
-                          ]}>
-                            {shadowItem.type}
-                          </Text>
-                          
-                          {shadowItem.description && (
-                            <Text style={[
-                              styles.fullBleedName,
-                              {
-                                fontSize: shadowDescriptionFontSize,
-                                color: shadowItem.description_color || '#FFFFFF',
-                              },
-                            ]}>
-                              {shadowItem.description}
+
+                      {/* Adaptive gradient overlay - same logic as normal full bleed */}
+                      {(() => {
+                        // Calculate adaptive gradient height based on content
+                        const titleLines = shadowItem.name ? Math.ceil(shadowItem.name.length / 20) : 0;
+                        const titleHeight = titleLines * shadowNameFontSize * 1.2;
+                        const descriptionLines = Math.min(4, Math.ceil((shadowItem.description || '').length / 30));
+                        const descriptionHeight = descriptionLines * shadowDescriptionFontSize * 1.4;
+                        const padding = 28;
+                        const spacing = 6;
+                        
+                        const totalContentHeight = titleHeight + descriptionHeight + padding + spacing;
+                        const adaptiveGradientHeight = Math.max(totalContentHeight + 20, cardHeight * 0.4);
+                        
+                        return (
+                          <LinearGradient
+                            colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0.1)', 'rgba(0,0,0,0.4)', 'rgba(0,0,0,0.8)']}
+                            start={{ x: 0, y: 0 }}
+                            end={{ x: 0, y: 1 }}
+                            style={[
+                              styles.fullBleedGradient, 
+                              { 
+                                height: adaptiveGradientHeight,
+                                bottom: 0
+                              }
+                            ]}
+                            pointerEvents="none"
+                          />
+                        );
+                      })()}
+
+                      {/* Type label in top right */}
+                      {shadowItem.type ? (
+                        <Text
+                          style={[
+                            styles.fullBleedCorner,
+                            styles.topRight,
+                            { fontSize: shadowTypeFontSize, color: shadowItem.type_color || '#FFFFFF' },
+                          ]}
+                        >
+                          {shadowItem.type}
+                        </Text>
+                      ) : null}
+
+                      {/* Role label in top left */}
+                      {shadowItem.role ? (
+                        <Text
+                          style={[
+                            styles.fullBleedCorner,
+                            styles.topLeft,
+                            { fontSize: shadowTypeFontSize, color: shadowItem.role_color || '#FFFFFF' },
+                          ]}
+                        >
+                          {shadowItem.role}
+                        </Text>
+                      ) : null}
+
+                      {/* Title and description in corner layout */}
+                      {shadowItem.description ? (
+                        <View style={styles.cornerTextContainer}>
+                          {shadowItem.name ? (
+                            <Text
+                              style={[
+                                styles.fullBleedName,
+                                { fontSize: shadowNameFontSize, color: shadowItem.name_color || '#FFFFFF' },
+                              ]}
+                              numberOfLines={2}
+                            >
+                              {shadowItem.name}
                             </Text>
-                          )}
+                          ) : null}
+                          {(() => {
+                            // Corner-shaped text layout algorithm - same as normal full bleed
+                            const words = shadowItem.description.split(' ');
+                            const lineHeight = Math.max(12, Math.round(shadowDescriptionFontSize * 1.4));
+                            const maxLines = Math.min(4, Math.ceil((shadowItem.description || '').length / 30));
+                            
+                            const cornerShapeWidthPercents = [0.45, 0.65, 0.85, 1.0];
+                            const availableWidth = cardWidth - 24;
+                            
+                            const getCharsPerLine = (widthPercent: number, fontSize: number) => {
+                              const baseCharsPerFullWidth = Math.floor(cardWidth / (fontSize * 0.6));
+                              return Math.floor(baseCharsPerFullWidth * widthPercent);
+                            };
+                            
+                            const lines: string[] = [];
+                            let remainingText = shadowItem.description;
+                            
+                            for (let lineIndex = 0; lineIndex < maxLines && remainingText.length > 0; lineIndex++) {
+                              const widthPercent = cornerShapeWidthPercents[lineIndex] || 1.0;
+                              const charsPerLine = getCharsPerLine(widthPercent, shadowDescriptionFontSize);
+                              
+                              if (remainingText.length <= charsPerLine) {
+                                lines.push(remainingText.trim());
+                                break;
+                              } else {
+                                let cutIndex = charsPerLine;
+                                while (cutIndex > 0 && remainingText[cutIndex] !== ' ') {
+                                  cutIndex--;
+                                }
+                                if (cutIndex === 0) cutIndex = charsPerLine;
+                                
+                                lines.push(remainingText.substring(0, cutIndex).trim());
+                                remainingText = remainingText.substring(cutIndex).trim();
+                              }
+                            }
+                            
+                            return lines.map((line, index) => {
+                              const widthPercent = cornerShapeWidthPercents[index] || 1.0;
+                              const availableWidth = cardWidth - 24;
+                              return (
+                                <View
+                                  key={index}
+                                  style={{
+                                    width: Math.floor(availableWidth * widthPercent),
+                                    marginLeft: index === 0 ? 0 : index * 8, // Stagger each line slightly to the right
+                                    marginTop: index === 0 ? 6 : 0, // Add space between title and description
+                                  }}
+                                >
+                                  <Text
+                                    style={[
+                                      styles.cornerTextLine,
+                                      {
+                                        fontSize: shadowDescriptionFontSize,
+                                        lineHeight: lineHeight,
+                                        color: shadowItem.description_color || '#FFFFFF',
+                                      },
+                                    ]}
+                                  >
+                                    {line}
+                                  </Text>
+                                </View>
+                              );
+                            });
+                          })()}
                         </View>
-                      </LinearGradient>
+                      ) : (
+                        shadowItem.name ? (
+                          <View style={styles.cornerTextContainer}>
+                            <Text
+                              style={[
+                                styles.fullBleedName,
+                                { fontSize: shadowNameFontSize, color: shadowItem.name_color || '#FFFFFF' },
+                              ]}
+                              numberOfLines={2}
+                            >
+                              {shadowItem.name}
+                            </Text>
+                          </View>
+                        ) : null
+                      )}
                     </>
                   );
                 } else {
@@ -2229,6 +2339,7 @@ const styles = StyleSheet.create({
     left: 0,
     width: '100%',
     height: '100%',
+    borderRadius: 16,
   },
   fullBleedName: {
     fontFamily: 'Inter-Bold',
@@ -2273,6 +2384,7 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
+    borderRadius: 16,
   },
   cornerTextLine: {
     fontFamily: 'Inter-Regular',
@@ -2321,6 +2433,8 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    borderRadius: 16,
+    overflow: 'hidden',
   },
   cardBackPressable: {
     flex: 1,
