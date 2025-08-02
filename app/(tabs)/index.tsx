@@ -1837,12 +1837,21 @@ export default function CollectionScreen() {
         pagingEnabled={false}
         contentContainerStyle={styles.horizontalListContent}
         style={styles.horizontalList}
-        bounces={false}
-        alwaysBounceVertical={false}
+        bounces={true}
+        alwaysBounceVertical={true}
         disableIntervalMomentum={true}
         snapToInterval={getCardDimensions().cardWidth + 32}
         snapToAlignment="center"
         decelerationRate="fast"
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor="#6366f1"
+            colors={["#6366f1"]}
+            progressBackgroundColor="#1f2937"
+          />
+        }
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
             <Text style={styles.emptyText}>
