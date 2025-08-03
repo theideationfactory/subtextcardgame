@@ -608,13 +608,37 @@ export default function CollectionScreen() {
     
     const backgroundGradient = getBackgroundGradient();
     
-    // Double tap detection for modal (now accepts targetCard parameter)
+    // Double tap detection for modal - NOW FLIP-STATE AWARE!
     let lastTap = 0;
-    const handleDoubleTapCard = (targetCard: Card) => {
+    const handleDoubleTapCard = () => {
       const now = Date.now();
       const DOUBLE_PRESS_DELAY = 300;
       if (lastTap && (now - lastTap) < DOUBLE_PRESS_DELAY) {
-        // Double tap detected - show modal for the tapped card (original or shadow)
+        // Determine which card to edit based on current flip state
+        let targetCard: Card;
+        
+        if (!isFlipped) {
+          // User is viewing FRONT side → always edit original card
+          targetCard = item;
+          console.log('🟢 FRONT SIDE DOUBLE TAP - editing original card:', item.name, item.id);
+        } else {
+          // User is viewing BACK side → edit what's displayed on back
+          const shadowCard = item.shadow_card 
+            ? (Array.isArray(item.shadow_card) ? item.shadow_card[0] : item.shadow_card)
+            : null;
+          
+          if (shadowCard) {
+            // Shadow exists and is displayed → edit shadow
+            targetCard = shadowCard;
+            console.log('🔵 BACK SIDE DOUBLE TAP (with shadow) - editing shadow card:', shadowCard.name, shadowCard.id);
+          } else {
+            // No shadow, showing default back → edit original
+            targetCard = item;
+            console.log('🟡 BACK SIDE DOUBLE TAP (no shadow) - editing original card:', item.name, item.id);
+          }
+        }
+        
+        // Double tap detected - show modal for the contextually correct card
         setSelectedCard(targetCard);
         setShowActions(true);
         setDeleteError('');
@@ -786,7 +810,7 @@ export default function CollectionScreen() {
       return (
         <Pressable
           style={[styles.fullBleedCard, { width: cardWidth, height: cardHeight }]}
-          onPress={() => handleDoubleTapCard(item)}
+          onPress={() => handleDoubleTapCard()}
           onLongPress={handleLongPress}
         >
           <Image source={{ uri: item.image_url }} style={styles.fullBleedImage} resizeMode="cover" />
@@ -953,7 +977,7 @@ export default function CollectionScreen() {
             height: cardHeight,
           }
         ]}
-        onPress={() => handleDoubleTapCard(item)}
+        onPress={() => handleDoubleTapCard()}
         onLongPress={handleLongPress}
       >
         <LinearGradient
@@ -1276,12 +1300,7 @@ export default function CollectionScreen() {
         >
           <Pressable
             style={styles.cardBackPressable}
-            onPress={() => {
-              const targetCard = item.shadow_card && Array.isArray(item.shadow_card)
-                ? item.shadow_card[0]
-                : (item.shadow_card || item);
-              handleDoubleTapCard(targetCard as Card);
-            }}
+            onPress={() => handleDoubleTapCard()}
             onLongPress={handleLongPress}
           >
             {(() => {
