@@ -1,9 +1,9 @@
 import { View, Text, TextInput, StyleSheet, FlatList, Pressable, Image, Modal, TouchableOpacity, RefreshControl, useWindowDimensions, Platform, PlatformIOSStatic, Dimensions, Alert, Animated } from 'react-native';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, useRef } from 'react';
 import { useFonts, Inter_400Regular, Inter_700Bold } from '@expo-google-fonts/inter';
 import * as SplashScreen from 'expo-splash-screen';
 import { useRouter } from 'expo-router';
-import { Settings2, CreditCard as Edit3, Trash2, Swords, Shield, Sparkles, Users, Globe as Globe2, Lock, Wallet, Plus } from 'lucide-react-native';
+import { Settings2, CreditCard as Edit3, Trash2, Swords, Shield, Sparkles, Users, Globe as Globe2, Lock, Wallet, Plus, Share2 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { supabase } from '@/lib/supabase';
@@ -11,6 +11,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Spacer } from '@/components/Spacer';
 import { isIPad, isTablet, isIPadMini } from '@/utils/deviceDimensions';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import ViewShot from 'react-native-view-shot';
+import * as Sharing from 'expo-sharing';
 
 const COLLECTION_TYPES = [
   {
@@ -107,6 +109,8 @@ export default function CollectionScreen() {
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [flippedCards, setFlippedCards] = useState<Set<string>>(new Set());
   const [flipAnimations, setFlipAnimations] = useState<Map<string, Animated.Value>>(new Map());
+  const [sharingCard, setSharingCard] = useState(false);
+  const viewShotRef = useRef<ViewShot>(null);
   const { height: screenHeight } = useWindowDimensions();
   const router = useRouter();
   
@@ -489,6 +493,48 @@ export default function CollectionScreen() {
         [{ text: 'OK' }]
       );
     }, 3000);
+  };
+
+  const handleShareCard = async (card: Card) => {
+    if (!viewShotRef.current || !viewShotRef.current.capture) {
+      Alert.alert('Error', 'Unable to capture card image');
+      return;
+    }
+
+    setSharingCard(true);
+    setShowActions(false); // Close modal first
+
+    try {
+      // Give a moment for modal to close
+      await new Promise(resolve => setTimeout(resolve, 300));
+      
+      // Capture the card as image
+      const uri = await viewShotRef.current.capture();
+
+      // Check if sharing is available
+      const isAvailable = await Sharing.isAvailableAsync();
+      if (!isAvailable) {
+        Alert.alert('Error', 'Sharing is not available on this device');
+        return;
+      }
+
+      // Share the captured image
+      await Sharing.shareAsync(uri, {
+        dialogTitle: `Share ${card.name}`,
+        mimeType: 'image/png',
+      });
+
+      // Provide haptic feedback
+      if (Platform.OS !== 'web') {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      }
+
+    } catch (error) {
+      console.error('Error sharing card:', error);
+      Alert.alert('Error', 'Failed to share card. Please try again.');
+    } finally {
+      setSharingCard(false);
+    }
   };
 
   const onLayoutRootView = useCallback(async () => {
@@ -1206,7 +1252,16 @@ export default function CollectionScreen() {
             }
           ]}
         >
-          {renderCardFront()}
+          <ViewShot
+            ref={viewShotRef}
+            options={{
+              format: 'png',
+              quality: 0.9,
+            }}
+            style={{ width: cardWidth, height: cardHeight }}
+          >
+            {renderCardFront()}
+          </ViewShot>
         </Animated.View>
         <Animated.View
           style={[
@@ -1838,7 +1893,9 @@ export default function CollectionScreen() {
         contentContainerStyle={styles.horizontalListContent}
         style={styles.horizontalList}
         bounces={true}
-        alwaysBounceVertical={true}
+        alwaysBounceVertical={false}
+        bouncesZoom={false}
+        directionalLockEnabled={true}
         disableIntervalMomentum={true}
         snapToInterval={getCardDimensions().cardWidth + 32}
         snapToAlignment="center"
@@ -1936,6 +1993,22 @@ export default function CollectionScreen() {
                 >
                   <Edit3 size={20} color="#fff" />
                   <Text style={styles.modalButtonText}>Edit Card</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.modalButton, styles.shareButton]}
+                  onPress={() => selectedCard && handleShareCard(selectedCard)}
+                  disabled={sharingCard}
+                >
+                  {sharingCard ? (
+                    <Text style={styles.modalButtonText}>
+                      Capturing...
+                    </Text>
+                  ) : (
+                    <>
+                      <Share2 size={20} color="#10b981" />
+                      <Text style={styles.modalButtonText}>Share Card</Text>
+                    </>
+                  )}
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={[
@@ -2225,6 +2298,9 @@ const styles = StyleSheet.create({
   },
   nftButton: {
     backgroundColor: 'rgba(130, 71, 229, 0.2)', // Polygon/Matic purple with transparency
+  },
+  shareButton: {
+    backgroundColor: 'rgba(16, 185, 129, 0.2)', // Green with transparency
   },
   errorText: {
     color: '#ff4444',
