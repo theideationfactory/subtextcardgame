@@ -813,7 +813,11 @@ export default function CardCreationNewScreen() {
         setSuccessMessage('Card updated successfully!');
         setTimeout(() => {
           setSuccessMessage('');
-          router.replace('/');
+          if (returnTo === 'cards') {
+            router.replace('/(tabs)');
+          } else {
+            router.replace('/');
+          }
         }, 1500);
       } else {
         console.log('Creating new card with data:', cardData);
@@ -879,8 +883,12 @@ export default function CardCreationNewScreen() {
     if (Platform.OS !== 'web') {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     }
-    // Navigate specifically to the create tab
-    router.push('/(tabs)/create');
+    // Navigate back to the appropriate tab based on returnTo parameter
+    if (returnTo === 'cards') {
+      router.push('/(tabs)');
+    } else {
+      router.push('/(tabs)/create');
+    }
   };
 
   return (

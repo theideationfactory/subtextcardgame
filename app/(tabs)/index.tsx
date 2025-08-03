@@ -422,7 +422,8 @@ export default function CollectionScreen() {
         type_color: card.type_color || '',
         description_color: card.description_color || '',
         context_color: card.context_color || '',
-        edit_mode: 'true'
+        edit_mode: 'true',
+        returnTo: 'cards'
       }
     });
   };
@@ -2162,9 +2163,9 @@ export default function CollectionScreen() {
         <TouchableOpacity
           style={styles.floatingButton}
           onPress={() => {
-            // Same smart navigation logic as the "Create Your First Card" button
+            // Always route directly to card creation screen
             if (selectedPhenomena === 'All') {
-              router.push('/create');
+              router.push('/card-creation-new');
             } else {
               router.push({
                 pathname: '/card-creation-new',
@@ -2179,7 +2180,7 @@ export default function CollectionScreen() {
             }
           }}
         >
-          <Plus size={24} color="#fff" />
+          <Plus size={14} color="#fff" />
         </TouchableOpacity>
       )}
     </LinearGradient>
@@ -2602,9 +2603,9 @@ const styles = StyleSheet.create({
     position: 'absolute',
     bottom: 20,
     right: 20,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
     backgroundColor: '#6366f1',
     justifyContent: 'center',
     alignItems: 'center',
