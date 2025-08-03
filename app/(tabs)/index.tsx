@@ -988,6 +988,7 @@ export default function CollectionScreen() {
             styles.cardFrame,
             { 
               borderWidth: borderWidth,
+              borderColor: item.frame_color || '#C0C0C0',
               height: '100%',
             }
           ]}
@@ -1495,7 +1496,7 @@ export default function CollectionScreen() {
                   );
                 } else {
                   // Render shadow card as framed (complete card rendering matching front card)
-                  const shadowBorderWidth = Math.max(1, Math.round(shadowItem.frame_width || 2));
+                  const shadowBorderWidth = Math.max(1, 3 * scaleFactor); // Match front card border calculation
                   const shadowContentPadding = Math.max(4, Math.round(8 * scaleFactor));
                   const shadowImageHeight = Math.round(cardHeight * 0.5);
                   
@@ -1584,24 +1585,72 @@ export default function CollectionScreen() {
                                   {shadowItem.type}
                                 </Text>
                               </View>
+                              
+                              {shadowItem.role && (
+                                <View style={styles.roleContainer}>
+                                  {getCardRoleIcon(shadowItem.role)}
+                                  <Text 
+                                    style={[
+                                      styles.roleText, 
+                                      { 
+                                        fontSize: Math.max(8, Math.round(14 * scaleFactor)),
+                                        color: '#FFFFFF' 
+                                      }
+                                    ]}
+                                  >
+                                    {shadowItem.role}
+                                  </Text>
+                                </View>
+                              )}
                             </View>
-                            
+
                             {/* Description */}
-                            {shadowItem.description && (
+                            <View 
+                              style={[
+                                styles.textBox,
+                                { 
+                                  marginTop: shadowContentPadding / 2,
+                                  flex: 1,
+                                  backgroundColor: shadowTextBackgroundColor
+                                }
+                              ]}
+                            >
                               <Text 
                                 style={[
                                   styles.cardDescription, 
                                   { 
                                     fontSize: shadowDescriptionFontSize,
-                                    color: shadowItem.description_color || '#FFFFFF',
-                                    backgroundColor: shadowTextBackgroundColor,
-                                    marginTop: shadowContentPadding
+                                    lineHeight: Math.max(12, Math.round(shadowDescriptionFontSize * 1.4)),
+                                    color: shadowItem.description_color || '#FFFFFF'
                                   }
                                 ]}
                                 numberOfLines={3}
                               >
                                 {shadowItem.description}
                               </Text>
+                            </View>
+
+                            {/* Context - at the bottom of the card */}
+                            {shadowItem.context && (
+                              <View style={[
+                                styles.contextContainer, 
+                                { 
+                                  marginTop: shadowContentPadding / 2,
+                                  backgroundColor: shadowTextBackgroundColor
+                                }
+                              ]}>
+                                <Text 
+                                  style={[
+                                    styles.contextText, 
+                                    { 
+                                      fontSize: shadowContextFontSize,
+                                      color: shadowItem.context_color || '#CCCCCC'
+                                    }
+                                  ]}
+                                >
+                                  {shadowItem.context}
+                                </Text>
+                              </View>
                             )}
                           </View>
                         </LinearGradient>
@@ -1648,7 +1697,9 @@ export default function CollectionScreen() {
                             />
                           </View>
 
+                          {/* Bottom section - Type line and description */}
                           <View style={{ flex: 1 }}>
+                            {/* Type line */}
                             <View style={[
                               styles.typeLine, 
                               { 
@@ -1669,23 +1720,72 @@ export default function CollectionScreen() {
                                   {shadowItem.type}
                                 </Text>
                               </View>
+                              
+                              {shadowItem.role && (
+                                <View style={styles.roleContainer}>
+                                  {getCardRoleIcon(shadowItem.role)}
+                                  <Text 
+                                    style={[
+                                      styles.roleText, 
+                                      { 
+                                        fontSize: Math.max(8, Math.round(14 * scaleFactor)),
+                                        color: '#FFFFFF' 
+                                      }
+                                    ]}
+                                  >
+                                    {shadowItem.role}
+                                  </Text>
+                                </View>
+                              )}
                             </View>
-                            
-                            {shadowItem.description && (
+
+                            {/* Description */}
+                            <View 
+                              style={[
+                                styles.textBox,
+                                { 
+                                  marginTop: shadowContentPadding / 2,
+                                  flex: 1,
+                                  backgroundColor: shadowTextBackgroundColor
+                                }
+                              ]}
+                            >
                               <Text 
                                 style={[
                                   styles.cardDescription, 
                                   { 
                                     fontSize: shadowDescriptionFontSize,
-                                    color: shadowItem.description_color || '#FFFFFF',
-                                    backgroundColor: shadowTextBackgroundColor,
-                                    marginTop: shadowContentPadding
+                                    lineHeight: Math.max(12, Math.round(shadowDescriptionFontSize * 1.4)),
+                                    color: shadowItem.description_color || '#FFFFFF'
                                   }
                                 ]}
                                 numberOfLines={3}
                               >
                                 {shadowItem.description}
                               </Text>
+                            </View>
+
+                            {/* Context - at the bottom of the card */}
+                            {shadowItem.context && (
+                              <View style={[
+                                styles.contextContainer, 
+                                { 
+                                  marginTop: shadowContentPadding / 2,
+                                  backgroundColor: shadowTextBackgroundColor
+                                }
+                              ]}>
+                                <Text 
+                                  style={[
+                                    styles.contextText, 
+                                    { 
+                                      fontSize: shadowContextFontSize,
+                                      color: shadowItem.context_color || '#CCCCCC'
+                                    }
+                                  ]}
+                                >
+                                  {shadowItem.context}
+                                </Text>
+                              </View>
                             )}
                           </View>
                         </View>
