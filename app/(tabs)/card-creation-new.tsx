@@ -95,6 +95,7 @@ export default function CardCreationNewScreen() {
   const [showTypeDropdown, setShowTypeDropdown] = useState(false);
   const [showRoleDropdown, setShowRoleDropdown] = useState(false);
   const [showContextDropdown, setShowContextDropdown] = useState(false);
+  const [showBackgroundDropdown, setShowBackgroundDropdown] = useState(false);
   
   // Chat functionality states
   const [showChat, setShowChat] = useState(false);
@@ -911,306 +912,159 @@ export default function CardCreationNewScreen() {
             />
           </View>
 
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Card Description <Text style={styles.required}>*</Text></Text>
-            <TextInput
-              style={[styles.input, styles.textArea]}
-              value={description}
-              onChangeText={setDescription}
-              placeholder="Enter card description"
-              placeholderTextColor="#666"
-              multiline
-              numberOfLines={4}
-              textAlignVertical="top"
-            />
-            <TouchableOpacity 
-              style={[styles.generateButton, styles.descriptionButton, (!name || isGeneratingDescription) && styles.generateButtonDisabled]} 
-              onPress={handleGenerateDescription}
-              disabled={!name || isGeneratingDescription}
-            >
-              {isGeneratingDescription ? (
-                <ActivityIndicator color="#fff" size="small" />
-              ) : (
-                <>
-                  <Wand2 size={18} color="#fff" style={styles.buttonIcon} />
-                  <Text style={styles.generateButtonText}>Generate Description</Text>
-                </>
-              )}
-            </TouchableOpacity>
-          </View>
-          
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Image Description <Text style={styles.required}>*</Text></Text>
-            <TextInput
-              style={[styles.input, styles.textArea]}
-              placeholder="Describe the image you want to generate"
-              placeholderTextColor="#666"
-              value={imageDescription}
-              onChangeText={setImageDescription}
-              multiline
-              numberOfLines={4}
-              textAlignVertical="top"
-            />
-            <TouchableOpacity 
-              style={[styles.generateButton, styles.descriptionButton, (!name || isGeneratingImageDescription) && styles.generateButtonDisabled]} 
-              onPress={handleGenerateImageDescription}
-              disabled={!name || isGeneratingImageDescription}
-            >
-              {isGeneratingImageDescription ? (
-                <ActivityIndicator color="#fff" size="small" />
-              ) : (
-                <>
-                  <Wand2 size={18} color="#fff" style={styles.buttonIcon} />
-                  <Text style={styles.generateButtonText}>Generate Image Description</Text>
-                </>
-              )}
-            </TouchableOpacity>
-            
-
-          </View>
-
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Phenomena</Text>
-            <TouchableOpacity 
-              style={styles.dropdownSelector}
-              onPress={() => setShowTypeDropdown(true)}
-            >
-              <Text style={[styles.dropdownText, !type && styles.placeholderText]}>
-                {type || 'Select phenomena'}
-              </Text>
-              <ChevronDown size={20} color="#666" />
-            </TouchableOpacity>
-            
-            <Modal
-              visible={showTypeDropdown}
-              transparent={true}
-              animationType="fade"
-              onRequestClose={() => setShowTypeDropdown(false)}
-            >
+          {/* Compact Dropdowns Row */}
+          <View style={styles.compactDropdownsContainer}>
+            {/* Phenomena Type */}
+            <View style={styles.compactDropdownGroup}>
+              <Text style={styles.compactLabel}>Type</Text>
               <TouchableOpacity 
-                style={styles.modalOverlay}
-                activeOpacity={1}
-                onPress={() => setShowTypeDropdown(false)}
+                style={styles.compactDropdownSelector}
+                onPress={() => setShowTypeDropdown(true)}
               >
-                <View style={styles.dropdownModal}>
-                  <FlatList
-                    data={typeOptions}
-                    keyExtractor={(item) => item}
-                    renderItem={({ item }) => (
-                      <TouchableOpacity
-                        style={styles.dropdownItem}
-                        onPress={() => {
-                          setType(item);
-                          setRole('');
-                          setShowTypeDropdown(false);
-                          if (Platform.OS !== 'web') {
-                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                          }
-                        }}
-                      >
-                        <Text style={styles.dropdownItemText}>{item}</Text>
-                        {type === item && <Check size={20} color="#6366f1" />}
-                      </TouchableOpacity>
-                    )}
-                  />
-                </View>
+                <Text style={[styles.compactDropdownText, !type && styles.placeholderText]}>
+                  {type || 'Phenomena'}
+                </Text>
+                <ChevronDown size={16} color="#666" />
               </TouchableOpacity>
-            </Modal>
-          </View>
+            </View>
 
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Phenomena Detail</Text>
-            <TouchableOpacity 
-              style={styles.dropdownSelector}
-              onPress={() => setShowRoleDropdown(true)}
-            >
-              <Text style={[styles.dropdownText, !role && styles.placeholderText]}>
-                {role || 'Select detail'}
-              </Text>
-              <ChevronDown size={20} color="#666" />
-            </TouchableOpacity>
-            
-            <Modal
-              visible={showRoleDropdown}
-              transparent={true}
-              animationType="fade"
-              onRequestClose={() => setShowRoleDropdown(false)}
-            >
+            {/* Phenomena Detail */}
+            <View style={styles.compactDropdownGroup}>
+              <Text style={styles.compactLabel}>Detail</Text>
               <TouchableOpacity 
-                style={styles.modalOverlay}
-                activeOpacity={1}
-                onPress={() => setShowRoleDropdown(false)}
+                style={styles.compactDropdownSelector}
+                onPress={() => setShowRoleDropdown(true)}
               >
-                <View style={styles.dropdownModal}>
-                  <FlatList
-                    data={roleOptions}
-                    keyExtractor={(item) => item}
-                    renderItem={({ item }) => (
-                      <TouchableOpacity
-                        style={styles.dropdownItem}
-                        onPress={() => {
-                          setRole(item);
-                          setShowRoleDropdown(false);
-                          if (Platform.OS !== 'web') {
-                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                          }
-                        }}
-                      >
-                        <Text style={styles.dropdownItemText}>{item}</Text>
-                        {role === item && <Check size={20} color="#6366f1" />}
-                      </TouchableOpacity>
-                    )}
-                  />
-                </View>
+                <Text style={[styles.compactDropdownText, !role && styles.placeholderText]}>
+                  {role || 'Detail'}
+                </Text>
+                <ChevronDown size={16} color="#666" />
               </TouchableOpacity>
-            </Modal>
-          </View>
+            </View>
 
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Context</Text>
-            <TouchableOpacity 
-              style={styles.dropdownSelector}
-              onPress={() => setShowContextDropdown(true)}
-            >
-              <Text style={[styles.dropdownText, !context && styles.placeholderText]}>
-                {context || 'Select context'}
-              </Text>
-              <ChevronDown size={20} color="#666" />
-            </TouchableOpacity>
-            
-            <Modal
-              visible={showContextDropdown}
-              transparent={true}
-              animationType="fade"
-              onRequestClose={() => setShowContextDropdown(false)}
-            >
+            {/* Context */}
+            <View style={styles.compactDropdownGroup}>
+              <Text style={styles.compactLabel}>Context</Text>
               <TouchableOpacity 
-                style={styles.modalOverlay}
-                activeOpacity={1}
-                onPress={() => setShowContextDropdown(false)}
+                style={styles.compactDropdownSelector}
+                onPress={() => setShowContextDropdown(true)}
               >
-                <View style={styles.dropdownModal}>
-                  <FlatList
-                    data={contextOptions}
-                    keyExtractor={(item) => item}
-                    renderItem={({ item }) => (
-                      <TouchableOpacity
-                        style={styles.dropdownItem}
-                        onPress={() => {
-                          setContext(item);
-                          setShowContextDropdown(false);
-                          if (Platform.OS !== 'web') {
-                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                          }
-                        }}
-                      >
-                        <Text style={styles.dropdownItemText}>{item}</Text>
-                        {context === item && <Check size={20} color="#6366f1" />}
-                      </TouchableOpacity>
-                    )}
-                  />
-                </View>
+                <Text style={[styles.compactDropdownText, !context && styles.placeholderText]}>
+                  {context || 'Context'}
+                </Text>
+                <ChevronDown size={16} color="#666" />
               </TouchableOpacity>
-            </Modal>
+            </View>
           </View>
 
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Background Color</Text>
-            <View style={styles.gradientOptionsContainer}>
-              {GRADIENT_OPTIONS.map((gradient, index) => (
-                <TouchableOpacity
-                  key={index}
-                  style={[
-                    styles.gradientOption,
-                    JSON.stringify(backgroundGradient) === JSON.stringify(gradient.colors) && styles.gradientOptionSelected
-                  ]}
-                  onPress={() => {
-                    setBackgroundGradient(gradient.colors);
-                    if (Platform.OS !== 'web') {
-                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                    }
-                  }}
-                >
-                  <LinearGradient
-                    colors={gradient.colors as [string, string, ...string[]]}
-                    style={styles.gradientPreview}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                  />
-                  <Text style={styles.gradientName}>{gradient.name}</Text>
-                  {JSON.stringify(backgroundGradient) === JSON.stringify(gradient.colors) && (
-                    <Check size={20} color="#6366f1" style={styles.gradientCheck} />
+          {/* Modals for all three dropdowns */}
+          <Modal
+            visible={showTypeDropdown}
+            transparent={true}
+            animationType="fade"
+            onRequestClose={() => setShowTypeDropdown(false)}
+          >
+            <TouchableOpacity 
+              style={styles.modalOverlay}
+              activeOpacity={1}
+              onPress={() => setShowTypeDropdown(false)}
+            >
+              <View style={styles.dropdownModal}>
+                <FlatList
+                  data={typeOptions}
+                  keyExtractor={(item) => item}
+                  renderItem={({ item }) => (
+                    <TouchableOpacity
+                      style={styles.dropdownItem}
+                      onPress={() => {
+                        setType(item);
+                        setRole('');
+                        setShowTypeDropdown(false);
+                        if (Platform.OS !== 'web') {
+                          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                        }
+                      }}
+                    >
+                      <Text style={styles.dropdownItemText}>{item}</Text>
+                      {type === item && <Check size={20} color="#6366f1" />}
+                    </TouchableOpacity>
                   )}
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
+                />
+              </View>
+            </TouchableOpacity>
+          </Modal>
 
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Visibility Settings</Text>
-            <View style={styles.visibilityOptions}>
-              <TouchableOpacity
-                style={[
-                  styles.visibilityOption,
-                  visibility.includes('personal') && styles.visibilityOptionSelected,
-                ]}
-                onPress={() => {
-                  if (!visibility.includes('personal')) {
-                    setVisibility([...visibility, 'personal']);
-                  } else if (visibility.length > 1) {
-                    setVisibility(visibility.filter(v => v !== 'personal'));
-                  }
-                }}
-              >
-                <Lock size={20} color={visibility.includes('personal') ? '#6366f1' : '#666'} />
-                <Text style={[
-                  styles.visibilityText,
-                  visibility.includes('personal') && styles.visibilityTextSelected
-                ]}>Personal</Text>
-              </TouchableOpacity>
+          <Modal
+            visible={showRoleDropdown}
+            transparent={true}
+            animationType="fade"
+            onRequestClose={() => setShowRoleDropdown(false)}
+          >
+            <TouchableOpacity 
+              style={styles.modalOverlay}
+              activeOpacity={1}
+              onPress={() => setShowRoleDropdown(false)}
+            >
+              <View style={styles.dropdownModal}>
+                <FlatList
+                  data={roleOptions}
+                  keyExtractor={(item) => item}
+                  renderItem={({ item }) => (
+                    <TouchableOpacity
+                      style={styles.dropdownItem}
+                      onPress={() => {
+                        setRole(item);
+                        setShowRoleDropdown(false);
+                        if (Platform.OS !== 'web') {
+                          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                        }
+                      }}
+                    >
+                      <Text style={styles.dropdownItemText}>{item}</Text>
+                      {role === item && <Check size={20} color="#6366f1" />}
+                    </TouchableOpacity>
+                  )}
+                />
+              </View>
+            </TouchableOpacity>
+          </Modal>
 
-              <TouchableOpacity
-                style={[
-                  styles.visibilityOption,
-                  visibility.includes('friends') && styles.visibilityOptionSelected,
-                ]}
-                onPress={() => {
-                  if (!visibility.includes('friends')) {
-                    setVisibility([...visibility, 'friends']);
-                  } else {
-                    setVisibility(visibility.filter(v => v !== 'friends'));
-                  }
-                }}
-              >
-                <Users size={20} color={visibility.includes('friends') ? '#ec4899' : '#666'} />
-                <Text style={[
-                  styles.visibilityText,
-                  visibility.includes('friends') && styles.visibilityTextSelected
-                ]}>Friends</Text>
-              </TouchableOpacity>
+          <Modal
+            visible={showContextDropdown}
+            transparent={true}
+            animationType="fade"
+            onRequestClose={() => setShowContextDropdown(false)}
+          >
+            <TouchableOpacity 
+              style={styles.modalOverlay}
+              activeOpacity={1}
+              onPress={() => setShowContextDropdown(false)}
+            >
+              <View style={styles.dropdownModal}>
+                <FlatList
+                  data={contextOptions}
+                  keyExtractor={(item) => item}
+                  renderItem={({ item }) => (
+                    <TouchableOpacity
+                      style={styles.dropdownItem}
+                      onPress={() => {
+                        setContext(item);
+                        setShowContextDropdown(false);
+                        if (Platform.OS !== 'web') {
+                          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                        }
+                      }}
+                    >
+                      <Text style={styles.dropdownItemText}>{item}</Text>
+                      {context === item && <Check size={20} color="#6366f1" />}
+                    </TouchableOpacity>
+                  )}
+                />
+              </View>
+            </TouchableOpacity>
+          </Modal>
 
-              <TouchableOpacity
-                style={[
-                  styles.visibilityOption,
-                  visibility.includes('public') && styles.visibilityOptionSelected,
-                ]}
-                onPress={() => {
-                  if (!visibility.includes('public')) {
-                    setVisibility([...visibility, 'public']);
-                  } else {
-                    setVisibility(visibility.filter(v => v !== 'public'));
-                  }
-                }}
-              >
-                <Globe2 size={20} color={visibility.includes('public') ? '#10b981' : '#666'} />
-                <Text style={[
-                  styles.visibilityText,
-                  visibility.includes('public') && styles.visibilityTextSelected
-                ]}>Public</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-
+          {/* Image Section */}
           <View style={[styles.cardPreview, format === 'fullBleed' && styles.cardPreviewFullBleed]}>
             {isGenerating ? (
               <View style={styles.loadingContainer}>
@@ -1289,6 +1143,192 @@ export default function CardCreationNewScreen() {
             >
               <Text style={[styles.formatOptionText, format === 'fullBleed' && styles.formatOptionTextSelected]}>Full-bleed</Text>
             </Pressable>
+          </View>
+          
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Image Description <Text style={styles.required}>*</Text></Text>
+            <View style={styles.inputWithIcon}>
+              <TextInput
+                style={[styles.input, styles.textArea, styles.textAreaWithIcon]}
+                placeholder="Describe the image you want to generate"
+                placeholderTextColor="#666"
+                value={imageDescription}
+                onChangeText={setImageDescription}
+                multiline
+                numberOfLines={4}
+                textAlignVertical="top"
+              />
+              <TouchableOpacity 
+                style={[styles.inputIcon, (!name || isGeneratingImageDescription) && styles.inputIconDisabled]}
+                onPress={handleGenerateImageDescription}
+                disabled={!name || isGeneratingImageDescription}
+              >
+                {isGeneratingImageDescription ? (
+                  <ActivityIndicator color="#6366f1" size="small" />
+                ) : (
+                  <Wand2 size={16} color={(!name || isGeneratingImageDescription) ? "#666" : "#6366f1"} />
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Card Description <Text style={styles.required}>*</Text></Text>
+            <TextInput
+              style={[styles.input, styles.textArea]}
+              value={description}
+              onChangeText={setDescription}
+              placeholder="Enter card description"
+              placeholderTextColor="#666"
+              multiline
+              numberOfLines={4}
+              textAlignVertical="top"
+            />
+            <TouchableOpacity 
+              style={[styles.generateButton, styles.descriptionButton, (!name || isGeneratingDescription) && styles.generateButtonDisabled]} 
+              onPress={handleGenerateDescription}
+              disabled={!name || isGeneratingDescription}
+            >
+              {isGeneratingDescription ? (
+                <ActivityIndicator color="#fff" size="small" />
+              ) : (
+                <>
+                  <Wand2 size={18} color="#fff" style={styles.buttonIcon} />
+                  <Text style={styles.generateButtonText}>Generate Description</Text>
+                </>
+              )}
+            </TouchableOpacity>
+          </View>
+
+
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Background Color</Text>
+            <TouchableOpacity 
+              style={styles.dropdownSelector}
+              onPress={() => setShowBackgroundDropdown(true)}
+            >
+              <View style={styles.backgroundDropdownContent}>
+                <LinearGradient
+                  colors={backgroundGradient as [string, string, ...string[]]}
+                  style={styles.backgroundPreviewSmall}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                />
+                <Text style={styles.dropdownText}>
+                  {GRADIENT_OPTIONS.find(g => JSON.stringify(g.colors) === JSON.stringify(backgroundGradient))?.name || 'Select background'}
+                </Text>
+              </View>
+              <ChevronDown size={20} color="#666" />
+            </TouchableOpacity>
+            
+            <Modal
+              visible={showBackgroundDropdown}
+              transparent={true}
+              animationType="fade"
+              onRequestClose={() => setShowBackgroundDropdown(false)}
+            >
+              <TouchableOpacity 
+                style={styles.modalOverlay}
+                activeOpacity={1}
+                onPress={() => setShowBackgroundDropdown(false)}
+              >
+                <View style={styles.dropdownModal}>
+                  <FlatList
+                    data={GRADIENT_OPTIONS}
+                    keyExtractor={(item, index) => index.toString()}
+                    renderItem={({ item }) => (
+                      <TouchableOpacity
+                        style={styles.dropdownItem}
+                        onPress={() => {
+                          setBackgroundGradient(item.colors);
+                          setShowBackgroundDropdown(false);
+                          if (Platform.OS !== 'web') {
+                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                          }
+                        }}
+                      >
+                        <View style={styles.backgroundDropdownItemContent}>
+                          <LinearGradient
+                            colors={item.colors as [string, string, ...string[]]}
+                            style={styles.backgroundPreviewSmall}
+                            start={{ x: 0, y: 0 }}
+                            end={{ x: 1, y: 1 }}
+                          />
+                          <Text style={styles.dropdownItemText}>{item.name}</Text>
+                        </View>
+                        {JSON.stringify(backgroundGradient) === JSON.stringify(item.colors) && <Check size={20} color="#6366f1" />}
+                      </TouchableOpacity>
+                    )}
+                  />
+                </View>
+              </TouchableOpacity>
+            </Modal>
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Visibility Settings</Text>
+            <View style={styles.visibilityOptions}>
+              <TouchableOpacity
+                style={[
+                  styles.visibilityOption,
+                  visibility.includes('personal') && styles.visibilityOptionSelected,
+                ]}
+                onPress={() => {
+                  if (!visibility.includes('personal')) {
+                    setVisibility([...visibility, 'personal']);
+                  } else if (visibility.length > 1) {
+                    setVisibility(visibility.filter(v => v !== 'personal'));
+                  }
+                }}
+              >
+                <Lock size={20} color={visibility.includes('personal') ? '#6366f1' : '#666'} />
+                <Text style={[
+                  styles.visibilityText,
+                  visibility.includes('personal') && styles.visibilityTextSelected
+                ]}>Personal</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.visibilityOption,
+                  visibility.includes('friends') && styles.visibilityOptionSelected,
+                ]}
+                onPress={() => {
+                  if (!visibility.includes('friends')) {
+                    setVisibility([...visibility, 'friends']);
+                  } else {
+                    setVisibility(visibility.filter(v => v !== 'friends'));
+                  }
+                }}
+              >
+                <Users size={20} color={visibility.includes('friends') ? '#ec4899' : '#666'} />
+                <Text style={[
+                  styles.visibilityText,
+                  visibility.includes('friends') && styles.visibilityTextSelected
+                ]}>Friends</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.visibilityOption,
+                  visibility.includes('public') && styles.visibilityOptionSelected,
+                ]}
+                onPress={() => {
+                  if (!visibility.includes('public')) {
+                    setVisibility([...visibility, 'public']);
+                  } else {
+                    setVisibility(visibility.filter(v => v !== 'public'));
+                  }
+                }}
+              >
+                <Globe2 size={20} color={visibility.includes('public') ? '#10b981' : '#666'} />
+                <Text style={[
+                  styles.visibilityText,
+                  visibility.includes('public') && styles.visibilityTextSelected
+                ]}>Public</Text>
+              </TouchableOpacity>
+            </View>
           </View>
 
           {error && <Text style={styles.errorText}>{error}</Text>}
@@ -1484,6 +1524,7 @@ const styles = StyleSheet.create({
   formatToggleContainer: {
     flexDirection: 'row',
     marginTop: 16,
+    marginBottom: 24,
     borderWidth: 1,
     borderColor: '#6366f1',
     borderRadius: 8,
@@ -1824,5 +1865,75 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 8,
     right: 8,
+  },
+  /* ---- Compact Dropdowns ---- */
+  compactDropdownsContainer: {
+    flexDirection: 'row',
+    marginBottom: 20,
+    gap: 8,
+  },
+  compactDropdownGroup: {
+    flex: 1,
+  },
+  compactLabel: {
+    color: '#ccc',
+    fontSize: 12,
+    marginBottom: 4,
+    fontFamily: 'Inter-Bold',
+  },
+  compactDropdownSelector: {
+    backgroundColor: '#1a1a1a',
+    borderWidth: 1,
+    borderColor: '#333',
+    borderRadius: 6,
+    padding: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    minHeight: 36,
+  },
+  compactDropdownText: {
+    color: '#fff',
+    fontSize: 12,
+    fontFamily: 'Inter-Regular',
+    flex: 1,
+  },
+  /* ---- Background Dropdown ---- */
+  backgroundDropdownContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  backgroundPreviewSmall: {
+    width: 24,
+    height: 24,
+    borderRadius: 4,
+    marginRight: 12,
+  },
+  backgroundDropdownItemContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  /* ---- Input with Icon ---- */
+  inputWithIcon: {
+    position: 'relative',
+  },
+  textAreaWithIcon: {
+    paddingRight: 48, // Space for icon
+  },
+  inputIcon: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    width: 32,
+    height: 32,
+    borderRadius: 6,
+    backgroundColor: 'rgba(99, 102, 241, 0.1)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  inputIconDisabled: {
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
   },
 });
