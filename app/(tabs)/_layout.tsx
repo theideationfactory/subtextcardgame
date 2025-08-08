@@ -149,6 +149,13 @@ export default function TabLayout() {
             headerShown: false, // Hide header for this screen
           }}
         />
+        <Tabs.Screen
+          name="deck-detail"
+          options={{
+            href: null, // This screen is not a tab itself
+            headerShown: false, // Hide header for this screen
+          }}
+        />
       </Tabs>
     </SafeAreaWrapper>
   );

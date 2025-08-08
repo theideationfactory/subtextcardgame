@@ -13,6 +13,7 @@ import { isIPad, isTablet, isIPadMini } from '@/utils/deviceDimensions';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import ViewShot from 'react-native-view-shot';
 import * as Sharing from 'expo-sharing';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const COLLECTION_TYPES = [
   {
@@ -61,6 +62,7 @@ const getCardRoleIcon = (role: string) => {
 
 export default function CollectionScreen() {
   const { user } = useAuth();
+  const insets = useSafeAreaInsets();
   // Define Card type to fix TypeScript errors
   type Card = {
     id: string;
@@ -1992,15 +1994,7 @@ export default function CollectionScreen() {
 
       {/* No column selector UI - automatically set based on device type */}
       
-      <TouchableOpacity 
-        style={{ flex: 1 }}
-        activeOpacity={1}
-        onPress={() => {
-          if (showPhenomenaMenu) {
-            setShowPhenomenaMenu(false);
-          }
-        }}
-      >
+      <View style={{ flex: 1 }}>
         <FlatList
         data={cards}
         renderItem={renderCard}
@@ -2012,14 +2006,25 @@ export default function CollectionScreen() {
         pagingEnabled={false}
         contentContainerStyle={styles.horizontalListContent}
         style={styles.horizontalList}
+        contentInsetAdjustmentBehavior="never"
+        scrollsToTop={false}
         bounces={true}
-        alwaysBounceVertical={false}
+        alwaysBounceVertical={true}
+        alwaysBounceHorizontal={false}
         bouncesZoom={false}
         directionalLockEnabled={true}
         disableIntervalMomentum={true}
         snapToInterval={getCardDimensions().cardWidth + 32}
         snapToAlignment="center"
         decelerationRate="fast"
+        overScrollMode="never"
+        nestedScrollEnabled={false}
+        scrollEventThrottle={16}
+        onScrollBeginDrag={() => {
+          if (showPhenomenaMenu) setShowPhenomenaMenu(false);
+          if (showTypeMenu) setShowTypeMenu(false);
+        }}
+        keyboardShouldPersistTaps="handled"
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -2027,6 +2032,8 @@ export default function CollectionScreen() {
             tintColor="#6366f1"
             colors={["#6366f1"]}
             progressBackgroundColor="#1f2937"
+            progressViewOffset={insets.top + 8}
+            enabled={true}
           />
         }
         ListEmptyComponent={
@@ -2066,7 +2073,7 @@ export default function CollectionScreen() {
           </View>
         }
         />
-      </TouchableOpacity>
+      </View>
 
       <Modal
         visible={showActions}

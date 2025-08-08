@@ -106,8 +106,12 @@ export default function CardCreationNewScreen() {
   
   // Dropdown options - loaded from AsyncStorage to include custom phenomena types
   const [typeOptions, setTypeOptions] = useState(['Intention', 'Context', 'Impact', 'Accuracy', 'Agenda', 'Needs', 'Emotion', 'Role']);
-  // Map of detail options for each Phenomena
-  const subOptionsMap: Record<string, string[]> = {
+  
+  // Custom detail options state
+  const [customDetailOptions, setCustomDetailOptions] = useState<Record<string, string[]>>({});
+  
+  // Default detail options map
+  const defaultSubOptionsMap: Record<string, string[]> = {
     Intention: ['Impact', 'Request', 'Protect', 'Connect'],
     Role: ['Advisor', 'Confessor', 'Judge', 'Peacemaker', 'Provocateur', 'Entertainer', 'Gatekeeper'],
     Context: ['Setting', 'Timing', 'Relationship', 'Power'],
@@ -116,6 +120,27 @@ export default function CardCreationNewScreen() {
     Needs: ['Connection', 'Autonomy', 'Safety', 'Meaning', 'Play', 'Rest'],
     Emotion: ['Joy', 'Anger', 'Fear', 'Sadness', 'Surprise', 'Disgust', 'Love'],
   };
+
+  // Merged options map that combines default and custom options
+  const subOptionsMap = useMemo(() => {
+    const merged: Record<string, string[]> = {};
+    
+    // Start with default options
+    Object.keys(defaultSubOptionsMap).forEach(phenomenaType => {
+      merged[phenomenaType] = [...defaultSubOptionsMap[phenomenaType]];
+    });
+    
+    // Add custom options for each phenomena type
+    Object.keys(customDetailOptions).forEach(phenomenaType => {
+      if (!merged[phenomenaType]) {
+        merged[phenomenaType] = [];
+      }
+      // Add custom options to the end
+      merged[phenomenaType] = [...merged[phenomenaType], ...customDetailOptions[phenomenaType]];
+    });
+    
+    return merged;
+  }, [customDetailOptions]);
 
   const roleOptions = useMemo(() => subOptionsMap[type] || [], [type]);
   const contextOptions = ['TBD', 'Self', 'Family', 'Friendship', 'Therapy', 'Peer', 'Work', 'Art', 'Politics'];
@@ -206,6 +231,40 @@ export default function CardCreationNewScreen() {
     } catch (error) {
       console.error('Error loading from AsyncStorage:', error);
       // Keep default types if loading fails
+    }
+  };
+
+  // Load custom detail options from database
+  const loadCustomDetailOptions = async () => {
+    try {
+      if (!user) {
+        console.log('No user found, using default detail options');
+        return;
+      }
+
+      // Load custom detail options from database
+      const { data: userData, error: dbError } = await supabase
+        .from('users')
+        .select('custom_detail_options')
+        .eq('id', user.id)
+        .single();
+
+      if (dbError) {
+        console.error('Error loading custom detail options from database:', dbError);
+        return;
+      }
+
+      if (userData?.custom_detail_options) {
+        console.log('Loaded custom detail options from database:', userData.custom_detail_options);
+        setCustomDetailOptions(userData.custom_detail_options);
+      } else {
+        console.log('No custom detail options found, using defaults only');
+        setCustomDetailOptions({});
+      }
+    } catch (error) {
+      console.error('Error loading custom detail options:', error);
+      // Keep empty custom options if loading fails
+      setCustomDetailOptions({});
     }
   };
 
@@ -321,15 +380,17 @@ export default function CardCreationNewScreen() {
     checkAuthStatus();
   }, []);
 
-  // Load phenomena types on component mount
+  // Load phenomena types and custom detail options on component mount
   useEffect(() => {
     loadPhenomenaTypes();
+    loadCustomDetailOptions();
   }, []);
 
-  // Also reload phenomena types when screen is focused (in case they were updated in deck creation)
+  // Also reload phenomena types and custom detail options when screen is focused (in case they were updated in deck creation)
   useFocusEffect(
     useCallback(() => {
       loadPhenomenaTypes();
+      loadCustomDetailOptions();
     }, [])
   );
 
@@ -866,6 +927,14 @@ export default function CardCreationNewScreen() {
                 autoAddZone: returnZone
               }
             });
+          } else if (returnTo === 'deck-detail') {
+            const returnPhenomena = params.returnPhenomena as string;
+            router.replace({
+              pathname: '/deck-detail',
+              params: {
+                type: returnPhenomena
+              }
+            });
           } else {
             router.replace('/');
           }
@@ -886,6 +955,14 @@ export default function CardCreationNewScreen() {
     // Navigate back to the appropriate tab based on returnTo parameter
     if (returnTo === 'cards') {
       router.push('/(tabs)');
+    } else if (returnTo === 'deck-detail') {
+      const returnPhenomena = params.returnPhenomena as string;
+      router.push({
+        pathname: '/deck-detail',
+        params: {
+          type: returnPhenomena
+        }
+      });
     } else {
       router.push('/(tabs)/create');
     }
