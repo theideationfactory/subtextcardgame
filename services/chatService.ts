@@ -298,4 +298,45 @@ export class ChatService {
       throw error;
     }
   }
+
+  static async generateResponseStrategies(speechAct: string): Promise<string[]> {
+    try {
+      console.log('Generating response strategies for:', speechAct);
+      
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        throw new Error('No authenticated session');
+      }
+
+      const { data, error } = await supabase.functions.invoke('generate-response-strategies', {
+        body: {
+          speechAct: speechAct
+        },
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
+      });
+
+      if (error) {
+        console.error('Function error:', error);
+        throw error;
+      }
+      
+      if (!data) {
+        console.error('No data returned from function');
+        throw new Error('No response from response strategies function');
+      }
+      
+      if (!data.success) {
+        console.error('Function returned error:', data.error);
+        throw new Error(data.error || 'Failed to generate response strategies');
+      }
+
+      console.log('Response strategies result:', data.responseStrategies);
+      return data.responseStrategies || [];
+    } catch (error) {
+      console.error('Error generating response strategies:', error);
+      throw error;
+    }
+  }
 }

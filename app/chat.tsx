@@ -53,10 +53,13 @@ export default function ChatScreen() {
   const [currentUserId, setCurrentUserId] = useState<string>('');
   const [headerHeight, setHeaderHeight] = useState(56);
   const [keyboardVisible, setKeyboardVisible] = useState(false);
-  const [selectedMessage, setSelectedMessage] = useState<Message | null>(null);
-  const [actionToolbarVisible, setActionToolbarVisible] = useState(false);
-  const [toolbarPosition, setToolbarPosition] = useState({ x: 0, y: 0 });
   const [analyzingMessage, setAnalyzingMessage] = useState<string | null>(null);
+  const [actionToolbarVisible, setActionToolbarVisible] = useState(false);
+  const [selectedMessage, setSelectedMessage] = useState<Message | null>(null);
+  const [toolbarPosition, setToolbarPosition] = useState({ x: 0, y: 0 });
+  const [selectedSpeechAct, setSelectedSpeechAct] = useState<string | null>(null);
+  const [responseStrategies, setResponseStrategies] = useState<string[]>([]);
+  const [loadingStrategies, setLoadingStrategies] = useState(false);
   
   const flatListRef = useRef<FlatList>(null);
   const inputRef = useRef<TextInput>(null);
@@ -82,12 +85,24 @@ export default function ChatScreen() {
       
       // Set up real-time subscription
       console.log('Setting up real-time subscription...');
-      const subscription = ChatService.subscribeToMessages((newMessage) => {
+      const subscription = ChatService.subscribeToMessages(async (newMessage) => {
         if (
           (newMessage.sender_id === friendId && newMessage.receiver_id === currentUserId) ||
           (newMessage.sender_id === currentUserId && newMessage.receiver_id === friendId)
         ) {
           setMessages(prev => [newMessage, ...prev]);
+          
+          // Auto-analyze the new message for speech acts
+          try {
+            const speechActs = await ChatService.analyzeSpeechActs(newMessage.id, newMessage.content);
+            setMessages(prev => prev.map(msg => 
+              msg.id === newMessage.id 
+                ? { ...msg, speech_acts: speechActs }
+                : msg
+            ));
+          } catch (analysisError) {
+            console.log('Auto-analysis failed for incoming message:', analysisError);
+          }
           
           // Mark as read if message is from friend
           if (newMessage.sender_id === friendId) {
@@ -167,10 +182,26 @@ export default function ChatScreen() {
     setSending(true);
 
     try {
-      await ChatService.sendMessage({
+      const sentMessage = await ChatService.sendMessage({
         receiver_id: friendId,
         content: messageText
       });
+
+      // Auto-analyze the sent message for speech acts
+      if (sentMessage?.id) {
+        try {
+          const speechActs = await ChatService.analyzeSpeechActs(sentMessage.id, messageText);
+          // Update local state with speech acts
+          setMessages(prev => prev.map(msg => 
+            msg.id === sentMessage.id 
+              ? { ...msg, speech_acts: speechActs }
+              : msg
+          ));
+        } catch (analysisError) {
+          console.log('Auto-analysis failed:', analysisError);
+          // Don't show error to user, just log it
+        }
+      }
 
       if (Platform.OS !== 'web') {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -465,6 +496,103 @@ export default function ChatScreen() {
     </View>
   );
 
+  const handleSpeechActClick = async (speechAct: string) => {
+    if (Platform.OS !== 'web') {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    }
+
+    if (selectedSpeechAct === speechAct) {
+      // If already selected, deselect
+      setSelectedSpeechAct(null);
+      setResponseStrategies([]);
+      return;
+    }
+
+    setSelectedSpeechAct(speechAct);
+    setLoadingStrategies(true);
+
+    try {
+      const strategies = await ChatService.generateResponseStrategies(speechAct);
+      setResponseStrategies(strategies);
+    } catch (error) {
+      console.error('Error generating response strategies:', error);
+      Alert.alert('Error', 'Failed to generate response strategies');
+      setSelectedSpeechAct(null);
+    } finally {
+      setLoadingStrategies(false);
+    }
+  };
+
+  const renderToolbox = () => {
+    // Collect all speech acts from messages
+    const allSpeechActs = messages
+      .filter(msg => msg.speech_acts && msg.speech_acts.length > 0)
+      .flatMap(msg => msg.speech_acts || []);
+    
+    // Count occurrences of each speech act
+    const speechActCounts = allSpeechActs.reduce((acc, act) => {
+      acc[act] = (acc[act] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+    
+    // Get unique speech acts sorted by frequency
+    const uniqueSpeechActs = Object.entries(speechActCounts)
+      .sort(([,a], [,b]) => b - a)
+      .map(([act, count]) => ({ act, count }));
+
+    return (
+      <View style={styles.toolboxContainer}>
+        <View style={styles.toolboxContent}>
+          {uniqueSpeechActs.length > 0 ? (
+            <>
+              {uniqueSpeechActs.map(({ act, count }) => (
+                <TouchableOpacity
+                  key={act}
+                  style={[
+                    styles.toolboxSpeechActTag,
+                    selectedSpeechAct === act && styles.toolboxSpeechActTagSelected
+                  ]}
+                  onPress={() => handleSpeechActClick(act)}
+                >
+                  <Text style={[
+                    styles.toolboxSpeechActText,
+                    selectedSpeechAct === act && styles.toolboxSpeechActTextSelected
+                  ]}>
+                    {act} {count > 1 && `(${count})`}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+              
+              {/* Response Strategies */}
+              {selectedSpeechAct && (
+                <>
+                  {loadingStrategies ? (
+                    <View style={styles.strategiesLoading}>
+                      <ActivityIndicator size="small" color="#6366f1" />
+                      <Text style={styles.strategiesLoadingText}>Loading...</Text>
+                    </View>
+                  ) : (
+                    responseStrategies.map((strategy, index) => (
+                      <View key={`${selectedSpeechAct}-${index}`} style={styles.responseStrategyTag}>
+                        <Text style={styles.responseStrategyText}>
+                          {strategy}
+                        </Text>
+                      </View>
+                    ))
+                  )}
+                </>
+              )}
+            </>
+          ) : (
+            <Text style={styles.toolboxPlaceholder}>
+              Use "Request" to analyze conversation patterns
+            </Text>
+          )}
+        </View>
+      </View>
+    );
+  };
+
   const renderInputBar = () => (
     <View
       style={[
@@ -554,6 +682,7 @@ export default function ChatScreen() {
           }
         />
         
+        {renderToolbox()}
         {renderInputBar()}
       </KeyboardAvoidingView>
       
@@ -886,41 +1015,51 @@ const styles = StyleSheet.create({
   },
   actionToolbar: {
     position: 'absolute',
-    backgroundColor: '#2a2a2a',
-    borderRadius: 12,
+    backgroundColor: 'rgba(42, 42, 42, 0.95)',
+    backdropFilter: 'blur(20px)',
+    borderRadius: 16,
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 8,
-    paddingHorizontal: 4,
+    paddingVertical: 12,
+    paddingHorizontal: 8,
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
-      height: 4,
+      height: 8,
     },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
+    shadowOpacity: 0.4,
+    shadowRadius: 16,
+    elevation: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
   },
   actionButton: {
-    borderRadius: 8,
+    borderRadius: 12,
     overflow: 'hidden',
+    marginHorizontal: 2,
   },
   actionButtonGradient: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    gap: 6,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    gap: 8,
+    minWidth: 80,
+    justifyContent: 'center',
   },
   actionButtonText: {
     color: '#fff',
-    fontSize: 14,
-    fontFamily: 'Inter-Regular',
+    fontSize: 13,
+    fontFamily: 'Inter-SemiBold',
+    textShadowColor: 'rgba(0, 0, 0, 0.3)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
   },
   actionSeparator: {
     width: 1,
-    height: 20,
-    backgroundColor: 'rgba(255,255,255,0.2)',
+    height: 24,
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    marginHorizontal: 4,
   },
   speechActsContainer: {
     flexDirection: 'row',
@@ -954,5 +1093,80 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontFamily: 'Inter-Regular',
     fontStyle: 'italic',
+  },
+  toolboxContainer: {
+    backgroundColor: 'rgba(42, 42, 42, 0.8)',
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.1)',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    minHeight: 50,
+  },
+  toolboxContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 12,
+    flexWrap: 'wrap',
+  },
+  toolboxLabel: {
+    color: 'rgba(255, 255, 255, 0.7)',
+    fontSize: 12,
+    fontFamily: 'Inter-Medium',
+    marginRight: 8,
+  },
+  toolboxSpeechActTag: {
+    backgroundColor: 'rgba(99, 102, 241, 0.2)',
+    borderWidth: 1,
+    borderColor: 'rgba(99, 102, 241, 0.4)',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 14,
+    marginHorizontal: 2,
+  },
+  toolboxSpeechActText: {
+    color: 'rgba(99, 102, 241, 1)',
+    fontSize: 11,
+    fontFamily: 'Inter-SemiBold',
+  },
+  toolboxPlaceholder: {
+    color: 'rgba(255, 255, 255, 0.5)',
+    fontSize: 12,
+    fontFamily: 'Inter-Regular',
+    fontStyle: 'italic',
+  },
+  toolboxSpeechActTagSelected: {
+    backgroundColor: 'rgba(99, 102, 241, 0.4)',
+    borderColor: 'rgba(99, 102, 241, 0.8)',
+    transform: [{ scale: 1.05 }],
+  },
+  toolboxSpeechActTextSelected: {
+    color: 'rgba(99, 102, 241, 1)',
+    fontFamily: 'Inter-Bold',
+  },
+  strategiesLoading: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginLeft: 8,
+  },
+  strategiesLoadingText: {
+    color: 'rgba(255, 255, 255, 0.6)',
+    fontSize: 11,
+    fontFamily: 'Inter-Regular',
+  },
+  responseStrategyTag: {
+    backgroundColor: 'rgba(34, 197, 94, 0.2)',
+    borderWidth: 1,
+    borderColor: 'rgba(34, 197, 94, 0.4)',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 12,
+    marginHorizontal: 2,
+  },
+  responseStrategyText: {
+    color: 'rgba(34, 197, 94, 1)',
+    fontSize: 10,
+    fontFamily: 'Inter-Medium',
   },
 });
