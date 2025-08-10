@@ -104,6 +104,16 @@ export default function CardCreationNewScreen() {
   const [isChatLoading, setIsChatLoading] = useState(false);
   const [currentResponseId, setCurrentResponseId] = useState<string | null>(null);
   
+  // Image cropping modal states
+  const [showImageCropModal, setShowImageCropModal] = useState(false);
+  const [tempImageUri, setTempImageUri] = useState('');
+  const [imageOrientation, setImageOrientation] = useState<'portrait' | 'landscape' | 'square'>('square');
+  const [cropPresets, setCropPresets] = useState<Array<{ name: string, ratio: [number, number] | null, description: string }>>([
+    { name: 'Card Portrait', ratio: [3, 4] as [number, number], description: 'Perfect for card backgrounds' },
+    { name: 'Square', ratio: [1, 1] as [number, number], description: 'Classic square format' },
+    { name: 'Original', ratio: null, description: 'Keep original proportions' }
+  ]);
+  
   // Dropdown options - loaded from AsyncStorage to include custom phenomena types
   const [typeOptions, setTypeOptions] = useState(['Intention', 'Context', 'Impact', 'Accuracy', 'Agenda', 'Needs', 'Emotion', 'Role']);
   
@@ -562,6 +572,49 @@ export default function CardCreationNewScreen() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
   };
 
+  const detectImageOrientation = (width: number, height: number): 'portrait' | 'landscape' | 'square' => {
+    const ratio = width / height;
+    if (ratio > 1.1) return 'landscape';
+    if (ratio < 0.9) return 'portrait';
+    return 'square';
+  };
+
+  const uploadImageWithCropping = async (aspectRatio: [number, number] | null = null) => {
+    try {
+      // Request permissions
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert(
+          'Permission Required',
+          'Sorry, we need camera roll permissions to upload images.'
+        );
+        return;
+      }
+
+      // Launch image picker with specific aspect ratio if provided
+      const pickerOptions: any = {
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        quality: 0.8,
+        base64: false,
+      };
+      
+      // Add aspect ratio for Android (iOS ignores this)
+      if (aspectRatio) {
+        pickerOptions.aspect = aspectRatio;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync(pickerOptions);
+
+      if (!result.canceled && result.assets?.[0]) {
+        await processUploadedImage(result.assets[0]);
+      }
+    } catch (err) {
+      console.error('Image picker error:', err);
+      setError('Failed to access image library. Please try again.');
+    }
+  };
+
   const uploadImage = async () => {
     try {
       // Request permissions
@@ -574,23 +627,45 @@ export default function CardCreationNewScreen() {
         return;
       }
 
-      // Launch image picker
+      // Launch image picker without editing to detect orientation first
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true,
-        // No aspect ratio constraint - allow original proportions
-        quality: 0.8,
+        allowsEditing: false, // Don't edit yet, we'll handle cropping
+        quality: 1.0, // Keep high quality for orientation detection
         base64: false,
       });
 
       if (!result.canceled && result.assets && result.assets[0]) {
-        const imageUri = result.assets[0].uri;
+        const asset = result.assets[0];
+        const orientation = detectImageOrientation(asset.width || 1, asset.height || 1);
         
-        // Set loading state
-        setIsGenerating(true);
-        setError('');
+        console.log('Image orientation detected:', orientation, 'Dimensions:', asset.width, 'x', asset.height);
         
-        try {
+        // If image is portrait and we're in full-bleed mode, show cropping options
+        if (orientation === 'portrait' && format === 'fullBleed') {
+          setTempImageUri(asset.uri);
+          setImageOrientation(orientation);
+          setShowImageCropModal(true);
+          return;
+        }
+        
+        // For landscape/square or framed format, process directly
+        await processUploadedImage(asset);
+      }
+    } catch (err) {
+      console.error('Image picker error:', err);
+      setError('Failed to access image library. Please try again.');
+    }
+  };
+
+  const processUploadedImage = async (asset: any) => {
+    const imageUri = asset.uri;
+    
+    // Set loading state
+    setIsGenerating(true);
+    setError('');
+    
+    try {
           // Get current session with better error handling
           const currentSession = await refreshSession();
           
@@ -660,35 +735,50 @@ export default function CardCreationNewScreen() {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
           }
           
-          console.log('Image upload completed successfully');
-          
-        } catch (uploadErr) {
-          console.error('Image upload error:', uploadErr);
-          
-          // Provide more specific error messages
-          let errorMessage = 'Failed to upload image. Please try again.';
-          
-          if (uploadErr instanceof Error) {
-            if (uploadErr.message.includes('Authentication') || uploadErr.message.includes('JWT')) {
-              errorMessage = 'Please log in again and try uploading.';
-            } else if (uploadErr.message.includes('Permission') || uploadErr.message.includes('policy')) {
-              errorMessage = 'Upload permission denied. Please contact support.';
-            } else if (uploadErr.message.includes('network') || uploadErr.message.includes('fetch')) {
-              errorMessage = 'Network error. Please check your connection and try again.';
-            } else {
-              errorMessage = uploadErr.message;
-            }
+        console.log('Image upload completed successfully');
+        
+      } catch (uploadErr) {
+        console.error('Image upload error:', uploadErr);
+        
+        // Provide more specific error messages
+        let errorMessage = 'Failed to upload image. Please try again.';
+        
+        if (uploadErr instanceof Error) {
+          if (uploadErr.message.includes('Authentication') || uploadErr.message.includes('JWT')) {
+            errorMessage = 'Please log in again and try uploading.';
+          } else if (uploadErr.message.includes('Permission') || uploadErr.message.includes('policy')) {
+            errorMessage = 'Upload permission denied. Please contact support.';
+          } else if (uploadErr.message.includes('network') || uploadErr.message.includes('fetch')) {
+            errorMessage = 'Network error. Please check your connection and try again.';
+          } else {
+            errorMessage = uploadErr.message;
           }
-          
-          setError(errorMessage);
-        } finally {
-          setIsGenerating(false);
         }
+        
+        setError(errorMessage);
+      } finally {
+        setIsGenerating(false);
       }
-    } catch (err) {
-      console.error('Image picker error:', err);
-      setError('Failed to access image library. Please try again.');
-      setIsGenerating(false);
+  };
+
+  const handleCropSelection = async (cropOption: { name: string, ratio: [number, number] | null, description: string }) => {
+    setShowImageCropModal(false);
+    
+    if (cropOption.ratio) {
+      // Re-launch image picker with specific aspect ratio
+      await uploadImageWithCropping(cropOption.ratio);
+    } else {
+      // Use original image without additional cropping
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        quality: 0.8,
+        base64: false,
+      });
+      
+      if (!result.canceled && result.assets?.[0]) {
+        await processUploadedImage(result.assets[0]);
+      }
     }
   };
 
@@ -1434,6 +1524,65 @@ export default function CardCreationNewScreen() {
         </View>
       </ScrollView>
 
+      {/* Image Cropping Modal */}
+      <Modal
+        visible={showImageCropModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowImageCropModal(false)}
+      >
+        <View style={styles.cropModalOverlay}>
+          <View style={styles.cropModalContainer}>
+            <View style={styles.cropModalHeader}>
+              <Text style={styles.cropModalTitle}>Portrait Image Detected</Text>
+              <TouchableOpacity 
+                onPress={() => setShowImageCropModal(false)}
+                style={styles.cropModalCloseButton}
+              >
+                <Text style={styles.cropModalCloseText}>✕</Text>
+              </TouchableOpacity>
+            </View>
+            
+            <Text style={styles.cropModalDescription}>
+              Your image is in portrait orientation. For best results in full-bleed cards, choose how you'd like to crop it:
+            </Text>
+            
+            {tempImageUri ? (
+              <View style={styles.cropImagePreview}>
+                <Image 
+                  source={{ uri: tempImageUri }} 
+                  style={styles.cropPreviewImage}
+                  resizeMode="cover"
+                />
+              </View>
+            ) : null}
+            
+            <View style={styles.cropOptionsContainer}>
+              {cropPresets.map((option, index) => (
+                <TouchableOpacity
+                  key={index}
+                  style={styles.cropOption}
+                  onPress={() => handleCropSelection(option)}
+                >
+                  <View style={styles.cropOptionContent}>
+                    <Text style={styles.cropOptionName}>{option.name}</Text>
+                    <Text style={styles.cropOptionDescription}>{option.description}</Text>
+                    {option.ratio && (
+                      <Text style={styles.cropOptionRatio}>
+                        {option.ratio[0]}:{option.ratio[1]} ratio
+                      </Text>
+                    )}
+                  </View>
+                  <View style={styles.cropOptionArrow}>
+                    <Text style={styles.cropOptionArrowText}>→</Text>
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+        </View>
+      </Modal>
+
       {/* Chat Modal */}
       <Modal
         visible={showChat}
@@ -2020,5 +2169,102 @@ const styles = StyleSheet.create({
   },
   inputIconDisabled: {
     backgroundColor: 'rgba(255, 255, 255, 0.05)',
+  },
+  /* ---- Image Crop Modal ---- */
+  cropModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  cropModalContainer: {
+    backgroundColor: '#1a1a1a',
+    borderRadius: 16,
+    padding: 20,
+    width: '100%',
+    maxWidth: 400,
+    maxHeight: '80%',
+  },
+  cropModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  cropModalTitle: {
+    color: '#fff',
+    fontSize: 18,
+    fontFamily: 'Inter-Bold',
+  },
+  cropModalCloseButton: {
+    padding: 8,
+    borderRadius: 20,
+    backgroundColor: '#333',
+  },
+  cropModalCloseText: {
+    color: '#fff',
+    fontSize: 16,
+    fontFamily: 'Inter-Bold',
+  },
+  cropModalDescription: {
+    color: '#ccc',
+    fontSize: 14,
+    fontFamily: 'Inter-Regular',
+    lineHeight: 20,
+    marginBottom: 20,
+  },
+  cropImagePreview: {
+    width: '100%',
+    height: 120,
+    borderRadius: 8,
+    overflow: 'hidden',
+    marginBottom: 20,
+    backgroundColor: '#333',
+  },
+  cropPreviewImage: {
+    width: '100%',
+    height: '100%',
+  },
+  cropOptionsContainer: {
+    gap: 12,
+  },
+  cropOption: {
+    backgroundColor: '#2a2a2a',
+    borderRadius: 12,
+    padding: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderWidth: 1,
+    borderColor: '#333',
+  },
+  cropOptionContent: {
+    flex: 1,
+  },
+  cropOptionName: {
+    color: '#fff',
+    fontSize: 16,
+    fontFamily: 'Inter-Bold',
+    marginBottom: 4,
+  },
+  cropOptionDescription: {
+    color: '#ccc',
+    fontSize: 14,
+    fontFamily: 'Inter-Regular',
+    marginBottom: 2,
+  },
+  cropOptionRatio: {
+    color: '#999',
+    fontSize: 12,
+    fontFamily: 'Inter-Regular',
+  },
+  cropOptionArrow: {
+    marginLeft: 12,
+  },
+  cropOptionArrowText: {
+    color: '#6366f1',
+    fontSize: 18,
+    fontFamily: 'Inter-Bold',
   },
 });

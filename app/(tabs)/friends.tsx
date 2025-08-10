@@ -1,15 +1,20 @@
 import { useState, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, Image, ActivityIndicator, FlatList } from 'react-native';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, Image, ActivityIndicator, FlatList, Platform, Alert } from 'react-native';
 import { useFonts, Inter_400Regular, Inter_600SemiBold, Inter_700Bold } from '@expo-google-fonts/inter';
-import { UserPlus, UserCheck, UserX, Search, Users, Clock, Check } from 'lucide-react-native';
+import { UserPlus, UserCheck, UserX, Search, Users, Clock, Check, MessageCircle, Send } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useRouter, useFocusEffect } from 'expo-router';
+import * as Haptics from 'expo-haptics';
 import { Spacer } from '@/components/Spacer';
 import { supabase } from '@/lib/supabase';
+import { ChatService } from '@/services/chatService';
+import { Conversation } from '@/types/chat';
+import { formatRelativeTime, getMessagePreview, getInitials, getAvatarColor } from '@/utils/chatUtils';
 
 const SECTIONS = {
-  SEARCH: 'search',
+  CHATS: 'chats',
   REQUESTS: 'requests',
-  FRIENDS: 'friends',
+  DISCOVER: 'discover',
 } as const;
 
 type Section = typeof SECTIONS[keyof typeof SECTIONS];
@@ -35,19 +40,21 @@ type Friend = {
 };
 
 type UserItemProps = {
-  item: User | FriendRequest | Friend;
-  type: 'search' | 'request' | 'friend';
+  item: User | FriendRequest | Friend | Conversation;
+  type: 'search' | 'request' | 'friend' | 'chat';
 };
 
 const DEFAULT_AVATAR = 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150';
 
 export default function FriendsScreen() {
+  const router = useRouter();
   const [searchQuery, setSearchQuery] = useState('');
-  const [activeSection, setActiveSection] = useState<Section>(SECTIONS.FRIENDS);
+  const [activeSection, setActiveSection] = useState<Section>(SECTIONS.CHATS);
   const [loading, setLoading] = useState(false);
   const [searchResults, setSearchResults] = useState<User[]>([]);
   const [friendRequests, setFriendRequests] = useState<FriendRequest[]>([]);
   const [friends, setFriends] = useState<Friend[]>([]);
+  const [conversations, setConversations] = useState<Conversation[]>([]);
   const [error, setError] = useState('');
   const [debouncedQuery, setDebouncedQuery] = useState('');
 
@@ -60,7 +67,25 @@ export default function FriendsScreen() {
   useEffect(() => {
     fetchFriends();
     fetchFriendRequests();
+    fetchConversations();
   }, []);
+
+  // Refresh conversations when screen comes into focus (e.g., returning from chat)
+  useFocusEffect(
+    useCallback(() => {
+      fetchConversations();
+    }, [])
+  );
+
+  const fetchConversations = async () => {
+    try {
+      const conversations = await ChatService.getConversations();
+      setConversations(conversations);
+    } catch (error) {
+      console.error('Error fetching conversations:', error);
+      setError('Failed to load conversations');
+    }
+  };
   
   // Debounce search query
   useEffect(() => {
@@ -204,6 +229,37 @@ export default function FriendsScreen() {
       setLoading(false);
     }
   }, []);
+
+  const openChat = (friendId: string, friendEmail: string) => {
+    if (Platform.OS !== 'web') {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    }
+    
+    console.log('=== OPENING CHAT ===');
+    console.log('Friend ID:', friendId);
+    console.log('Friend Email:', friendEmail);
+    console.log('Router available:', !!router);
+    
+    if (!friendId || !friendEmail) {
+      Alert.alert('Error', 'Missing friend information');
+      return;
+    }
+    
+    try {
+      console.log('Attempting navigation to /chat');
+      router.push({
+        pathname: '/chat',
+        params: { 
+          friendId: friendId.toString(), 
+          friendEmail: friendEmail.toString() 
+        }
+      });
+      console.log('Navigation call completed');
+    } catch (error) {
+      console.error('Navigation error:', error);
+      Alert.alert('Navigation Error', `Could not open chat: ${error}`);
+    }
+  };
 
   const handleSendRequest = async (userId: string) => {
     try {
@@ -388,17 +444,69 @@ export default function FriendsScreen() {
     const isSearchUser = (item: any): item is User => type === 'search';
     const isRequest = (item: any): item is FriendRequest => type === 'request';
     const isFriend = (item: any): item is Friend => type === 'friend';
+    const isConversation = (item: any): item is Conversation => type === 'chat';
+  
+    const getDisplayEmail = () => {
+      if (isRequest(item)) return item.sender_email;
+      if (isConversation(item)) return item.friend_email;
+      return (item as User | Friend).email;
+    };
+
+    const getDisplayName = () => {
+      const email = getDisplayEmail();
+      return email.split('@')[0];
+    };
+
+    const handleItemPress = () => {
+      if (isConversation(item)) {
+        openChat(item.friend_id, item.friend_email);
+      } else if (isFriend(item)) {
+        openChat(item.friend_id, item.email);
+      }
+    };
   
     return (
-      <View style={styles.userItem}>
-        <Image
-          source={{ uri: DEFAULT_AVATAR }}
-          style={styles.avatar}
-        />
+      <TouchableOpacity 
+        style={styles.userItem}
+        onPress={isConversation(item) || isFriend(item) ? handleItemPress : undefined}
+        activeOpacity={isConversation(item) || isFriend(item) ? 0.7 : 1}
+      >
+        <View style={styles.avatarContainer}>
+          <View style={[
+            styles.avatar,
+            { backgroundColor: getAvatarColor(isConversation(item) ? item.friend_id : (item as any).id || '') }
+          ]}>
+            <Text style={styles.avatarText}>
+              {getInitials(getDisplayEmail())}
+            </Text>
+          </View>
+          {isConversation(item) && item.unread_count > 0 && (
+            <View style={styles.unreadBadge}>
+              <Text style={styles.unreadCount}>
+                {item.unread_count > 99 ? '99+' : item.unread_count.toString()}
+              </Text>
+            </View>
+          )}
+        </View>
         <View style={styles.userInfo}>
-          <Text style={styles.userName}>
-            {isRequest(item) ? item.sender_email : item.email}
-          </Text>
+          <View style={styles.userNameRow}>
+            <Text style={styles.userName}>
+              {getDisplayName()}
+            </Text>
+            {isConversation(item) && (
+              <Text style={styles.messageTime}>
+                {formatRelativeTime(item.last_message_time)}
+              </Text>
+            )}
+          </View>
+          {isConversation(item) && (
+            <Text style={[
+              styles.lastMessage,
+              item.unread_count > 0 && styles.unreadMessage
+            ]} numberOfLines={1}>
+              {getMessagePreview(item.last_message, item.message_type)}
+            </Text>
+          )}
           {isSearchUser(item) && item.friendship_status !== 'none' && (
             <Text style={[
               styles.statusText,
@@ -425,6 +533,14 @@ export default function FriendsScreen() {
             )}
           </TouchableOpacity>
         )}  
+        {isSearchUser(item) && item.friendship_status === 'friend' && (
+          <TouchableOpacity
+            style={styles.messageButton}
+            onPress={() => openChat(item.id, item.email)}
+          >
+            <MessageCircle size={20} color="#22c55e" />
+          </TouchableOpacity>
+        )}
         {isSearchUser(item) && item.friendship_status === 'request_sent' && (
           <View style={[styles.actionButton, styles.sentIndicator]}>
             <Check size={20} color="#4CAF50" />
@@ -456,13 +572,41 @@ export default function FriendsScreen() {
             </TouchableOpacity>
           </View>
         )}  
-      </View>
+        {isFriend(item) && (
+          <TouchableOpacity
+            style={styles.messageButton}
+            onPress={() => openChat(item.friend_id, item.email)}
+          >
+            <MessageCircle size={20} color="#6366f1" />
+          </TouchableOpacity>
+        )}
+      </TouchableOpacity>
     );
   };
 
   const renderContent = () => {
     switch (activeSection) {
-      case SECTIONS.SEARCH:
+      case SECTIONS.CHATS:
+        return (
+          <FlatList
+            data={conversations}
+            renderItem={({ item }) => renderUserItem({ item, type: 'chat' })}
+            keyExtractor={item => item.conversation_id}
+            contentContainerStyle={styles.listContent}
+            ListEmptyComponent={
+              <View style={styles.emptyState}>
+                <MessageCircle size={48} color="#666" />
+                <Text style={styles.emptyText}>
+                  No conversations yet
+                </Text>
+                <Text style={[styles.emptyText, { fontSize: 14, marginTop: 8 }]}>
+                  Start chatting with your friends to see conversations here
+                </Text>
+              </View>
+            }
+          />
+        );
+      case SECTIONS.DISCOVER:
         return (
           <>
             {renderSearchBar()}
@@ -519,23 +663,8 @@ export default function FriendsScreen() {
             }
           />
         );
-      case SECTIONS.FRIENDS:
-        return (
-          <FlatList
-            data={friends}
-            renderItem={({ item }) => renderUserItem({ item, type: 'friend' })}
-            keyExtractor={item => item.friend_id}
-            contentContainerStyle={styles.listContent}
-            ListEmptyComponent={
-              <View style={styles.emptyState}>
-                <Users size={48} color="#666" />
-                <Text style={styles.emptyText}>
-                  Add some friends to get started
-                </Text>
-              </View>
-            }
-          />
-        );
+      default:
+        return null;
     }
   };
 
@@ -553,6 +682,16 @@ export default function FriendsScreen() {
         <Text style={styles.errorText}>{error}</Text>
       ) : null}
       {renderContent()}
+      
+      {/* Floating Action Button for New Chat */}
+      {activeSection === SECTIONS.CHATS && (
+        <TouchableOpacity
+          style={styles.fab}
+          onPress={() => setActiveSection(SECTIONS.DISCOVER)}
+        >
+          <MessageCircle size={24} color="#fff" />
+        </TouchableOpacity>
+      )}
     </LinearGradient>
   );
 }
@@ -621,20 +760,68 @@ const styles = StyleSheet.create({
     padding: 12,
     marginBottom: 8,
   },
+  avatarContainer: {
+    position: 'relative',
+  },
   avatar: {
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: '#2a2a2a',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarText: {
+    color: '#fff',
+    fontSize: 16,
+    fontFamily: 'Inter-Bold',
+  },
+  unreadBadge: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+    backgroundColor: '#ff4444',
+    borderRadius: 10,
+    minWidth: 20,
+    height: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: '#1a1a1a',
+  },
+  unreadCount: {
+    color: '#fff',
+    fontSize: 11,
+    fontFamily: 'Inter-Bold',
   },
   userInfo: {
     flex: 1,
     marginLeft: 12,
   },
+  userNameRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
   userName: {
     color: '#fff',
     fontSize: 16,
     fontFamily: 'Inter-Bold',
+    flex: 1,
+  },
+  messageTime: {
+    color: '#666',
+    fontSize: 12,
+    fontFamily: 'Inter-Regular',
+  },
+  lastMessage: {
+    color: '#999',
+    fontSize: 14,
+    fontFamily: 'Inter-Regular',
+    marginTop: 4,
+  },
+  unreadMessage: {
+    color: '#fff',
+    fontFamily: 'Inter-SemiBold',
   },
   statusText: {
     fontSize: 12,
@@ -659,6 +846,11 @@ const styles = StyleSheet.create({
     padding: 8,
     borderRadius: 8,
     backgroundColor: 'rgba(99, 102, 241, 0.1)',
+  },
+  messageButton: {
+    padding: 8,
+    borderRadius: 8,
+    backgroundColor: 'rgba(34, 197, 94, 0.1)',
   },
   requestActions: {
     flexDirection: 'row',
@@ -715,5 +907,24 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(76, 175, 80, 0.1)',
     margin: 16,
     borderRadius: 8,
+  },
+  fab: {
+    position: 'absolute',
+    bottom: 20,
+    right: 20,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#6366f1',
+    alignItems: 'center',
+    justifyContent: 'center',
+    elevation: 8,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 4.65,
   },
 });

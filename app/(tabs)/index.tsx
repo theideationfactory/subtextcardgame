@@ -378,27 +378,77 @@ export default function CollectionScreen() {
       return;
     }
 
+    if (!user?.id) {
+      setDeleteError('User not authenticated');
+      return;
+    }
+
     setDeleteLoading(true);
     setDeleteError('');
 
     try {
-      const { error: deleteError } = await supabase
+      console.log('🗑️ Attempting to delete card:', cardId, 'for user:', user.id);
+      
+      // First, check if this card is being used as a shadow card by other cards
+      const { data: referencingCards, error: checkError } = await supabase
+        .from('cards')
+        .select('id, name')
+        .eq('shadow_card_id', cardId)
+        .eq('user_id', user.id);
+
+      if (checkError) {
+        console.error('Error checking shadow card references:', checkError);
+        throw new Error(`Database error: ${checkError.message}`);
+      }
+
+      // If this card is used as a shadow card, unlink it first
+      if (referencingCards && referencingCards.length > 0) {
+        console.log('🔗 Card is used as shadow by:', referencingCards.map(c => c.name).join(', '));
+        console.log('🔗 Unlinking shadow card references...');
+        
+        const { error: unlinkError } = await supabase
+          .from('cards')
+          .update({ shadow_card_id: null })
+          .eq('shadow_card_id', cardId)
+          .eq('user_id', user.id);
+
+        if (unlinkError) {
+          console.error('Error unlinking shadow card:', unlinkError);
+          throw new Error(`Failed to unlink shadow card: ${unlinkError.message}`);
+        }
+
+        console.log('✅ Shadow card references unlinked successfully');
+      }
+      
+      // Now delete the card
+      const { error: deleteError, data } = await supabase
         .from('cards')
         .delete()
         .eq('id', cardId)
-        .eq('user_id', user?.id || '');
+        .eq('user_id', user.id)
+        .select(); // Add select to see what was deleted
+
+      console.log('Delete response:', { error: deleteError, data });
 
       if (deleteError) {
-        throw deleteError;
+        console.error('Supabase delete error:', deleteError);
+        throw new Error(`Database error: ${deleteError.message} (Code: ${deleteError.code})`);
       }
 
+      if (!data || data.length === 0) {
+        throw new Error('Card not found or you do not have permission to delete it');
+      }
+
+      console.log('✅ Card deleted successfully:', data);
       setAllCards(prevCards => prevCards.filter(card => card.id !== cardId));
       setShowActions(false);
       setSelectedCard(null);
       
     } catch (err) {
-      console.error('Delete error:', err instanceof Error ? err.message : 'Unknown error');
-      setDeleteError(err instanceof Error ? err.message : 'Failed to delete card');
+      console.error('Delete error details:', err);
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred';
+      console.error('Final error message:', errorMessage);
+      setDeleteError(errorMessage);
     } finally {
       setDeleteLoading(false);
     }

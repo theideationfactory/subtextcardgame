@@ -19,7 +19,7 @@ function useProtectedRoute() {
     if (loading || !segments.length || isNavigating) return;
 
     const inAuthGroup = segments[0] === '(tabs)';
-    const inPublicGroup = segments[0] === 'welcome' || segments[0] === 'login' || segments[0] === 'drafts' || segments[0] === 'inbox';
+    const inPublicGroup = segments[0] === 'welcome' || segments[0] === 'login' || segments[0] === 'drafts' || segments[0] === 'inbox' || segments[0] === 'chat';
 
     const navigate = async () => {
       setIsNavigating(true);
@@ -54,6 +54,7 @@ function RootLayoutNav() {
         <Stack.Screen name="welcome" />
         <Stack.Screen name="login" />
         <Stack.Screen name="(tabs)" />
+        <Stack.Screen name="chat" options={{ headerShown: false }} />
         <Stack.Screen 
           name="drafts" 
           options={{
