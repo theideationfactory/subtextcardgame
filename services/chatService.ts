@@ -254,4 +254,48 @@ export class ChatService {
       return null;
     }
   }
+
+  // Analyze speech acts in a message using OpenAI
+  static async analyzeSpeechActs(messageId: string, messageContent: string): Promise<string[]> {
+    try {
+      console.log('Starting speech act analysis for:', { messageId, messageContent });
+      
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) throw new Error('User not authenticated');
+
+      console.log('Calling analyze-speech-acts function...');
+      const { data, error } = await supabase.functions.invoke('analyze-speech-acts', {
+        body: {
+          messageId,
+          messageContent
+        },
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
+      });
+
+      console.log('Function response:', { data, error });
+
+      if (error) {
+        console.error('Function error:', error);
+        throw error;
+      }
+      
+      if (!data) {
+        console.error('No data returned from function');
+        throw new Error('No response from speech acts function');
+      }
+      
+      if (!data.success) {
+        console.error('Function returned error:', data.error);
+        throw new Error(data.error || 'Failed to analyze speech acts');
+      }
+
+      console.log('Speech acts result:', data.speechActs);
+      return data.speechActs || [];
+    } catch (error) {
+      console.error('Error analyzing speech acts:', error);
+      throw error;
+    }
+  }
 }

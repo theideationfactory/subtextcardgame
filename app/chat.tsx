@@ -10,14 +10,18 @@ import {
   Platform,
   Alert,
   ActivityIndicator,
-  Image
+  Image,
+  Pressable,
+  Modal,
+  Animated,
+  Dimensions
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Keyboard } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useFonts, Inter_400Regular, Inter_600SemiBold, Inter_700Bold } from '@expo-google-fonts/inter';
 import { LinearGradient } from 'expo-linear-gradient';
-import { ArrowLeft, Send, Plus, Image as ImageIcon } from 'lucide-react-native';
+import { ArrowLeft, Send, Plus, Image as ImageIcon, Flag, MoreHorizontal, FileText } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { Spacer } from '@/components/Spacer';
 import { supabase } from '@/lib/supabase';
@@ -49,6 +53,10 @@ export default function ChatScreen() {
   const [currentUserId, setCurrentUserId] = useState<string>('');
   const [headerHeight, setHeaderHeight] = useState(56);
   const [keyboardVisible, setKeyboardVisible] = useState(false);
+  const [selectedMessage, setSelectedMessage] = useState<Message | null>(null);
+  const [actionToolbarVisible, setActionToolbarVisible] = useState(false);
+  const [toolbarPosition, setToolbarPosition] = useState({ x: 0, y: 0 });
+  const [analyzingMessage, setAnalyzingMessage] = useState<string | null>(null);
   
   const flatListRef = useRef<FlatList>(null);
   const inputRef = useRef<TextInput>(null);
@@ -183,6 +191,89 @@ export default function ChatScreen() {
     router.back();
   };
 
+  const handleMessageLongPress = (message: Message, event: any) => {
+    if (Platform.OS !== 'web') {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    }
+    
+    // Get touch position for toolbar placement with proper screen bounds
+    const { pageX, pageY } = event.nativeEvent;
+    const { width: screenWidth } = Dimensions.get('window');
+    const toolbarWidth = 200;
+    const isMyMessage = message.sender_id === currentUserId;
+    
+    // For sender messages (right side), position toolbar more to the left
+    let x;
+    if (isMyMessage) {
+      // For right-aligned messages, position toolbar to the left of the touch point
+      x = Math.max(16, Math.min(pageX - toolbarWidth + 20, screenWidth - toolbarWidth - 16));
+    } else {
+      // For left-aligned messages, center on touch point
+      x = Math.max(16, Math.min(pageX - toolbarWidth / 2, screenWidth - toolbarWidth - 16));
+    }
+    
+    const y = Math.max(120, pageY - 70);
+    
+    setToolbarPosition({ x, y });
+    setSelectedMessage(message);
+    setActionToolbarVisible(true);
+  };
+
+  const handleToolbarAction = async (action: 'request' | 'report' | 'other') => {
+    if (Platform.OS !== 'web') {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    }
+    
+    const currentMessage = selectedMessage;
+    setActionToolbarVisible(false);
+    setSelectedMessage(null);
+    
+    // Handle different actions
+    switch (action) {
+      case 'request':
+        if (currentMessage) {
+          await handleSpeechActRequest(currentMessage);
+        }
+        break;
+      case 'report':
+        Alert.alert('Report', 'Report message functionality coming soon!');
+        break;
+      case 'other':
+        Alert.alert('More Options', 'Additional options coming soon!');
+        break;
+    }
+  };
+
+  const handleSpeechActRequest = async (message: Message) => {
+    try {
+      setAnalyzingMessage(message.id);
+      
+      // Call OpenAI to analyze speech acts
+      const speechActs = await ChatService.analyzeSpeechActs(message.id, message.content);
+      
+      // Update the message in local state
+      setMessages(prev => prev.map(msg => 
+        msg.id === message.id 
+          ? { ...msg, speech_acts: speechActs }
+          : msg
+      ));
+      
+      if (Platform.OS !== 'web') {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      }
+      
+    } catch (error) {
+      console.error('Error analyzing speech acts:', error);
+      Alert.alert('Error', 'Failed to analyze message. Please try again.');
+      
+      if (Platform.OS !== 'web') {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      }
+    } finally {
+      setAnalyzingMessage(null);
+    }
+  };
+
   const renderMessage = ({ item, index }: { item: Message; index: number }) => {
     const isMyMessage = item.sender_id === currentUserId;
     const previousMessage = index < messages.length - 1 ? messages[index + 1] : null;
@@ -198,11 +289,54 @@ export default function ChatScreen() {
           </View>
         )}
         
-        <View style={[
-          styles.messageContainer,
-          isMyMessage ? styles.myMessageContainer : styles.theirMessageContainer
-        ]}>
-          {!isMyMessage && (
+        {isMyMessage ? (
+          // User messages - align to right
+          <View style={styles.myMessageContainer}>
+            <Pressable
+              style={[styles.messageBubble, styles.myMessage]}
+              onLongPress={(event) => handleMessageLongPress(item, event)}
+              delayLongPress={500}
+            >
+              {item.message_type === 'card' ? (
+                <CardMessage cardId={item.card_id} content={item.content} />
+              ) : item.message_type === 'spread' ? (
+                <SpreadMessage spreadId={item.spread_id} content={item.content} />
+              ) : (
+                <LinearGradient
+                  colors={['#6366f1', '#8b5cf6']}
+                  style={styles.messageGradient}
+                >
+                  <Text style={styles.messageText}>{item.content}</Text>
+                  
+                  {/* Speech Acts Display */}
+                  {item.speech_acts && item.speech_acts.length > 0 && (
+                    <View style={styles.speechActsContainer}>
+                      {item.speech_acts.map((act, index) => (
+                        <View key={index} style={styles.speechActTag}>
+                          <Text style={styles.speechActText}>{act}</Text>
+                        </View>
+                      ))}
+                    </View>
+                  )}
+                  
+                  {/* Analysis Loading Indicator */}
+                  {analyzingMessage === item.id && (
+                    <View style={styles.analyzingContainer}>
+                      <ActivityIndicator size="small" color="rgba(255,255,255,0.7)" />
+                      <Text style={styles.analyzingText}>Analyzing...</Text>
+                    </View>
+                  )}
+                  
+                  <Text style={styles.messageTime}>
+                    {formatMessageTime(item.created_at)}
+                  </Text>
+                </LinearGradient>
+              )}
+            </Pressable>
+          </View>
+        ) : (
+          // Friend messages - align to left with avatar
+          <View style={styles.theirMessageContainer}>
             <View style={styles.avatarContainer}>
               <View style={[styles.messageAvatar, { backgroundColor: getAvatarColor(item.sender_id) }]}>
                 <Text style={styles.avatarText}>
@@ -210,31 +344,50 @@ export default function ChatScreen() {
                 </Text>
               </View>
             </View>
-          )}
-          
-          <View style={[
-            styles.messageBubble,
-            isMyMessage ? styles.myMessage : styles.theirMessage
-          ]}>
-            {item.message_type === 'card' ? (
-              <CardMessage cardId={item.card_id} content={item.content} />
-            ) : item.message_type === 'spread' ? (
-              <SpreadMessage spreadId={item.spread_id} content={item.content} />
-            ) : (
-              <LinearGradient
-                colors={isMyMessage ? ['#6366f1', '#8b5cf6'] : ['#2a2a2a', '#3a3a3a']}
-                style={styles.messageGradient}
-              >
-                <Text style={styles.messageText}>{item.content}</Text>
-                <Text style={styles.messageTime}>
-                  {formatMessageTime(item.created_at)}
-                </Text>
-              </LinearGradient>
-            )}
+            
+            <Pressable
+              style={[styles.messageBubble, styles.theirMessage]}
+              onLongPress={(event) => handleMessageLongPress(item, event)}
+              delayLongPress={500}
+            >
+              {item.message_type === 'card' ? (
+                <CardMessage cardId={item.card_id} content={item.content} />
+              ) : item.message_type === 'spread' ? (
+                <SpreadMessage spreadId={item.spread_id} content={item.content} />
+              ) : (
+                <LinearGradient
+                  colors={['#2a2a2a', '#3a3a3a']}
+                  style={styles.messageGradient}
+                >
+                  <Text style={styles.messageText}>{item.content}</Text>
+                  
+                  {/* Speech Acts Display */}
+                  {item.speech_acts && item.speech_acts.length > 0 && (
+                    <View style={styles.speechActsContainer}>
+                      {item.speech_acts.map((act, index) => (
+                        <View key={index} style={styles.speechActTag}>
+                          <Text style={styles.speechActText}>{act}</Text>
+                        </View>
+                      ))}
+                    </View>
+                  )}
+                  
+                  {/* Analysis Loading Indicator */}
+                  {analyzingMessage === item.id && (
+                    <View style={styles.analyzingContainer}>
+                      <ActivityIndicator size="small" color="rgba(255,255,255,0.7)" />
+                      <Text style={styles.analyzingText}>Analyzing...</Text>
+                    </View>
+                  )}
+                  
+                  <Text style={styles.messageTime}>
+                    {formatMessageTime(item.created_at)}
+                  </Text>
+                </LinearGradient>
+              )}
+            </Pressable>
           </View>
-          
-          {isMyMessage && <View style={styles.avatarSpacer} />}
-        </View>
+        )}
       </View>
     );
   };
@@ -403,6 +556,79 @@ export default function ChatScreen() {
         
         {renderInputBar()}
       </KeyboardAvoidingView>
+      
+      {/* Message Action Toolbar */}
+      <Modal
+        visible={actionToolbarVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => {
+          setActionToolbarVisible(false);
+          setSelectedMessage(null);
+        }}
+      >
+        <Pressable 
+          style={styles.modalOverlay}
+          onPress={() => {
+            setActionToolbarVisible(false);
+            setSelectedMessage(null);
+          }}
+        >
+          <LinearGradient
+            colors={['#2a2a2a', '#1a1a1a']}
+            style={[
+              styles.actionToolbar,
+              {
+                left: toolbarPosition.x,
+                top: toolbarPosition.y,
+              }
+            ]}
+          >
+            <TouchableOpacity
+              style={styles.actionButton}
+              onPress={() => handleToolbarAction('request')}
+            >
+              <LinearGradient
+                colors={['#6366f1', '#8b5cf6']}
+                style={styles.actionButtonGradient}
+              >
+                <FileText size={18} color="#fff" />
+                <Text style={styles.actionButtonText}>Request</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+            
+            <View style={styles.actionSeparator} />
+            
+            <TouchableOpacity
+              style={styles.actionButton}
+              onPress={() => handleToolbarAction('report')}
+            >
+              <LinearGradient
+                colors={['#ef4444', '#dc2626']}
+                style={styles.actionButtonGradient}
+              >
+                <Flag size={18} color="#fff" />
+                <Text style={styles.actionButtonText}>Report</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+            
+            <View style={styles.actionSeparator} />
+            
+            <TouchableOpacity
+              style={styles.actionButton}
+              onPress={() => handleToolbarAction('other')}
+            >
+              <LinearGradient
+                colors={['#10b981', '#059669']}
+                style={styles.actionButtonGradient}
+              >
+                <MoreHorizontal size={18} color="#fff" />
+                <Text style={styles.actionButtonText}>Other</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+          </LinearGradient>
+        </Pressable>
+      </Modal>
     </LinearGradient>
   );
 }
@@ -493,10 +719,18 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
   },
   myMessageContainer: {
+    flexDirection: 'row',
     justifyContent: 'flex-end',
+    alignItems: 'flex-end',
+    marginBottom: 12,
+    width: '100%',
   },
   theirMessageContainer: {
+    flexDirection: 'row',
     justifyContent: 'flex-start',
+    alignItems: 'flex-end',
+    marginBottom: 12,
+    width: '100%',
   },
   avatarContainer: {
     marginRight: 8,
@@ -645,5 +879,80 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontFamily: 'Inter-Regular',
     textAlign: 'center',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+  },
+  actionToolbar: {
+    position: 'absolute',
+    backgroundColor: '#2a2a2a',
+    borderRadius: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 4,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  actionButton: {
+    borderRadius: 8,
+    overflow: 'hidden',
+  },
+  actionButtonGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    gap: 6,
+  },
+  actionButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontFamily: 'Inter-Regular',
+  },
+  actionSeparator: {
+    width: 1,
+    height: 20,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+  },
+  speechActsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginTop: 8,
+    marginBottom: 4,
+  },
+  speechActTag: {
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.2)',
+  },
+  speechActText: {
+    color: 'rgba(255,255,255,0.9)',
+    fontSize: 11,
+    fontFamily: 'Inter-Regular',
+  },
+  analyzingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 6,
+    marginBottom: 2,
+  },
+  analyzingText: {
+    color: 'rgba(255,255,255,0.7)',
+    fontSize: 11,
+    fontFamily: 'Inter-Regular',
+    fontStyle: 'italic',
   },
 });

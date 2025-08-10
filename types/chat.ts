@@ -13,6 +13,7 @@ export interface Message {
   is_read: boolean;
   created_at: string;
   sender_email?: string;
+  speech_acts?: string[];
 }
 
 export interface Conversation {

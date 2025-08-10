@@ -112,7 +112,7 @@ export default function CollectionScreen() {
   const [flippedCards, setFlippedCards] = useState<Set<string>>(new Set());
   const [flipAnimations, setFlipAnimations] = useState<Map<string, Animated.Value>>(new Map());
   const [sharingCard, setSharingCard] = useState(false);
-  const viewShotRef = useRef<ViewShot>(null);
+  const viewShotRefs = useRef<Map<string, ViewShot | null>>(new Map());
   const { height: screenHeight } = useWindowDimensions();
   const router = useRouter();
   
@@ -549,8 +549,10 @@ export default function CollectionScreen() {
   };
 
   const handleShareCard = async (card: Card) => {
-    if (!viewShotRef.current || !viewShotRef.current.capture) {
-      Alert.alert('Error', 'Unable to capture card image');
+    const viewShotRef = viewShotRefs.current.get(card.id);
+    if (!viewShotRef || !viewShotRef.capture) {
+      Alert.alert('Error', 'Unable to capture card image. Please try again.');
+      console.error('ViewShot ref not found for card:', card.id);
       return;
     }
 
@@ -561,8 +563,9 @@ export default function CollectionScreen() {
       // Give a moment for modal to close
       await new Promise(resolve => setTimeout(resolve, 300));
       
-      // Capture the card as image
-      const uri = await viewShotRef.current.capture();
+      // Capture the specific card as image
+      console.log('📸 Capturing card:', card.name, card.id);
+      const uri = await viewShotRef.capture();
 
       // Check if sharing is available
       const isAvailable = await Sharing.isAvailableAsync();
@@ -1331,7 +1334,13 @@ export default function CollectionScreen() {
           ]}
         >
           <ViewShot
-            ref={viewShotRef}
+            ref={(ref) => {
+              if (ref) {
+                viewShotRefs.current.set(item.id, ref);
+              } else {
+                viewShotRefs.current.delete(item.id);
+              }
+            }}
             options={{
               format: 'png',
               quality: 0.9,
