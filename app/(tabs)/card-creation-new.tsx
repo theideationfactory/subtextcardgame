@@ -25,18 +25,6 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-// Custom debounce implementation to avoid lodash dependency
-const debounce = (func: Function, wait: number) => {
-  let timeout: NodeJS.Timeout;
-  return function executedFunction(...args: any[]) {
-    const later = () => {
-      clearTimeout(timeout);
-      func(...args);
-    };
-    clearTimeout(timeout);
-    timeout = setTimeout(later, wait);
-  };
-};
 import { ArrowLeft, Wand2, ChevronDown, ChevronUp, Lock, Users, Globe2, Check, Plus, Edit, PlusCircle, Upload } from 'lucide-react-native';
 
 SplashScreen.preventAutoHideAsync();
@@ -76,15 +64,17 @@ export default function CardCreationNewScreen() {
   const returnZone = params.zone as string | undefined;
   const shadowForCardId = params.shadowForCardId as string | undefined;
   
-  const [isGenerating, setIsGenerating] = useState(false);
   const [isGeneratingDescription, setIsGeneratingDescription] = useState(false);
   const [isGeneratingImageDescription, setIsGeneratingImageDescription] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const [error, setError] = useState('');
   const [errorDetails, setErrorDetails] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
+  const [isGenerating, setIsGenerating] = useState(false);
   const [authChecking, setAuthChecking] = useState(false);
-  
+  const [showGenChoiceModal, setShowGenChoiceModal] = useState(false);
+  const [isPremiumGeneration, setIsPremiumGeneration] = useState(false);
+
   // Collapsible section states
   const [visibility, setVisibility] = useState<string[]>(['personal']);
   const [showVisibility, setShowVisibility] = useState(false);
@@ -408,6 +398,81 @@ export default function CardCreationNewScreen() {
     return null;
   }
 
+  // Enhanced premium-prompt generation using new edge function (still gpt-image-1)
+  const generateEnhancedImage = async () => {
+    if (!name) {
+      setError('Please provide a card name');
+      return;
+    }
+
+    if (!imageDescription) {
+      setError('Please provide an image description');
+      return;
+    }
+
+    setIsGenerating(true);
+    setError('');
+    setErrorDetails('');
+
+    try {
+      setAuthChecking(true);
+
+      const currentSession = await refreshSession();
+
+      if (!currentSession || !currentSession.access_token) {
+        console.error('No valid session found after refresh attempt');
+        throw new Error('You must be logged in to generate images');
+      }
+
+      const response = await fetch(
+        `${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/generate-enhanced-card`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${currentSession.access_token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            name,
+            description: imageDescription,
+            type,
+            role,
+            context,
+            format,
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error('Server error response (enhanced):', errorData);
+        setError(errorData.error || `Failed to generate enhanced image: ${response.status}`);
+        setErrorDetails(errorData.details || `Server responded with status: ${response.status}`);
+        throw new Error(errorData.error || 'Failed to generate enhanced image');
+      }
+
+      const data = await response.json();
+
+      if (!data.imageUrl) {
+        console.error('No image URL in enhanced response:', data);
+        throw new Error('No image URL received');
+      }
+
+      setCardImage(data.imageUrl);
+      setIsPremiumGeneration(true); // Flag this as premium generation
+    } catch (err) {
+      console.error('Enhanced image generation error:', err);
+      if (err instanceof Error) {
+        setError(err.message);
+      } else {
+        setError('An unknown error occurred');
+      }
+    } finally {
+      setIsGenerating(false);
+      setAuthChecking(false);
+    }
+  };
+
   const generateImage = async () => {
     if (!name) {
       setError('Please provide a card name');
@@ -466,6 +531,7 @@ export default function CardCreationNewScreen() {
       }
 
       setCardImage(data.imageUrl);
+      setIsPremiumGeneration(false); // Flag this as legacy generation
     } catch (err) {
       console.error('Image generation error:', err);
       if (err instanceof Error) {
@@ -942,6 +1008,7 @@ export default function CardCreationNewScreen() {
         image_url: cardImage,
         format,
         frame_color: DEFAULT_FRAME_COLOR,
+        is_premium_generation: isPremiumGeneration, // Track if this uses premium generation
         // Only save background gradient if user selected something other than default black
         ...(JSON.stringify(backgroundGradient) !== JSON.stringify(['#1a1a1a', '#000000']) && {
           background_gradient: JSON.stringify(backgroundGradient)
@@ -1086,6 +1153,46 @@ export default function CardCreationNewScreen() {
               placeholderTextColor="#666"
             />
           </View>
+
+          {/* Generation Choice Modal */}
+          <Modal
+            visible={showGenChoiceModal}
+            transparent={true}
+            animationType="fade"
+            onRequestClose={() => setShowGenChoiceModal(false)}
+          >
+            <TouchableOpacity 
+              style={styles.modalOverlay}
+              activeOpacity={1}
+              onPress={() => setShowGenChoiceModal(false)}
+            >
+              <View style={styles.genChoiceModal}>
+                <Text style={styles.genChoiceTitle}>Choose generation method</Text>
+
+                <TouchableOpacity
+                  style={styles.genChoiceButton}
+                  onPress={async () => {
+                    setShowGenChoiceModal(false);
+                    await generateImage();
+                  }}
+                  disabled={isGenerating}
+                >
+                  <Text style={styles.genChoiceButtonText}>Legacy: Background Image</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.genChoiceButton, styles.genChoiceButtonSecondary]}
+                  onPress={async () => {
+                    setShowGenChoiceModal(false);
+                    await generateEnhancedImage();
+                  }}
+                  disabled={isGenerating}
+                >
+                  <Text style={[styles.genChoiceButtonText, styles.genChoiceButtonSecondaryText]}>New: Premium Prompt</Text>
+                </TouchableOpacity>
+              </View>
+            </TouchableOpacity>
+          </Modal>
 
           {/* Compact Dropdowns Row */}
           <View style={styles.compactDropdownsContainer}>
@@ -1272,7 +1379,7 @@ export default function CardCreationNewScreen() {
           <View style={styles.imageButtonsContainer}>
             <TouchableOpacity 
               style={[styles.generateButton, (!name || !imageDescription || isGenerating) && styles.generateButtonDisabled]} 
-              onPress={generateImage}
+              onPress={() => setShowGenChoiceModal(true)}
               disabled={!name || !imageDescription || isGenerating}
             >
               {isGenerating ? (
@@ -1912,6 +2019,41 @@ const styles = StyleSheet.create({
     padding: 12,
     width: '80%',
     maxHeight: '60%',
+  },
+  genChoiceModal: {
+    backgroundColor: '#1a1a1a',
+    borderRadius: 12,
+    padding: 16,
+    width: '85%',
+    gap: 12,
+    borderWidth: 1,
+    borderColor: '#333',
+  },
+  genChoiceTitle: {
+    color: '#fff',
+    fontSize: 16,
+    fontFamily: 'Inter-Bold',
+    marginBottom: 4,
+    textAlign: 'center',
+  },
+  genChoiceButton: {
+    backgroundColor: '#6366f1',
+    padding: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  genChoiceButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontFamily: 'Inter-Bold',
+  },
+  genChoiceButtonSecondary: {
+    backgroundColor: 'transparent',
+    borderWidth: 2,
+    borderColor: '#6366f1',
+  },
+  genChoiceButtonSecondaryText: {
+    color: '#6366f1',
   },
   dropdownItem: {
     flexDirection: 'row',

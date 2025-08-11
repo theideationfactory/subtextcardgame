@@ -53,10 +53,13 @@ export default function ChatScreen() {
   const [currentUserId, setCurrentUserId] = useState<string>('');
   const [headerHeight, setHeaderHeight] = useState(56);
   const [keyboardVisible, setKeyboardVisible] = useState(false);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
   const [analyzingMessage, setAnalyzingMessage] = useState<string | null>(null);
   const [actionToolbarVisible, setActionToolbarVisible] = useState(false);
   const [selectedMessage, setSelectedMessage] = useState<Message | null>(null);
   const [toolbarPosition, setToolbarPosition] = useState({ x: 0, y: 0 });
+  const [toolbarSize, setToolbarSize] = useState({ width: 0, height: 0 });
+  const [lastTouch, setLastTouch] = useState<{ x: number; y: number; isMy: boolean } | null>(null);
   const [selectedSpeechAct, setSelectedSpeechAct] = useState<string | null>(null);
   const [responseStrategies, setResponseStrategies] = useState<string[]>([]);
   const [loadingStrategies, setLoadingStrategies] = useState(false);
@@ -120,17 +123,53 @@ export default function ChatScreen() {
     }
   }, [friendId, currentUserId]);
 
-  // Track keyboard visibility to shrink bottom padding while typing
+  // Track keyboard visibility and height to adjust menu positioning
   useEffect(() => {
     const showEvt = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
     const hideEvt = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
-    const showSub = Keyboard.addListener(showEvt as any, () => setKeyboardVisible(true));
-    const hideSub = Keyboard.addListener(hideEvt as any, () => setKeyboardVisible(false));
+    const showSub = Keyboard.addListener(showEvt as any, (event) => {
+      setKeyboardVisible(true);
+      setKeyboardHeight(event.endCoordinates.height);
+    });
+    const hideSub = Keyboard.addListener(hideEvt as any, () => {
+      setKeyboardVisible(false);
+      setKeyboardHeight(0);
+    });
     return () => {
       showSub.remove();
       hideSub.remove();
     };
   }, []);
+
+  // Recalculate toolbar position once we know its measured size
+  useEffect(() => {
+    if (!actionToolbarVisible || !lastTouch || !toolbarSize.width || !toolbarSize.height) return;
+
+    const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
+    const margin = 16; // edge padding
+    const gap = 12; // gap between touch point and toolbar
+
+    const tbWidth = toolbarSize.width;
+    const tbHeight = toolbarSize.height;
+
+    const desiredX = lastTouch.isMy ? lastTouch.x - tbWidth - gap : lastTouch.x + gap;
+    const x = Math.max(margin, Math.min(desiredX, screenWidth - tbWidth - margin));
+
+    const topMargin = Math.max(insets.top + headerHeight + 8, 8);
+    // When keyboard is visible, reduce available height by keyboard height
+    const effectiveScreenHeight = keyboardVisible ? screenHeight - keyboardHeight : screenHeight;
+    const bottomMargin = Math.max(insets.bottom, 8);
+    const aboveY = lastTouch.y - tbHeight - 12; // prefer above message
+    let y: number;
+    if (aboveY >= topMargin) {
+      y = aboveY;
+    } else {
+      const belowY = lastTouch.y + 12;
+      y = Math.max(topMargin, Math.min(belowY, effectiveScreenHeight - tbHeight - bottomMargin));
+    }
+
+    setToolbarPosition({ x, y });
+  }, [actionToolbarVisible, lastTouch, toolbarSize.width, toolbarSize.height, insets.top, insets.bottom, headerHeight, keyboardVisible, keyboardHeight]);
 
   const getCurrentUser = async () => {
     try {
@@ -227,30 +266,42 @@ export default function ChatScreen() {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     }
     
-    // Get touch position for toolbar placement with proper screen bounds
+    // Get touch position and compute initial placement with clamping
     const { pageX, pageY } = event.nativeEvent;
-    const { width: screenWidth } = Dimensions.get('window');
-    const toolbarWidth = 200;
+    const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
     const isMyMessage = message.sender_id === currentUserId;
-    
-    // For sender messages (right side), position toolbar more to the left
-    let x;
-    if (isMyMessage) {
-      // For right-aligned messages, position toolbar to the left of the touch point
-      x = Math.max(16, Math.min(pageX - toolbarWidth + 20, screenWidth - toolbarWidth - 16));
+
+    // Save for potential reflow after measurement
+    setLastTouch({ x: pageX, y: pageY, isMy: isMyMessage });
+
+    // Use measured size if available; fall back to reasonable defaults
+    const tbWidth = toolbarSize.width || 260;
+    const tbHeight = toolbarSize.height || 60;
+    const margin = 16; // edge padding
+    const gap = 12; // distance from touch
+
+    const desiredX = isMyMessage ? pageX - tbWidth - gap : pageX + gap;
+    const x = Math.max(margin, Math.min(desiredX, screenWidth - tbWidth - margin));
+
+    const topMargin = Math.max(insets.top + headerHeight + 8, 8);
+    // When keyboard is visible, reduce available height by keyboard height
+    const effectiveScreenHeight = keyboardVisible ? screenHeight - keyboardHeight : screenHeight;
+    const bottomMargin = Math.max(insets.bottom, 8);
+    const aboveY = pageY - tbHeight - 12; // prefer above
+    let y: number;
+    if (aboveY >= topMargin) {
+      y = aboveY;
     } else {
-      // For left-aligned messages, center on touch point
-      x = Math.max(16, Math.min(pageX - toolbarWidth / 2, screenWidth - toolbarWidth - 16));
+      const belowY = pageY + 12;
+      y = Math.max(topMargin, Math.min(belowY, effectiveScreenHeight - tbHeight - bottomMargin));
     }
-    
-    const y = Math.max(120, pageY - 70);
-    
+
     setToolbarPosition({ x, y });
     setSelectedMessage(message);
     setActionToolbarVisible(true);
   };
 
-  const handleToolbarAction = async (action: 'request' | 'report' | 'other') => {
+  const handleToolbarAction = async (action: 'request' | 'reveal' | 'other') => {
     if (Platform.OS !== 'web') {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     }
@@ -266,8 +317,8 @@ export default function ChatScreen() {
           await handleSpeechActRequest(currentMessage);
         }
         break;
-      case 'report':
-        Alert.alert('Report', 'Report message functionality coming soon!');
+      case 'reveal':
+        Alert.alert('Reveal', 'Reveal message functionality coming soon!');
         break;
       case 'other':
         Alert.alert('More Options', 'Additional options coming soon!');
@@ -712,6 +763,12 @@ export default function ChatScreen() {
                 top: toolbarPosition.y,
               }
             ]}
+            onLayout={(e) => {
+              const { width, height } = e.nativeEvent.layout;
+              if (width !== toolbarSize.width || height !== toolbarSize.height) {
+                setToolbarSize({ width, height });
+              }
+            }}
           >
             <TouchableOpacity
               style={styles.actionButton}
@@ -730,14 +787,14 @@ export default function ChatScreen() {
             
             <TouchableOpacity
               style={styles.actionButton}
-              onPress={() => handleToolbarAction('report')}
+              onPress={() => handleToolbarAction('reveal')}
             >
               <LinearGradient
                 colors={['#ef4444', '#dc2626']}
                 style={styles.actionButtonGradient}
               >
                 <Flag size={18} color="#fff" />
-                <Text style={styles.actionButtonText}>Report</Text>
+                <Text style={styles.actionButtonText}>Reveal</Text>
               </LinearGradient>
             </TouchableOpacity>
             
@@ -1111,7 +1168,7 @@ const styles = StyleSheet.create({
   },
   toolboxLabel: {
     color: 'rgba(255, 255, 255, 0.7)',
-    fontSize: 12,
+    fontSize: 14,
     fontFamily: 'Inter-Medium',
     marginRight: 8,
   },
@@ -1126,12 +1183,12 @@ const styles = StyleSheet.create({
   },
   toolboxSpeechActText: {
     color: 'rgba(99, 102, 241, 1)',
-    fontSize: 11,
+    fontSize: 13,
     fontFamily: 'Inter-SemiBold',
   },
   toolboxPlaceholder: {
     color: 'rgba(255, 255, 255, 0.5)',
-    fontSize: 12,
+    fontSize: 14,
     fontFamily: 'Inter-Regular',
     fontStyle: 'italic',
   },
@@ -1152,7 +1209,7 @@ const styles = StyleSheet.create({
   },
   strategiesLoadingText: {
     color: 'rgba(255, 255, 255, 0.6)',
-    fontSize: 11,
+    fontSize: 13,
     fontFamily: 'Inter-Regular',
   },
   responseStrategyTag: {
@@ -1166,7 +1223,7 @@ const styles = StyleSheet.create({
   },
   responseStrategyText: {
     color: 'rgba(34, 197, 94, 1)',
-    fontSize: 10,
+    fontSize: 12,
     fontFamily: 'Inter-Medium',
   },
 });

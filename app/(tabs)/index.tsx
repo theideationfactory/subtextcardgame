@@ -81,6 +81,7 @@ export default function CollectionScreen() {
     context_color?: string;
     format?: "framed" | "fullBleed";
     background_gradient?: string;
+    is_premium_generation?: boolean;
     user_id: string;
     collection_id?: string;
     collections?: any;
@@ -150,10 +151,11 @@ export default function CollectionScreen() {
             .select(`
               id, name, description, type, role, context, image_url, frame_width, frame_color, 
               name_color, type_color, description_color, context_color, format, background_gradient, 
-              user_id, collection_id, shadow_card_id,
+              is_premium_generation, user_id, collection_id, shadow_card_id,
               shadow_card:shadow_card_id(
                 id, name, description, type, role, context, image_url, frame_width, frame_color,
-                name_color, type_color, description_color, context_color, format, background_gradient
+                name_color, type_color, description_color, context_color, format, background_gradient,
+                is_premium_generation
               )
             `)
             .eq('user_id', user.id)
@@ -185,7 +187,7 @@ export default function CollectionScreen() {
 
           let friendCardsQuery = supabase
             .from('cards')
-            .select('id, name, description, type, role, context, image_url, frame_width, frame_color, name_color, type_color, description_color, context_color, format, background_gradient, user_id, collection_id')
+            .select('id, name, description, type, role, context, image_url, frame_width, frame_color, name_color, type_color, description_color, context_color, format, background_gradient, is_premium_generation, user_id, collection_id')
             .in('user_id', friendIds)
             .order('created_at', { ascending: false })
             .limit(50);
@@ -220,7 +222,7 @@ export default function CollectionScreen() {
             // First try with is_public column (if migration has been run)
             const { data: publicCards, error: publicError } = await supabase
               .from('cards')
-              .select('id, name, description, type, role, context, image_url, frame_width, frame_color, name_color, type_color, description_color, context_color, format, background_gradient, user_id, collection_id')
+              .select('id, name, description, type, role, context, image_url, frame_width, frame_color, name_color, type_color, description_color, context_color, format, background_gradient, is_premium_generation, user_id, collection_id')
               .eq('is_public', true)
               .order('created_at', { ascending: false })
               .limit(50);
@@ -231,7 +233,7 @@ export default function CollectionScreen() {
                 console.log('is_public column not found, falling back to showing other users\' cards');
                 const { data: fallbackCards, error: fallbackError } = await supabase
                   .from('cards')
-                  .select('id, name, description, type, role, context, image_url, frame_width, frame_color, name_color, type_color, description_color, context_color, format, background_gradient, user_id, collection_id')
+                  .select('id, name, description, type, role, context, image_url, frame_width, frame_color, name_color, type_color, description_color, context_color, format, background_gradient, is_premium_generation, user_id, collection_id')
                   .neq('user_id', user.id)
                   .order('created_at', { ascending: false })
                   .limit(50);
@@ -251,7 +253,7 @@ export default function CollectionScreen() {
               console.log('Caught is_public column error in catch block, using fallback');
               const { data: fallbackCards, error: fallbackError } = await supabase
                 .from('cards')
-                .select('id, name, description, type, role, context, image_url, frame_width, frame_color, name_color, type_color, description_color, context_color, format, background_gradient, user_id, collection_id')
+                .select('id, name, description, type, role, context, image_url, frame_width, frame_color, name_color, type_color, description_color, context_color, format, background_gradient, is_premium_generation, user_id, collection_id')
                 .neq('user_id', user.id)
                 .order('created_at', { ascending: false })
                 .limit(50);
@@ -909,7 +911,8 @@ export default function CollectionScreen() {
 
 
 
-          {item.type ? (
+          {/* Hide text overlays for premium generation */}
+          {!item.is_premium_generation && item.type ? (
             <Text
               style={[
                 styles.fullBleedCorner,
@@ -921,7 +924,7 @@ export default function CollectionScreen() {
             </Text>
           ) : null}
 
-          {item.role ? (
+          {!item.is_premium_generation && item.role ? (
             <Text
               style={[
                 styles.fullBleedCorner,
@@ -933,7 +936,8 @@ export default function CollectionScreen() {
             </Text>
           ) : null}
 
-          {item.description ? (
+          {/* Hide name and description overlays for premium generation */}
+          {!item.is_premium_generation && item.description ? (
             <View style={styles.cornerTextContainer}>
               {item.name ? (
                 <Text
@@ -1064,24 +1068,26 @@ export default function CollectionScreen() {
                 }
               ]}
             >
-              {/* Top section - Card name */}
-              <View style={[
-                styles.cardNameContainer,
-                { backgroundColor: textBackgroundColor } // Conditional background
-              ]}>
-                <Text 
-                  style={[
-                    styles.cardName, 
-                    { 
-                      fontSize: nameFontSize,
-                      color: item.name_color || '#FFFFFF' 
-                    }
-                  ]}
-                  numberOfLines={1}
-                >
-                  {item.name}
-                </Text>
-              </View>
+              {/* Top section - Card name (hidden for premium generation) */}
+              {!item.is_premium_generation && (
+                <View style={[
+                  styles.cardNameContainer,
+                  { backgroundColor: textBackgroundColor } // Conditional background
+                ]}>
+                  <Text 
+                    style={[
+                      styles.cardName, 
+                      { 
+                        fontSize: nameFontSize,
+                        color: item.name_color || '#FFFFFF' 
+                      }
+                    ]}
+                    numberOfLines={1}
+                  >
+                    {item.name}
+                  </Text>
+                </View>
+              )}
 
               {/* Middle section - Card image (50% of card height) */}
               <View 
@@ -1097,97 +1103,99 @@ export default function CollectionScreen() {
                 />
               </View>
 
-              {/* Bottom section - Type line and description (50% of card height) */}
-              <View style={{ flex: 1 }}>
-                {/* Type line */}
-                <View style={[
-                  styles.typeLine, 
-                  { 
-                    marginTop: contentPadding,
-                    backgroundColor: textBackgroundColor // Conditional background
-                  }
-                ]}>
-                  <View style={styles.typeContainer}>
-                    <Text 
-                      style={[
-                        styles.typeText, 
-                        { 
-                          fontSize: typeFontSize,
-                          color: item.type_color || '#FFFFFF' 
-                        }
-                      ]}
-                    >
-                      {item.type}
-                    </Text>
-                  </View>
-                  
-                  {item.role && (
-                    <View style={styles.roleContainer}>
-                      {getCardRoleIcon(item.role)}
+              {/* Bottom section - Type line and description (hidden for premium generation) */}
+              {!item.is_premium_generation && (
+                <View style={{ flex: 1 }}>
+                  {/* Type line */}
+                  <View style={[
+                    styles.typeLine, 
+                    { 
+                      marginTop: contentPadding,
+                      backgroundColor: textBackgroundColor // Conditional background
+                    }
+                  ]}>
+                    <View style={styles.typeContainer}>
                       <Text 
                         style={[
-                          styles.roleText, 
+                          styles.typeText, 
                           { 
-                            fontSize: Math.max(8, Math.round(14 * scaleFactor)),
-                            color: '#FFFFFF' 
+                            fontSize: typeFontSize,
+                            color: item.type_color || '#FFFFFF' 
                           }
                         ]}
                       >
-                        {item.role}
+                        {item.type}
+                      </Text>
+                    </View>
+                    
+                    {item.role && (
+                      <View style={styles.roleContainer}>
+                        {getCardRoleIcon(item.role)}
+                        <Text 
+                          style={[
+                            styles.roleText, 
+                            { 
+                              fontSize: Math.max(8, Math.round(14 * scaleFactor)),
+                              color: '#FFFFFF' 
+                            }
+                          ]}
+                        >
+                          {item.role}
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+
+                  {/* Description - directly below type line */}
+                  <View 
+                    style={[
+                      styles.textBox,
+                      { 
+                        marginTop: contentPadding / 2,
+                        flex: 1,
+                        backgroundColor: textBackgroundColor // Conditional background
+                      }
+                    ]}
+                  >
+                    <Text 
+                      style={[
+                        styles.cardDescription, 
+                        { 
+                          fontSize: descriptionFontSize,
+                          lineHeight: Math.max(12, Math.round(descriptionFontSize * 1.4)),
+                          color: item.description_color || '#FFFFFF' 
+                        }
+                      ]}
+                      numberOfLines={numberOfLines}
+                    >
+                      {item.description}
+                    </Text>
+                  </View>
+
+                  {/* Context - at the bottom of the card */}
+                  {item.context && (
+                    <View style={[
+                      styles.contextContainer, 
+                      { 
+                        marginTop: contentPadding / 2,
+                        backgroundColor: textBackgroundColor // Conditional background
+                      }
+                    ]}>
+                      <Text 
+                        style={[
+                          styles.contextText, 
+                          { 
+                            fontSize: contextFontSize,
+                            color: item.context_color || '#CCCCCC' 
+                          }
+                        ]}
+                      >
+                        {item.context}
                       </Text>
                     </View>
                   )}
                 </View>
-
-                {/* Description - directly below type line */}
-                <View 
-                  style={[
-                    styles.textBox,
-                    { 
-                      marginTop: contentPadding / 2,
-                      flex: 1,
-                      backgroundColor: textBackgroundColor // Conditional background
-                    }
-                  ]}
-                >
-                  <Text 
-                    style={[
-                      styles.cardDescription, 
-                      { 
-                        fontSize: descriptionFontSize,
-                        lineHeight: Math.max(12, Math.round(descriptionFontSize * 1.4)),
-                        color: item.description_color || '#FFFFFF' 
-                      }
-                    ]}
-                    numberOfLines={numberOfLines}
-                  >
-                    {item.description}
-                  </Text>
-                </View>
-
-                {/* Context - at the bottom of the card */}
-                {item.context && (
-                  <View style={[
-                    styles.contextContainer, 
-                    { 
-                      marginTop: contentPadding / 2,
-                      backgroundColor: textBackgroundColor // Conditional background
-                    }
-                  ]}>
-                    <Text 
-                      style={[
-                        styles.contextText, 
-                        { 
-                          fontSize: contextFontSize,
-                          color: item.context_color || '#CCCCCC' 
-                        }
-                      ]}
-                    >
-                      {item.context}
-                    </Text>
-                  </View>
-                )}
-              </View>
+              )}
             </LinearGradient>
           ) : (
             <View 
