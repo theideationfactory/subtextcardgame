@@ -865,6 +865,37 @@ export default function CollectionScreen() {
     
     // If the card uses the full-bleed format, render it with edge-to-edge art and text overlays
     if (item.format === 'fullBleed') {
+      // For premium generation, use optimized container since image is already a complete trading card
+      if (item.is_premium_generation) {
+        return (
+          <Pressable
+            style={[
+              styles.fullBleedCard, 
+              { 
+                width: cardWidth, 
+                height: cardHeight,
+                backgroundColor: 'transparent' // Blend with app background
+              }
+            ]}
+            onPress={() => handleDoubleTapCard()}
+            onLongPress={handleLongPress}
+          >
+            <Image 
+              source={{ uri: item.image_url }} 
+              style={[
+                styles.fullBleedImage, 
+                { 
+                  borderRadius: 8,
+                  backgroundColor: 'transparent' // Remove any background from image container
+                }
+              ]} 
+              resizeMode="contain" // Use contain for complete trading cards
+            />
+          </Pressable>
+        );
+      }
+      
+      // Regular fullBleed rendering for legacy cards
       return (
         <Pressable
           style={[styles.fullBleedCard, { width: cardWidth, height: cardHeight }]}
