@@ -90,20 +90,24 @@ Deno.serve(async (req: Request) => {
     }
 
     // Build an enhanced prompt for premium card art - clean image without text overlays
-    const labels: string[] = [];
-    if (type) labels.push(`Type: ${type}`);
-    if (role) labels.push(`Role: ${role}`);
-    if (context) labels.push(`Context: ${context}`);
+    const topLabels = [];
+    if (type) topLabels.push(type); // Phenomenon type
+    if (role) topLabels.push(role); // Role/detail
+    
+    const bottomLabels = [];
+    if (context) bottomLabels.push(context); // Context
 
     const premiumPrompt = [
-      `Create a premium trading card featuring "${name}" with ${description}.`,
-      `Design as a complete trading card with integrated text elements in a fantasy card game style.`,
-      `Include the title "${name}" prominently displayed at the top or bottom of the card.`,
-      labels.length > 0 ? `Show these card attributes as elegant text labels: ${labels.join(', ')}.` : '',
+      `Create a premium trading card artwork featuring "${name}" with ${description}.`,
+      `Design as a complete trading card with integrated card name and attribute labels in a fantasy card game style.`,
+      `Include the title "${name}" prominently displayed at the bottom of the card.`,
+      topLabels.length > 0 ? `Show these attributes as elegant text labels in the TOP corners: ${topLabels.join(' in top-left, ')} in top-right.` : '',
+      bottomLabels.length > 0 ? `Show this attribute as an elegant text label in a BOTTOM corner: ${bottomLabels.join(', ')}.` : '',
       'Style: professional trading card illustration, cinematic lighting, rich colors, sharp details.',
-      'Layout: portrait orientation, leave space for card name and attribute text integrated into the design.',
+      'Layout: portrait orientation, decorative borders and frames.',
       'Quality: print-ready artwork suitable for collectible card game, similar to Magic: The Gathering or Pokémon cards.',
-      'Include decorative borders, frames, or design elements that enhance the trading card aesthetic.'
+      'Do not include any creation metadata, timestamps, or technical information in the image.',
+      'Focus purely on the fantasy artwork and card design elements.'
     ].filter(Boolean).join(' ');
 
     const abortSignal = AbortSignal.timeout(120_000); // 2 minutes for gpt-image-1
