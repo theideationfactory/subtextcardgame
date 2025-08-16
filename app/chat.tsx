@@ -271,8 +271,15 @@ export default function ChatScreen() {
     const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
     const isMyMessage = message.sender_id === currentUserId;
 
+    // Calculate effective screen height first
+    const effectiveScreenHeight = keyboardVisible ? screenHeight - keyboardHeight : screenHeight;
+    
+    // Adjust touch Y coordinate when keyboard is visible
+    // The touch coordinate is relative to full screen, but we need it relative to visible area
+    const adjustedPageY = keyboardVisible ? Math.min(pageY, effectiveScreenHeight) : pageY;
+    
     // Save for potential reflow after measurement
-    setLastTouch({ x: pageX, y: pageY, isMy: isMyMessage });
+    setLastTouch({ x: pageX, y: adjustedPageY, isMy: isMyMessage });
 
     // Use measured size if available; fall back to reasonable defaults
     const tbWidth = toolbarSize.width || 260;
@@ -284,15 +291,14 @@ export default function ChatScreen() {
     const x = Math.max(margin, Math.min(desiredX, screenWidth - tbWidth - margin));
 
     const topMargin = Math.max(insets.top + headerHeight + 8, 8);
-    // When keyboard is visible, reduce available height by keyboard height
-    const effectiveScreenHeight = keyboardVisible ? screenHeight - keyboardHeight : screenHeight;
     const bottomMargin = Math.max(insets.bottom, 8);
-    const aboveY = pageY - tbHeight - 12; // prefer above
+    
+    const aboveY = adjustedPageY - tbHeight - 12; // prefer above
     let y: number;
     if (aboveY >= topMargin) {
       y = aboveY;
     } else {
-      const belowY = pageY + 12;
+      const belowY = adjustedPageY + 12;
       y = Math.max(topMargin, Math.min(belowY, effectiveScreenHeight - tbHeight - bottomMargin));
     }
 
