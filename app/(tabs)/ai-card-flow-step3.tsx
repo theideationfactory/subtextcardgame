@@ -8,13 +8,14 @@ import {
   TextInput,
   ActivityIndicator,
   Dimensions,
-  Platform,
   Image,
-  KeyboardAvoidingView
+  Platform,
+  Alert
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import { ArrowLeft, ChevronRight, ChevronLeft, ChevronDown, Check } from 'lucide-react-native';
+import { ArrowLeft, ChevronRight, ChevronLeft, Check } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
+import { supabase } from '@/lib/supabase';
 
 // Get screen dimensions for responsive layout
 const { width } = Dimensions.get('window');
@@ -87,9 +88,13 @@ const MOCK_CARD_DATA = {
   },
 };
 
-// Type and role options from the existing app
-const typeOptions = ['TBD', 'Impact', 'Request', 'Protect', 'Connect', 'Percept'];
-const roleOptions = ['TBD', 'Advisor', 'Confessor', 'Judge', 'Peacemaker', 'Provocateur', 'Entertainer', 'Gatekeeper'];
+// Dropdown options matching card-creation-new.tsx
+const typeOptions = ['Intention', 'Context', 'Impact', 'Accuracy', 'Agenda', 'Needs', 'Emotion', 'Role'];
+const detailOptions: Record<string, string[]> = {
+  Intention: ['Impact', 'Request', 'Protect', 'Connect'],
+  Role: ['Advisor', 'Confessor', 'Judge', 'Peacemaker', 'Provocateur', 'Entertainer', 'Gatekeeper'],
+  Context: ['Setting', 'Timing', 'Relationship', 'Power'],
+};
 const contextOptions = ['TBD', 'Self', 'Family', 'Friendship', 'Therapy', 'Peer', 'Work', 'Art', 'Politics'];
 
 export default function AICardFlowStep3() {
@@ -99,115 +104,153 @@ export default function AICardFlowStep3() {
   const conversationPrompt = params.prompt as string || '';
   
   const [isLoading, setIsLoading] = useState(true);
-  const [currentCardIndex, setCurrentCardIndex] = useState(0);
   const [cardData, setCardData] = useState<Record<string, any>>({});
-  const [showTypeDropdown, setShowTypeDropdown] = useState(false);
-  const [showRoleDropdown, setShowRoleDropdown] = useState(false);
-  const [showContextDropdown, setShowContextDropdown] = useState(false);
-  
-  // Simulate API call to get card descriptions
+
+  // Auto-generate cards using foreground generation
   useEffect(() => {
-    const timer = setTimeout(() => {
-      // Filter mock data to only include selected cards
-      const selectedCardData: Record<string, any> = {};
-      selectedCardIds.forEach(id => {
-        if (MOCK_CARD_DATA[id as keyof typeof MOCK_CARD_DATA]) {
-          selectedCardData[id] = { ...MOCK_CARD_DATA[id as keyof typeof MOCK_CARD_DATA] };
+    const generateCards = async () => {
+      try {
+        const passedCardData = params.cardData as string;
+        if (passedCardData) {
+          const parsedCards = JSON.parse(passedCardData);
+          
+          // Initialize card data with pending status
+          const initialCardData: Record<string, any> = {};
+          parsedCards.forEach((card: any) => {
+            initialCardData[card.id] = {
+              ...card,
+              status: 'pending'
+            };
+          });
+          setCardData(initialCardData);
+          setIsLoading(false);
+
+          // Generate cards in foreground
+          await generateCardsInForeground(parsedCards);
         }
-      });
-      
-      setCardData(selectedCardData);
-      setIsLoading(false);
-    }, 2000);
+      } catch (error) {
+        console.error('Error setting up card generation:', error);
+        setCardData({});
+        setIsLoading(false);
+      }
+    };
+
+    generateCards();
+  }, [params.cardData]);
+
+  const generateCardsInForeground = async (parsedCards: any[]) => {
+    // Get current user
+    const { data: { user } } = await supabase.auth.getUser();
     
-    return () => clearTimeout(timer);
-  }, [selectedCardIds]);
+    for (const card of parsedCards) {
+      try {
+        // Update status to processing
+        setCardData(prev => ({
+          ...prev,
+          [card.id]: { ...prev[card.id], status: 'processing' }
+        }));
+
+        // Generate image description
+        const { data: imageDescData, error: imageDescError } = await supabase.functions.invoke('generate-image-description', {
+          body: { 
+            cardName: card.name,
+            cardType: card.type !== 'TBD' ? card.type : undefined,
+            cardDescription: card.description || undefined
+          },
+        });
+
+        const imageDescription = imageDescData?.imageDescription || card.description;
+
+        // Generate the complete card
+        const { data: cardData, error: cardError } = await supabase.functions.invoke('generate-enhanced-card', {
+          body: { 
+            name: card.name, 
+            description: imageDescription, 
+            type: card.type, 
+            role: card.role, 
+            context: card.context, 
+            format: 'fullBleed', 
+            size: '1024x1536', 
+            quality: 'auto' 
+          },
+        });
+
+        if (!cardError && cardData?.imageUrl) {
+          // Save card to database if user is authenticated
+          if (user) {
+            const { data: savedCard, error: saveError } = await supabase
+              .from('cards')
+              .insert({
+                name: card.name,
+                description: card.description,
+                type: card.type,
+                role: card.role,
+                context: card.context,
+                image_url: cardData.imageUrl,
+                user_id: user.id,
+                format: 'fullBleed',
+                is_premium_generation: true
+              })
+              .select()
+              .single();
+
+            if (!saveError && savedCard) {
+              setCardData(prev => ({
+                ...prev,
+                [card.id]: {
+                  ...prev[card.id],
+                  imageUrl: cardData.imageUrl,
+                  cardId: savedCard.id,
+                  status: 'completed'
+                }
+              }));
+            } else {
+              setCardData(prev => ({
+                ...prev,
+                [card.id]: {
+                  ...prev[card.id],
+                  status: 'error',
+                  error: saveError?.message || 'Failed to save card'
+                }
+              }));
+            }
+          } else {
+            // No user session, just store locally
+            setCardData(prev => ({
+              ...prev,
+              [card.id]: {
+                ...prev[card.id],
+                imageUrl: cardData.imageUrl,
+                status: 'completed'
+              }
+            }));
+          }
+        } else {
+          setCardData(prev => ({
+            ...prev,
+            [card.id]: {
+              ...prev[card.id],
+              status: 'error',
+              error: cardError?.message || 'Failed to generate card'
+            }
+          }));
+        }
+      } catch (error) {
+        console.error('Error generating card:', error);
+        setCardData(prev => ({
+          ...prev,
+          [card.id]: {
+            ...prev[card.id],
+            status: 'error',
+            error: error instanceof Error ? error.message : 'Unknown error'
+          }
+        }));
+      }
+    }
+  };
   
-  const currentCardId = selectedCardIds[currentCardIndex];
-  const currentCard = cardData[currentCardId];
   const totalCards = selectedCardIds.length;
-  
-  const handlePrevCard = () => {
-    if (currentCardIndex > 0) {
-      setCurrentCardIndex(currentCardIndex - 1);
-      if (Platform.OS !== 'web') {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      }
-    }
-  };
-  
-  const handleNextCard = () => {
-    if (currentCardIndex < totalCards - 1) {
-      setCurrentCardIndex(currentCardIndex + 1);
-      if (Platform.OS !== 'web') {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      }
-    }
-  };
-  
-  const handleDescriptionChange = (text: string) => {
-    if (!currentCardId || !cardData[currentCardId]) return;
-    
-    setCardData(prev => ({
-      ...prev,
-      [currentCardId]: {
-        ...prev[currentCardId],
-        description: text
-      }
-    }));
-  };
-  
-  const handleTypeSelect = (type: string) => {
-    if (!currentCardId || !cardData[currentCardId]) return;
-    
-    setCardData(prev => ({
-      ...prev,
-      [currentCardId]: {
-        ...prev[currentCardId],
-        type
-      }
-    }));
-    
-    setShowTypeDropdown(false);
-    if (Platform.OS !== 'web') {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    }
-  };
-  
-  const handleRoleSelect = (role: string) => {
-    if (!currentCardId || !cardData[currentCardId]) return;
-    
-    setCardData(prev => ({
-      ...prev,
-      [currentCardId]: {
-        ...prev[currentCardId],
-        role
-      }
-    }));
-    
-    setShowRoleDropdown(false);
-    if (Platform.OS !== 'web') {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    }
-  };
-  
-  const handleContextSelect = (context: string) => {
-    if (!currentCardId || !cardData[currentCardId]) return;
-    
-    setCardData(prev => ({
-      ...prev,
-      [currentCardId]: {
-        ...prev[currentCardId],
-        context
-      }
-    }));
-    
-    setShowContextDropdown(false);
-    if (Platform.OS !== 'web') {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    }
-  };
-  
+
   const handleContinue = () => {
     if (Platform.OS !== 'web') {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -223,209 +266,105 @@ export default function AICardFlowStep3() {
     });
   };
   
-  const renderDropdown = (
-    visible: boolean,
-    options: string[],
-    selectedValue: string,
-    onSelect: (value: string) => void,
-    onClose: () => void
-  ) => {
-    if (!visible) return null;
-    
-    return (
-      <View style={styles.dropdownOverlay}>
-        <TouchableOpacity 
-          style={styles.dropdownBackdrop}
-          activeOpacity={1}
-          onPress={onClose}
-        />
-        <View style={styles.dropdownContainer}>
-          <ScrollView style={styles.dropdownScroll}>
-            {options.map((option) => (
-              <TouchableOpacity
-                key={option}
-                style={styles.dropdownItem}
-                onPress={() => onSelect(option)}
-              >
-                <Text style={styles.dropdownItemText}>{option}</Text>
-                {selectedValue === option && (
-                  <Check size={20} color="#6366f1" />
-                )}
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        </View>
-      </View>
-    );
-  };
+  // Helper function to get color based on card type
+  function getTypeColor(type: string) {
+    switch (type) {
+      case 'Impact':
+        return styles.typeImpact;
+      case 'Request':
+        return styles.typeRequest;
+      case 'Protect':
+        return styles.typeProtect;
+      case 'Connect':
+        return styles.typeConnect;
+      case 'Percept':
+        return styles.typePercept;
+      default:
+        return {};
+    }
+  }
+
+  // Helper function to get status indicator color
+  function getStatusColor(status: string) {
+    switch (status) {
+      case 'completed':
+        return { backgroundColor: '#4CAF50' };
+      case 'error':
+        return { backgroundColor: '#F44336' };
+      default:
+        return { backgroundColor: '#FF9800' };
+    }
+  }
+
   
   return (
-    <KeyboardAvoidingView 
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-    >
+    <View style={styles.container}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
           <ArrowLeft size={24} color="#fff" />
         </TouchableOpacity>
-        <Text style={styles.title}>Create Cards</Text>
         <View style={styles.headerRight} />
       </View>
       
-      <ScrollView 
-        style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
-        keyboardShouldPersistTaps="handled"
-      >
-        <View style={styles.stepIndicator}>
-          <View style={styles.stepBubble}>
-            <Text style={styles.stepNumber}>3</Text>
-          </View>
-          <Text style={styles.stepText}>Edit card descriptions</Text>
+      {isLoading ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#6366f1" />
+          <Text style={styles.loadingText}>Generating cards with AI...</Text>
         </View>
-        
-        {isLoading ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#6366f1" />
-            <Text style={styles.loadingText}>Generating card descriptions...</Text>
-          </View>
-        ) : (
-          <>
-            <View style={styles.cardProgress}>
-              <Text style={styles.cardProgressText}>
-                Card {currentCardIndex + 1} of {totalCards}
-              </Text>
-              <View style={styles.cardNavigation}>
-                <TouchableOpacity
-                  style={[styles.navButton, currentCardIndex === 0 && styles.navButtonDisabled]}
-                  onPress={handlePrevCard}
-                  disabled={currentCardIndex === 0}
-                >
-                  <ChevronLeft size={20} color={currentCardIndex === 0 ? '#666' : '#fff'} />
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.navButton, currentCardIndex === totalCards - 1 && styles.navButtonDisabled]}
-                  onPress={handleNextCard}
-                  disabled={currentCardIndex === totalCards - 1}
-                >
-                  <ChevronRight size={20} color={currentCardIndex === totalCards - 1 ? '#666' : '#fff'} />
-                </TouchableOpacity>
+      ) : (
+        <>
+          <ScrollView 
+            horizontal 
+            showsHorizontalScrollIndicator={false}
+            style={styles.cardsContainer}
+            contentContainerStyle={styles.cardsContentContainer}
+          >
+            {Object.values(cardData).map((card: any) => (
+              <View key={card.id} style={styles.cardItem}>
+                <View style={styles.cardHeader}>
+                  <Text style={styles.cardName}>{card.name}</Text>
+                  <View style={[styles.statusIndicator, getStatusColor(card.status)]}>
+                    {card.status === 'completed' ? (
+                      <Check size={16} color="#fff" />
+                    ) : card.status === 'error' ? (
+                      <Text style={styles.statusText}>!</Text>
+                    ) : (
+                      <ActivityIndicator size="small" color="#fff" />
+                    )}
+                  </View>
+                </View>
+                
+                {card.imageUrl ? (
+                  <Image source={{ uri: card.imageUrl }} style={styles.fullCardImage} />
+                ) : card.status === 'processing' ? (
+                  <View style={styles.cardPlaceholder}>
+                    <ActivityIndicator size="large" color="#fff" />
+                    <Text style={styles.placeholderText}>Generating card...</Text>
+                  </View>
+                ) : null}
+                
+                {card.status === 'error' && (
+                  <Text style={styles.errorText}>{card.error}</Text>
+                )}
               </View>
-            </View>
-            
-            {currentCard && (
-              <View style={styles.cardEditor}>
-                <View style={styles.cardPreview}>
-                  <View style={styles.cardHeader}>
-                    <Text style={styles.cardName}>{currentCard.name}</Text>
-                    <View style={styles.cardTypeIndicator}>
-                      <Text style={styles.cardTypeText}>{currentCard.type}</Text>
-                    </View>
-                  </View>
-                  
-                  <View style={styles.placeholderImage}>
-                    <Text style={styles.placeholderImageText}>Card Image</Text>
-                    <Text style={styles.placeholderImageSubtext}>(Generated in next step)</Text>
-                  </View>
-                  
-                  <Text style={styles.previewDescription} numberOfLines={3} ellipsizeMode="tail">
-                    {currentCard.description}
-                  </Text>
-                  
-                  <View style={styles.cardMeta}>
-                    <Text style={styles.cardMetaText}>Role: {currentCard.role}</Text>
-                    <Text style={styles.cardMetaText}>Context: {currentCard.context}</Text>
-                  </View>
-                </View>
-                
-                <View style={styles.editorSection}>
-                  <Text style={styles.editorLabel}>Description</Text>
-                  <TextInput
-                    style={styles.descriptionInput}
-                    multiline
-                    value={currentCard.description}
-                    onChangeText={handleDescriptionChange}
-                    placeholder="Enter card description..."
-                    placeholderTextColor="#666"
-                    maxLength={200}
-                  />
-                  <Text style={styles.characterCount}>
-                    {currentCard.description.length}/200
-                  </Text>
-                </View>
-                
-                <View style={styles.editorSection}>
-                  <Text style={styles.editorLabel}>Card Type</Text>
-                  <TouchableOpacity
-                    style={styles.dropdownSelector}
-                    onPress={() => setShowTypeDropdown(true)}
-                  >
-                    <Text style={styles.dropdownSelectorText}>{currentCard.type}</Text>
-                    <ChevronDown size={20} color="#666" />
-                  </TouchableOpacity>
-                </View>
-                
-                <View style={styles.editorSection}>
-                  <Text style={styles.editorLabel}>Card Role</Text>
-                  <TouchableOpacity
-                    style={styles.dropdownSelector}
-                    onPress={() => setShowRoleDropdown(true)}
-                  >
-                    <Text style={styles.dropdownSelectorText}>{currentCard.role}</Text>
-                    <ChevronDown size={20} color="#666" />
-                  </TouchableOpacity>
-                </View>
-                
-                <View style={styles.editorSection}>
-                  <Text style={styles.editorLabel}>Context</Text>
-                  <TouchableOpacity
-                    style={styles.dropdownSelector}
-                    onPress={() => setShowContextDropdown(true)}
-                  >
-                    <Text style={styles.dropdownSelectorText}>{currentCard.context}</Text>
-                    <ChevronDown size={20} color="#666" />
-                  </TouchableOpacity>
-                </View>
-              </View>
-            )}
-            
-            <TouchableOpacity
-              style={styles.continueButton}
-              onPress={handleContinue}
-              activeOpacity={0.8}
-            >
-              <Text style={styles.continueButtonText}>Continue to image generation</Text>
-              <ChevronRight size={20} color="#fff" />
-            </TouchableOpacity>
-          </>
-        )}
-      </ScrollView>
-      
-      {/* Dropdowns */}
-      {renderDropdown(
-        showTypeDropdown,
-        typeOptions,
-        currentCard?.type || '',
-        handleTypeSelect,
-        () => setShowTypeDropdown(false)
+            ))}
+          </ScrollView>
+        </>
       )}
       
-      {renderDropdown(
-        showRoleDropdown,
-        roleOptions,
-        currentCard?.role || '',
-        handleRoleSelect,
-        () => setShowRoleDropdown(false)
+      {!isLoading && Object.values(cardData).every((card: any) => card.status === 'completed' || card.status === 'error') && (
+        <View style={styles.bottomButtonContainer}>
+          <TouchableOpacity
+            style={styles.continueButton}
+            onPress={() => router.push('/(tabs)')}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.continueButtonText}>View your cards</Text>
+            <ChevronRight size={20} color="#fff" />
+          </TouchableOpacity>
+        </View>
       )}
-      
-      {renderDropdown(
-        showContextDropdown,
-        contextOptions,
-        currentCard?.context || '',
-        handleContextSelect,
-        () => setShowContextDropdown(false)
-      )}
-    </KeyboardAvoidingView>
+    </View>
   );
 }
 
@@ -450,18 +389,83 @@ const styles = StyleSheet.create({
   backButton: {
     padding: 8,
   },
-  title: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#fff',
-    textAlign: 'center',
+  nameInput: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#FFFFFF',
+    backgroundColor: 'transparent',
+    borderBottomWidth: 1,
+    borderBottomColor: '#444',
+    paddingVertical: 8,
+    paddingHorizontal: 0,
+    marginBottom: 4,
   },
-  scrollView: {
+  typeImpact: {
+    color: '#FF6B6B',
+  },
+  typeRequest: {
+    color: '#4ECDC4',
+  },
+  typeProtect: {
+    color: '#45B7D1',
+  },
+  typeConnect: {
+    color: '#96CEB4',
+  },
+  typePercept: {
+    color: '#FFEAA7',
+  },
+  statusCompleted: {
+    color: '#4CAF50',
+  },
+  statusError: {
+    color: '#F44336',
+  },
+  statusProcessing: {
+    color: '#FF9800',
+  },
+  cardsContainer: {
     flex: 1,
+    paddingHorizontal: 20,
+    paddingTop: 20,
   },
-  scrollContent: {
-    padding: 20,
-    paddingBottom: 40,
+  cardsContentContainer: {
+    paddingRight: 20,
+  },
+  cardItem: {
+    backgroundColor: '#2A2A2A',
+    borderRadius: 12,
+    padding: 16,
+    marginRight: 20,
+    borderWidth: 1,
+    borderColor: '#444',
+    width: 320, // Increased width for larger cards
+  },
+  statusIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  statusText: {
+    fontSize: 14,
+    fontWeight: '500',
+    marginLeft: 8,
+  },
+  cardPreviewImage: {
+    width: '100%',
+    height: 200,
+    borderRadius: 8,
+    marginBottom: 12,
+  },
+  cardDescription: {
+    fontSize: 14,
+    color: '#CCCCCC',
+    lineHeight: 20,
+  },
+  errorText: {
+    fontSize: 14,
+    color: '#F44336',
+    fontStyle: 'italic',
   },
   stepIndicator: {
     flexDirection: 'row',
@@ -682,5 +686,97 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
     marginRight: 8,
+  },
+  inputWithIcon: {
+    position: 'relative',
+  },
+  textAreaWithIcon: {
+    paddingRight: 50,
+  },
+  inputIcon: {
+    position: 'absolute',
+    right: 12,
+    top: 12,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#f0f0f0',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  inputIconDisabled: {
+    backgroundColor: '#333',
+    opacity: 0.5,
+  },
+  generateButton: {
+    backgroundColor: '#6366f1',
+    borderRadius: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  generateButtonDisabled: {
+    backgroundColor: '#3f3f46',
+    opacity: 0.7,
+  },
+  generateButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+  descriptionButton: {
+    alignSelf: 'flex-start',
+  },
+  buttonIcon: {
+    marginRight: 8,
+  },
+  cardSubtitle: {
+    color: '#aaa',
+    fontSize: 14,
+    marginTop: 4,
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    paddingBottom: 100,
+  },
+  fullCardImage: {
+    width: '100%',
+    aspectRatio: 2/3, // Portrait card aspect ratio
+    borderRadius: 12,
+    marginBottom: 12,
+  },
+  cardPlaceholder: {
+    width: '100%',
+    aspectRatio: 2/3,
+    backgroundColor: '#1A1A1A',
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 12,
+    borderWidth: 2,
+    borderColor: '#333',
+    borderStyle: 'dashed',
+  },
+  placeholderText: {
+    color: '#888',
+    fontSize: 14,
+    marginTop: 12,
+    textAlign: 'center',
+  },
+  bottomButtonContainer: {
+    padding: 20,
+    paddingBottom: 40,
   },
 });

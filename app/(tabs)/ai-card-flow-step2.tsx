@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { 
   View, 
   Text, 
@@ -21,17 +21,14 @@ import { Zap, Shield, HandHeart, MessageCircle, Eye } from 'lucide-react-native'
 const { width } = Dimensions.get('window');
 const cardWidth = (width - 60) / 2; // 2 cards per row with margins
 
-// Mock card suggestions - in real implementation, these would come from an API
-const MOCK_CARD_SUGGESTIONS = [
-  { id: '1', name: 'Emotional Deflection', type: 'Impact', icon: Zap },
-  { id: '2', name: 'Boundary Setting', type: 'Protect', icon: Shield },
-  { id: '3', name: 'Empathetic Listening', type: 'Connect', icon: HandHeart },
-  { id: '4', name: 'Topic Shifting', type: 'Request', icon: MessageCircle },
-  { id: '5', name: 'Vulnerability Block', type: 'Protect', icon: Shield },
-  { id: '6', name: 'Perspective Taking', type: 'Percept', icon: Eye },
-  { id: '7', name: 'Validation Seeking', type: 'Request', icon: MessageCircle },
-  { id: '8', name: 'Emotional Mirroring', type: 'Connect', icon: HandHeart },
-];
+// Card type to icon mapping
+const CARD_TYPE_ICONS = {
+  Impact: Zap,
+  Protect: Shield,
+  Connect: HandHeart,
+  Request: MessageCircle,
+  Percept: Eye,
+};
 
 export default function AICardFlowStep2() {
   const router = useRouter();
@@ -41,24 +38,76 @@ export default function AICardFlowStep2() {
   const [isLoading, setIsLoading] = useState(true);
   const [isRegenerating, setIsRegenerating] = useState(false);
   const [selectedCards, setSelectedCards] = useState<string[]>([]);
-  const [cardSuggestions, setCardSuggestions] = useState<typeof MOCK_CARD_SUGGESTIONS>([]);
+  const [cardSuggestions, setCardSuggestions] = useState<Array<{
+    id: string;
+    name: string;
+    type: string;
+    description?: string;
+    role?: string;
+    context?: string;
+    icon: any;
+  }>>([]);
   
-  // Simulate API call to get card suggestions
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setCardSuggestions(MOCK_CARD_SUGGESTIONS);
+  // Fetch card suggestions from AI
+  const fetchCardSuggestions = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      const response = await fetch(
+        `${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/analyze-conversation`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY}`,
+          },
+          body: JSON.stringify({ conversationText: conversationPrompt }),
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error('Failed to analyze conversation');
+      }
+
+      const { cards } = await response.json();
+      
+      // Map the API response to our card format
+      const formattedCards = cards.map((card: any, index: number) => ({
+        id: String(index + 1),
+        name: card.name,
+        type: card.type,
+        description: card.description,
+        role: card.role,
+        context: card.context,
+        icon: CARD_TYPE_ICONS[card.type as keyof typeof CARD_TYPE_ICONS] || MessageCircle,
+      }));
+
+      setCardSuggestions(formattedCards);
+    } catch (error) {
+      console.error('Error fetching card suggestions:', error);
+      // Fallback to mock data if API fails
+      const fallbackCards = [
+        { id: '1', name: 'Emotional Deflection', type: 'Impact', icon: Zap },
+        { id: '2', name: 'Boundary Setting', type: 'Protect', icon: Shield },
+        { id: '3', name: 'Empathetic Listening', type: 'Connect', icon: HandHeart },
+      ];
+      setCardSuggestions(fallbackCards);
+    } finally {
       setIsLoading(false);
-    }, 1500);
-    
-    return () => clearTimeout(timer);
-  }, []);
+    }
+  }, [conversationPrompt]);
+
+  // Initial fetch of card suggestions
+  useEffect(() => {
+    fetchCardSuggestions();
+  }, [fetchCardSuggestions]);
   
+  // Regenerate card suggestions
   const handleCardSelect = (cardId: string) => {
     if (Platform.OS !== 'web') {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     }
     
-    setSelectedCards(prev => {
+    setSelectedCards((prev: string[]) => {
       if (prev.includes(cardId)) {
         return prev.filter(id => id !== cardId);
       } else {
@@ -67,20 +116,16 @@ export default function AICardFlowStep2() {
     });
   };
   
-  const handleRegenerate = () => {
+  const handleRegenerate = async () => {
+    if (isRegenerating) return;
+    
     if (Platform.OS !== 'web') {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     }
     
     setIsRegenerating(true);
-    
-    // Simulate API call to regenerate suggestions
-    setTimeout(() => {
-      // In a real implementation, you would call an API to get new suggestions
-      // For now, we'll just shuffle the existing ones
-      setCardSuggestions([...MOCK_CARD_SUGGESTIONS].sort(() => Math.random() - 0.5));
-      setIsRegenerating(false);
-    }, 1500);
+    await fetchCardSuggestions();
+    setIsRegenerating(false);
   };
   
   const handleContinue = () => {
@@ -90,17 +135,21 @@ export default function AICardFlowStep2() {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     }
     
-    // Navigate to step 3 with the selected card IDs and the original prompt
+    // Get the full card data for selected cards
+    const selectedCardData = cardSuggestions.filter(card => selectedCards.includes(card.id));
+    
+    // Navigate to step 3 with the selected card data and the original prompt
     router.push({
       pathname: '/(tabs)/ai-card-flow-step3',
       params: { 
         selectedCards: selectedCards.join(','),
+        cardData: JSON.stringify(selectedCardData),
         prompt: conversationPrompt
       }
     });
   };
   
-  const renderCardItem = ({ item }: { item: typeof MOCK_CARD_SUGGESTIONS[0] }) => {
+  const renderCardItem = ({ item }: { item: { id: string; name: string; type: string; icon: any; description?: string; role?: string; context?: string } }) => {
     const isSelected = selectedCards.includes(item.id);
     const IconComponent = item.icon;
     
@@ -119,7 +168,6 @@ export default function AICardFlowStep2() {
           <IconComponent size={16} color="#fff" />
         </View>
         <Text style={styles.cardName}>{item.name}</Text>
-        <Text style={styles.cardType}>{item.type}</Text>
       </TouchableOpacity>
     );
   };

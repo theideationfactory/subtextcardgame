@@ -21,6 +21,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFonts, Inter_400Regular, Inter_700Bold } from '@expo-google-fonts/inter';
 import * as SplashScreen from 'expo-splash-screen';
+import { activateKeepAwake, deactivateKeepAwake } from 'expo-keep-awake';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
@@ -414,6 +415,14 @@ export default function CardCreationNewScreen() {
     setError('');
     setErrorDetails('');
 
+    // Activate KeepAwake to prevent screen sleep during generation
+    try {
+      activateKeepAwake('image-generation');
+      console.log('KeepAwake activated for enhanced image generation');
+    } catch (keepAwakeError) {
+      console.warn('Failed to activate KeepAwake:', keepAwakeError);
+    }
+
     try {
       setAuthChecking(true);
 
@@ -470,6 +479,14 @@ export default function CardCreationNewScreen() {
     } finally {
       setIsGenerating(false);
       setAuthChecking(false);
+      
+      // Deactivate KeepAwake when generation completes
+      try {
+        deactivateKeepAwake('image-generation');
+        console.log('KeepAwake deactivated after enhanced image generation');
+      } catch (keepAwakeError) {
+        console.warn('Failed to deactivate KeepAwake:', keepAwakeError);
+      }
     }
   };
 
@@ -487,6 +504,14 @@ export default function CardCreationNewScreen() {
     setIsGenerating(true);
     setError('');
     setErrorDetails('');
+
+    // Activate KeepAwake to prevent screen sleep during generation
+    try {
+      activateKeepAwake('image-generation');
+      console.log('KeepAwake activated for legacy image generation');
+    } catch (keepAwakeError) {
+      console.warn('Failed to activate KeepAwake:', keepAwakeError);
+    }
 
     try {
       setAuthChecking(true);
@@ -542,6 +567,14 @@ export default function CardCreationNewScreen() {
     } finally {
       setIsGenerating(false);
       setAuthChecking(false);
+      
+      // Deactivate KeepAwake when generation completes
+      try {
+        deactivateKeepAwake('image-generation');
+        console.log('KeepAwake deactivated after legacy image generation');
+      } catch (keepAwakeError) {
+        console.warn('Failed to deactivate KeepAwake:', keepAwakeError);
+      }
     }
   };
 
