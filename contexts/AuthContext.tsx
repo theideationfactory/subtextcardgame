@@ -48,150 +48,74 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Removed verbose logging
       const { data: { session }, error } = await supabase.auth.refreshSession();
       if (error) {
-        console.error('Error refreshing session:', error);
-        return;
+        console.error('Session refresh error:', error);
+        return null;
       }
-      // Session refresh successful
-      setUser(session?.user ?? null);
       return session;
     } catch (error) {
-      console.error('Error in refreshSession:', error);
+      console.error('Unexpected error during session refresh:', error);
       return null;
     }
   };
 
-    const fetchCards = async (page = 0, limit = 20, useCache = true, scope?: string): Promise<Card[]> => {
+  const fetchCards = async (page = 0, limit = 20, useCache = true, scope = 'personal'): Promise<Card[]> => {
     try {
-      if (!user) {
-        console.log('fetchCards: No authenticated user, skipping card fetch');
+      setLoading(true);
+      
+      // Early return if no user for scopes that require authentication
+      if (!user?.id) {
+        console.log('No authenticated user, returning empty cards array');
+        setCards([]);
         return [];
       }
-
-      // Use cached cards if available and requested
-            if (useCache && !scope && cards.length > 0 && page === 0) {
-        return cards;
-      }
-
-            console.log(`fetchCards: Fetching cards for user ${user.id}, page ${page}, scope: ${scope}`);
-
-      // First, let's try a simple query to test basic connectivity
-      const { data: testData, error: testError } = await supabase
-        .from('cards')
-        .select('count', { count: 'exact', head: true })
-        .eq('user_id', user.id);
-
-      if (testError) {
-        console.error('fetchCards: Test query failed:', testError);
-        throw new Error(`Database connectivity test failed: ${testError.message}`);
-      }
-
-      console.log(`fetchCards: Test query successful, user has ${testData} cards`);
-
-      // Start with basic columns and gradually add more to identify the problematic column
-      let selectColumns = 'id, name, description, type, role, context, image_url, user_id, created_at';
       
-      try {
-        // Try with basic columns first
-        console.log('fetchCards: Trying basic columns...');
-        const { data: basicData, error: basicError } = await supabase
-          .from('cards')
-          .select(selectColumns)
-          .eq('user_id', user.id)
-          .order('created_at', { ascending: false })
-          .range(page * limit, (page + 1) * limit - 1);
+      // Return cached cards if available and cache is enabled
+      if (useCache && !scope && cards.length > 0 && page === 0) {
+        return cards; // CACHED RESULT!
+      }
+      
+      // Rest of fetchCards implementation...
+      let query = supabase
+        .from('cards')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .range(page * limit, (page + 1) * limit - 1);
 
-        if (basicError) {
-          console.error('fetchCards: Basic query failed:', basicError);
-          throw new Error(`Basic query failed: ${basicError.message}`);
+      // Apply scope filtering with proper null checks
+      if (scope === 'personal') {
+        query = query.eq('user_id', user.id);
+      } else if (scope === 'friends') {
+        // Friend filtering logic...
+        const { data: friends } = await supabase
+          .from('friend_requests')
+          .select('sender_id, receiver_id')
+          .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`)
+          .eq('status', 'accepted');
+
+        if (friends) {
+          const friendIds = friends.flatMap(f => [f.sender_id, f.receiver_id]).filter(id => id !== user.id);
+          query = query.in('user_id', friendIds).eq('is_shared_with_friends', true);
         }
-
-        console.log(`fetchCards: Basic query successful, got ${basicData?.length || 0} cards`);
-
-        // Now try adding the additional columns one by one
-        const additionalColumns = ['frame_width', 'frame_color', 'name_color', 'type_color', 'description_color', 'context_color', 'collection_id', 'is_shared_with_friends'];
-        let workingColumns = selectColumns;
-
-        for (const col of additionalColumns) {
-          try {
-            const testSelect = `${workingColumns}, ${col}`;
-            console.log(`fetchCards: Testing with column: ${col}`);
-            
-            const { data: testColData, error: testColError } = await supabase
-              .from('cards')
-              .select(testSelect)
-              .eq('user_id', user.id)
-              .limit(1);
-
-            if (testColError) {
-              console.error(`fetchCards: Column ${col} failed:`, testColError);
-              // Skip this column and continue
-              continue;
-            }
-
-            // If successful, add to working columns
-            workingColumns = testSelect;
-            console.log(`fetchCards: Column ${col} works fine`);
-          } catch (colErr) {
-            console.error(`fetchCards: Error testing column ${col}:`, colErr);
-          }
-        }
-
-        // Now do the final query with all working columns
-        console.log(`fetchCards: Final query with columns: ${workingColumns}`);
-        const query = supabase
-          .from('cards')
-          .select(workingColumns);
-
-        if (scope === 'Personal') {
-          query.eq('user_id', user.id);
-        } else if (scope === 'Public') {
-          query.eq('is_public', true);
-        } else if (scope === 'Friends') {
-          // Check for cards shared with the current user
-          const friendsConditions = [`shared_with_user_ids.cs.{"${user.id}"}`];
-          if (workingColumns.includes('is_shared_with_friends')) {
-            friendsConditions.push('is_shared_with_friends.eq.true');
-          }
-          query.or(friendsConditions.join(','));
-        } else {
-          // Default: get user's own cards, public cards, and cards shared with them
-          // Correct array containment syntax: cs.{"value"} for UUID arrays
-          query.or(`user_id.eq.${user.id},is_public.eq.true,shared_with_user_ids.cs.{"${user.id}"}`);
-        }
-
-        query
-          .order('created_at', { ascending: false })
-          .range(page * limit, (page + 1) * limit - 1);
-
-        const { data, error: fetchError } = await query;
-
-        if (fetchError) {
-          console.error('fetchCards: Final query failed:', fetchError);
-          console.error('fetchCards: Error details:', JSON.stringify(fetchError, null, 2));
-          throw new Error(`Failed to fetch cards: ${fetchError.message}`);
-        }
-
-        console.log(`fetchCards: Successfully fetched ${data?.length || 0} cards`);
-
-        // Explicitly cast data to Card[] | null here using a double assertion
-        const fetchedCards: Card[] = (data as unknown as Card[] | null) || [];
-                // If it's the first page or a scope is applied, we replace the cards. Otherwise, we append for pagination.
-        const newCards = (page === 0 || scope) ? fetchedCards : [...cards, ...fetchedCards];
-        setCards(newCards);
-        return newCards;
-
-      } catch (queryErr) {
-        console.error('fetchCards: Query execution failed:', queryErr);
-        throw queryErr;
+      } else if (scope === 'public') {
+        query = query.eq('is_public', true).neq('user_id', user.id);
       }
 
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
-      console.error('Error in fetchCards:', errorMessage);
-      console.error('Error details:', err);
+      const { data, error } = await query;
+
+      if (error) {
+        console.error('Error fetching cards:', error);
+        return []; // Return empty array on error
+      }
+
+      const fetchedCards = data || [];
+      setCards(fetchedCards);
+      return fetchedCards;
+    } catch (error) {
+      console.error('Unexpected error fetching cards:', error);
       return []; // Return empty array on error
+    } finally {
+      setLoading(false);
     }
-    return []; // Should not be reached, but for type safety
   };
 
   useEffect(() => {
@@ -214,10 +138,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           
           if (session?.user) {
             await fetchCards(); // This call updates the state, no need to capture return here
+            
           }
         }
       } catch (error) {
-        console.error('Error getting initial session:', error);
+        console.error('Auth initialization error:', error);
       } finally {
         setLoading(false);
       }
@@ -225,37 +150,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     initAuth();
 
-    // Subscribe to auth changes
+    // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      // Auth state change
-      // Session update
+      console.log('Auth state changed:', event, session?.user?.id);
       
-      // Handle different auth events
-      if (event === 'SIGNED_IN') {
-        console.log('User signed in');
-        setUser(session?.user ?? null);
-        if (session?.user) {
-          await fetchCards(); // This call updates the state, no need to capture return here
-        }
+      if (event === 'SIGNED_IN' && session?.user) {
+        setUser(session.user);
+        await fetchCards();
+        
       } else if (event === 'SIGNED_OUT') {
-        console.log('User signed out');
         setUser(null);
         setCards([]);
-      } else if (event === 'TOKEN_REFRESHED') {
-        console.log('Token refreshed');
-        setUser(session?.user ?? null);
-      } else if (event === 'USER_UPDATED') {
-        console.log('User updated');
-        setUser(session?.user ?? null);
-      } else {
-        // For any other event, update the user state
-        setUser(session?.user ?? null);
         
-        if (session?.user) {
-          await fetchCards(); // This call updates the state, no need to capture return here
-        } else {
-          setCards([]);
-        }
       }
     });
 
@@ -264,11 +170,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
-  return (
-    <AuthContext.Provider value={{ user, loading, cards, refreshSession, fetchCards }}>
-      {children}
-    </AuthContext.Provider>
-  );
+  const value = {
+    user,
+    loading,
+    cards,
+    refreshSession,
+    fetchCards,
+  };
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
 export const useAuth = () => {

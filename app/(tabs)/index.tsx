@@ -117,6 +117,9 @@ export default function CollectionScreen() {
   const { height: screenHeight } = useWindowDimensions();
   const router = useRouter();
   
+  // Double tap timing ref
+  const lastTapRef = useRef<number>(0);
+  
   // Calculate scaling factor for horizontal scrolling based on device
   const getScaleFactor = () => {
     // For horizontal scrolling, use consistent scaling based on device type
@@ -667,11 +670,10 @@ export default function CollectionScreen() {
     const backgroundGradient = getBackgroundGradient();
     
     // Double tap detection for modal - NOW FLIP-STATE AWARE!
-    let lastTap = 0;
     const handleDoubleTapCard = () => {
       const now = Date.now();
       const DOUBLE_PRESS_DELAY = 300;
-      if (lastTap && (now - lastTap) < DOUBLE_PRESS_DELAY) {
+      if (lastTapRef.current && (now - lastTapRef.current) < DOUBLE_PRESS_DELAY) {
         // Determine which card to edit based on current flip state
         let targetCard: Card;
         
@@ -709,7 +711,7 @@ export default function CollectionScreen() {
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         }
       }
-      lastTap = now;
+      lastTapRef.current = now;
     };
     
     // Long press handler for animated card flip

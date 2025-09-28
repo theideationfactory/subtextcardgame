@@ -25,7 +25,8 @@
         "NSPhotoLibraryUsageDescription": "We need access to your photo library to select images for your cards.",
         "NSMicrophoneUsageDescription": "We need access to your microphone for audio recordings.",
         "NSFaceIDUsageDescription": "We use Face ID to secure your account.",
-        "CFBundleAllowMixedLocalizations": true
+        "CFBundleAllowMixedLocalizations": true,
+        "UIBackgroundModes": ["fetch", "processing"]
       },
       "config": {
         "usesNonExemptEncryption": false
@@ -62,7 +63,9 @@
         {
           "faceIDPermission": "Allow $(PRODUCT_NAME) to access your Face ID biometric data."
         }
-      ]
+      ],
+      "expo-background-fetch",
+      "expo-task-manager"
     ],
     "experiments": {
       "typedRoutes": true,

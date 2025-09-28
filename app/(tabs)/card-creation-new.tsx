@@ -75,6 +75,45 @@ export default function CardCreationNewScreen() {
   const [authChecking, setAuthChecking] = useState(false);
   const [showGenChoiceModal, setShowGenChoiceModal] = useState(false);
   const [isPremiumGeneration, setIsPremiumGeneration] = useState(false);
+  const [generationJobId, setGenerationJobId] = useState<string | null>(null);
+
+  // Check for completed jobs on screen focus
+  useFocusEffect(
+    useCallback(() => {
+      const checkJobStatus = async () => {
+        if (generationJobId) {
+          console.log('Checking status for job:', generationJobId);
+          const { data, error } = await supabase
+            .from('image_generation_queue')
+            .select('status, image_url')
+            .eq('id', generationJobId)
+            .single();
+
+          if (error) {
+            console.error('Error fetching job status:', error);
+            return;
+          }
+
+          if (data.status === 'completed' && data.image_url) {
+            console.log('Job completed! Image URL:', data.image_url);
+            setCardImage(data.image_url);
+            setGenerationJobId(null); // Clear the job ID
+            Alert.alert('Image Ready!', 'Your new card image has been successfully generated.');
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          } else if (data.status === 'failed') {
+            setError('Image generation failed. Please try again.');
+            setGenerationJobId(null);
+          } else {
+            console.log('Job status:', data.status);
+          }
+        }
+      };
+
+      const intervalId = setInterval(checkJobStatus, 5000); // Check every 5 seconds
+
+      return () => clearInterval(intervalId);
+    }, [generationJobId])
+  );
 
   // Collapsible section states
   const [visibility, setVisibility] = useState<string[]>(['personal']);
@@ -399,8 +438,60 @@ export default function CardCreationNewScreen() {
     return null;
   }
 
-  // Enhanced premium-prompt generation using new edge function (still gpt-image-1)
-  const generateEnhancedImage = async () => {
+  const queueImageGeneration = async (isPremium: boolean) => {
+    if (!name || !imageDescription) {
+      setError('Please provide a card name and image description.');
+      return;
+    }
+
+    setIsGenerating(true);
+    setError('');
+
+    try {
+      const currentSession = await refreshSession();
+      if (!currentSession?.user?.id) {
+        throw new Error('Authentication required. Please log in again.');
+      }
+
+      const cardDetails = {
+        name,
+        description: imageDescription,
+        type,
+        role,
+        context,
+        format,
+        isPremium,
+      };
+
+      const { data, error } = await supabase.functions.invoke('queue-image-generation', {
+        body: { 
+          userId: currentSession.user.id,
+          cardData: cardDetails
+        },
+      });
+
+      if (error) throw error;
+
+      setGenerationJobId(data.jobId);
+      setIsPremiumGeneration(isPremium);
+
+      Alert.alert(
+        'Generation Started!',
+        'Your image is being generated in the background. You can safely leave this screen. We\'ll notify you when it\'s ready.',
+        [{ text: 'OK' }]
+      );
+
+    } catch (err) {
+      console.error('Error queueing image generation:', err);
+      setError(err instanceof Error ? err.message : 'Failed to start generation.');
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  // Old synchronous generation functions are now deprecated by the queue system.
+  // They are kept here for reference but should be removed later.
+  const generateEnhancedImage_DEPRECATED = async () => {
     if (!name) {
       setError('Please provide a card name');
       return;
@@ -490,7 +581,7 @@ export default function CardCreationNewScreen() {
     }
   };
 
-  const generateImage = async () => {
+  const generateImage_DEPRECATED = async () => {
     if (!name) {
       setError('Please provide a card name');
       return;
@@ -1204,9 +1295,9 @@ export default function CardCreationNewScreen() {
 
                 <TouchableOpacity
                   style={styles.genChoiceButton}
-                  onPress={async () => {
+                  onPress={() => {
                     setShowGenChoiceModal(false);
-                    await generateImage();
+                    queueImageGeneration(false);
                   }}
                   disabled={isGenerating}
                 >
@@ -1215,9 +1306,9 @@ export default function CardCreationNewScreen() {
 
                 <TouchableOpacity
                   style={[styles.genChoiceButton, styles.genChoiceButtonSecondary]}
-                  onPress={async () => {
+                  onPress={() => {
                     setShowGenChoiceModal(false);
-                    await generateEnhancedImage();
+                    queueImageGeneration(true);
                   }}
                   disabled={isGenerating}
                 >
