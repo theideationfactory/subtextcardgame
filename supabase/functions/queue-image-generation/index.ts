@@ -13,17 +13,27 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
+    console.log('🔄 Processing queue request...');
+    
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
       { global: { headers: { Authorization: req.headers.get('Authorization')! } } }
     );
 
-    const { cardData, userId } = await req.json();
+    console.log('✅ Supabase client created');
+
+    const requestBody = await req.json();
+    console.log('📥 Request body:', requestBody);
+    
+    const { cardData, userId } = requestBody;
 
     if (!cardData || !userId) {
+      console.error('❌ Missing required fields:', { cardData: !!cardData, userId: !!userId });
       throw new Error('Missing cardData or userId');
     }
+
+    console.log('✅ Request validation passed');
 
     // Insert a new job into the queue
     const { data: job, error } = await supabaseClient
@@ -37,9 +47,12 @@ Deno.serve(async (req: Request) => {
       .single();
 
     if (error) {
-      console.error('Error queueing job:', error);
+      console.error('❌ Database error:', error);
+      console.error('❌ Error details:', JSON.stringify(error, null, 2));
       throw error;
     }
+
+    console.log('✅ Job inserted successfully:', job);
 
     // Asynchronously trigger the processing function without waiting for it to complete.
     // We don't await this call.

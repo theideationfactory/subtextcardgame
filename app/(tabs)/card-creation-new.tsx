@@ -438,12 +438,19 @@ export default function CardCreationNewScreen() {
     return null;
   }
 
+  // Debug logging removed to reduce console spam
+
   const queueImageGeneration = async (isPremium: boolean) => {
+    console.log('🚀 queueImageGeneration called with isPremium:', isPremium);
+    console.log('📝 Current form state:', { name, imageDescription, type, role, context });
+    
     if (!name || !imageDescription) {
+      console.log('❌ Missing required fields:', { name: !!name, imageDescription: !!imageDescription });
       setError('Please provide a card name and image description.');
       return;
     }
 
+    console.log('✅ Form validation passed, starting generation...');
     setIsGenerating(true);
     setError('');
 
@@ -463,6 +470,10 @@ export default function CardCreationNewScreen() {
         isPremium,
       };
 
+      console.log('🎨 Starting image generation for:', cardDetails);
+      console.log('👤 User ID:', currentSession.user.id);
+      console.log('📤 Calling queue-image-generation function...');
+
       const { data, error } = await supabase.functions.invoke('queue-image-generation', {
         body: { 
           userId: currentSession.user.id,
@@ -470,7 +481,12 @@ export default function CardCreationNewScreen() {
         },
       });
 
-      if (error) throw error;
+      console.log('📥 Function response:', { data, error });
+
+      if (error) {
+        console.error('❌ Edge function error:', error);
+        throw error;
+      }
 
       setGenerationJobId(data.jobId);
       setIsPremiumGeneration(isPremium);
@@ -482,9 +498,12 @@ export default function CardCreationNewScreen() {
       );
 
     } catch (err) {
-      console.error('Error queueing image generation:', err);
-      setError(err instanceof Error ? err.message : 'Failed to start generation.');
+      console.error('❌ Error queueing image generation:', err);
+      console.error('❌ Error details:', JSON.stringify(err, null, 2));
+      setError(`Failed to start image generation: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      console.error('Error details:', err);
     } finally {
+      console.log('🏁 Generation attempt finished, setting isGenerating to false');
       setIsGenerating(false);
     }
   };
@@ -973,6 +992,7 @@ export default function CardCreationNewScreen() {
   };
 
   const handleGenerateDescription = async () => {
+    console.log('📝 Generate Description button pressed');
     if (!name) {
       setError('Please provide a card name');
       return;
@@ -1018,6 +1038,7 @@ export default function CardCreationNewScreen() {
   };
 
   const handleGenerateImageDescription = async () => {
+    console.log('🖼️ Generate Image Description button pressed');
     if (!name) {
       setError('Please provide a card name');
       return;
@@ -1296,6 +1317,7 @@ export default function CardCreationNewScreen() {
                 <TouchableOpacity
                   style={styles.genChoiceButton}
                   onPress={() => {
+                    console.log('🎨 Standard generation selected');
                     setShowGenChoiceModal(false);
                     queueImageGeneration(false);
                   }}
@@ -1307,6 +1329,7 @@ export default function CardCreationNewScreen() {
                 <TouchableOpacity
                   style={[styles.genChoiceButton, styles.genChoiceButtonSecondary]}
                   onPress={() => {
+                    console.log('💎 Premium generation selected');
                     setShowGenChoiceModal(false);
                     queueImageGeneration(true);
                   }}
@@ -1503,7 +1526,12 @@ export default function CardCreationNewScreen() {
           <View style={styles.imageButtonsContainer}>
             <TouchableOpacity 
               style={[styles.generateButton, (!name || !imageDescription || isGenerating) && styles.generateButtonDisabled]} 
-              onPress={() => setShowGenChoiceModal(true)}
+              onPress={() => {
+                console.log('🎯 Generate Image button pressed - MAIN BUTTON');
+                console.log('📋 Button state:', { name: !!name, imageDescription: !!imageDescription, isGenerating });
+                console.log('📝 Form values:', { name, imageDescription });
+                setShowGenChoiceModal(true);
+              }}
               disabled={!name || !imageDescription || isGenerating}
             >
               {isGenerating ? (
