@@ -45,15 +45,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const refreshSession = async () => {
     try {
-      // Removed verbose logging
+      console.log('🔄 Refreshing session...');
       const { data: { session }, error } = await supabase.auth.refreshSession();
+      
       if (error) {
-        console.error('Session refresh error:', error);
+        console.error('❌ Session refresh error:', error.message);
         return null;
       }
-      return session;
+      
+      if (session?.user) {
+        console.log('✅ Session refreshed successfully for user:', session.user.email);
+        setUser(session.user);
+        return session;
+      } else {
+        console.log('⚠️ No session returned after refresh');
+        return null;
+      }
     } catch (error) {
-      console.error('Unexpected error during session refresh:', error);
+      console.error('❌ Unexpected error during session refresh:', error);
       return null;
     }
   };
@@ -122,27 +131,47 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Initial session check
     const initAuth = async () => {
       try {
-        // Auth init
-        const { data: { session } } = await supabase.auth.getSession();
+        console.log('🔄 Initializing authentication...');
         
-        // If no session found or session appears invalid, try to refresh it
-        if (!session) {
-          // No initial session
-          const refreshedSession = await refreshSession();
-          if (!refreshedSession) {
-            // No session after refresh
+        // Get current session from storage
+        const { data: { session }, error } = await supabase.auth.getSession();
+        
+        if (error) {
+          console.error('❌ Error getting session:', error);
+          setLoading(false);
+          return;
+        }
+        
+        if (session?.user) {
+          console.log('✅ Found existing session for user:', session.user.email);
+          setUser(session.user);
+          
+          // Check if session is still valid by making a test query
+          try {
+            await supabase.from('users').select('id').limit(1);
+            console.log('✅ Session is valid, fetching cards...');
+            await fetchCards();
+          } catch (sessionError) {
+            console.log('⚠️ Session expired, attempting refresh...');
+            // Session expired, try to refresh
+            const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
+            
+            if (refreshError || !refreshData.session) {
+              console.log('❌ Session refresh failed, user needs to sign in again');
+              setUser(null);
+            } else {
+              console.log('✅ Session refreshed successfully');
+              setUser(refreshData.session.user);
+              await fetchCards();
+            }
           }
         } else {
-          // Session found
-          setUser(session?.user ?? null);
-          
-          if (session?.user) {
-            await fetchCards(); // This call updates the state, no need to capture return here
-            
-          }
+          console.log('ℹ️ No existing session found');
+          setUser(null);
         }
       } catch (error) {
-        console.error('Auth initialization error:', error);
+        console.error('❌ Auth initialization error:', error);
+        setUser(null);
       } finally {
         setLoading(false);
       }
@@ -152,16 +181,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log('Auth state changed:', event, session?.user?.id);
+      console.log('🔄 Auth state changed:', event, session?.user?.email || 'no user');
       
       if (event === 'SIGNED_IN' && session?.user) {
+        console.log('✅ User signed in:', session.user.email);
         setUser(session.user);
         await fetchCards();
-        
       } else if (event === 'SIGNED_OUT') {
+        console.log('👋 User signed out');
         setUser(null);
         setCards([]);
-        
+      } else if (event === 'TOKEN_REFRESHED' && session?.user) {
+        console.log('🔄 Token refreshed for user:', session.user.email);
+        setUser(session.user);
+        // Don't refetch cards on token refresh, just update user state
+      } else if (event === 'USER_UPDATED' && session?.user) {
+        console.log('👤 User updated:', session.user.email);
+        setUser(session.user);
       }
     });
 
