@@ -161,7 +161,7 @@ export default function AICardFlowStep3() {
 
         const imageDescription = imageDescData?.imageDescription || card.description;
 
-        // Generate the complete card
+        // Generate the complete card (now returns jobId for background processing)
         const { data: cardData, error: cardError } = await supabase.functions.invoke('generate-enhanced-card', {
           body: { 
             name: card.name, 
@@ -175,61 +175,146 @@ export default function AICardFlowStep3() {
           },
         });
 
-        if (!cardError && cardData?.imageUrl) {
-          // Save card to database if user is authenticated
-          if (user) {
-            const { data: savedCard, error: saveError } = await supabase
-              .from('cards')
-              .insert({
-                name: card.name,
-                description: card.description,
-                type: card.type,
-                role: card.role,
-                context: card.context,
-                image_url: cardData.imageUrl,
-                user_id: user.id,
-                format: 'fullBleed',
-                is_premium_generation: true
-              })
-              .select()
-              .single();
-
-            if (!saveError && savedCard) {
-              setCardData(prev => ({
-                ...prev,
-                [card.id]: {
-                  ...prev[card.id],
-                  imageUrl: cardData.imageUrl,
-                  cardId: savedCard.id,
-                  status: 'completed'
-                }
-              }));
-            } else {
-              setCardData(prev => ({
-                ...prev,
-                [card.id]: {
-                  ...prev[card.id],
-                  status: 'error',
-                  error: saveError?.message || 'Failed to save card'
-                }
-              }));
-            }
-          } else {
-            // No user session, just store locally
-            setCardData(prev => ({
-              ...prev,
-              [card.id]: {
-                ...prev[card.id],
-                imageUrl: cardData.imageUrl,
-                status: 'completed'
-              }
-            }));
-          }
-        } else {
+        if (!cardError && cardData?.jobId) {
+          console.log('✅ Card queued for background generation, jobId:', cardData.jobId);
           setCardData(prev => ({
             ...prev,
             [card.id]: {
-              ...prev[card.id],
+              ...card,
+              isGenerating: true,
+              status: 'generating',
+              jobId: cardData.jobId
+            }
+          }));
+          
+          // Start polling for completion
+          const pollForCompletion = async () => {
+            for (let i = 0; i < 60; i++) { // Poll for up to 2 minutes
+              await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds
+              
+              const { data: job } = await supabase
+                .from('image_generation_queue')
+                .select('*')
+                .eq('id', cardData.jobId)
+                .single();
+              
+              if (job?.status === 'completed' && job.image_url) {
+                console.log('✅ Card generation completed:', job.image_url);
+                
+                // Save the card to the database
+                try {
+                  if (user) {
+                    // Get or create collection
+                    const { data: existingCollections } = await supabase
+                      .from('collections')
+                      .select('id')
+                      .eq('user_id', user.id)
+                      .limit(1);
+
+                    let collectionId = null;
+                    if (existingCollections && existingCollections.length > 0) {
+                      collectionId = existingCollections[0].id;
+                    } else {
+                      const { data: newCollection } = await supabase
+                        .from('collections')
+                        .insert({
+                          name: 'My Collection',
+                          user_id: user.id,
+                          is_public: false
+                        })
+                        .select()
+                        .single();
+                      collectionId = newCollection?.id;
+                    }
+
+                    // Save the card
+                    const { data: savedCard, error: saveError } = await supabase
+                      .from('cards')
+                      .insert({
+                        name: card.name,
+                        description: card.description,
+                        type: card.type,
+                        role: card.role || 'TBD',
+                        context: card.context || 'TBD',
+                        image_url: job.image_url,
+                        user_id: user.id,
+                        collection_id: collectionId,
+                        format: 'fullBleed',
+                        is_premium_generation: true,
+                        is_public: false,
+                        is_shared_with_friends: false
+                      })
+                      .select()
+                      .single();
+
+                    if (saveError) {
+                      console.error('❌ Error saving card:', saveError);
+                    } else {
+                      console.log('✅ Card saved to database:', savedCard.id);
+                    }
+                  }
+                } catch (saveErr) {
+                  console.error('❌ Error during card save:', saveErr);
+                }
+
+                setCardData(prev => ({
+                  ...prev,
+                  [card.id]: {
+                    ...card,
+                    isGenerating: false,
+                    imageUrl: job.image_url,
+                    status: 'completed'
+                  }
+                }));
+                return;
+              } else if (job?.status === 'failed') {
+                console.error('❌ Card generation failed:', job.error_message);
+                setCardData(prev => ({
+                  ...prev,
+                  [card.id]: {
+                    ...card,
+                    isGenerating: false,
+                    status: 'error',
+                    error: job.error_message || 'Image generation failed'
+                  }
+                }));
+                return;
+              }
+            }
+            
+            // Timeout
+            console.error('❌ Card generation timed out');
+            setCardData(prev => ({
+              ...prev,
+              [card.id]: {
+                ...card,
+                isGenerating: false,
+                status: 'error',
+                error: 'Image generation timed out'
+              }
+            }));
+          };
+          
+          pollForCompletion();
+        } else if (!cardError && cardData?.imageUrl) {
+          // Old response format - direct image URL
+          console.log('✅ Card generated successfully:', cardData.imageUrl);
+          setCardData(prev => ({
+            ...prev,
+            [card.id]: {
+              ...card,
+              isGenerating: false,
+              imageUrl: cardData.imageUrl,
+              status: 'completed'
+            }
+          }));
+        } else {
+          console.error('❌ Error generating card:', cardError?.message || 'Failed to generate card');
+          setCardData(prev => ({
+            ...prev,
+            [card.id]: {
+              ...card,
+              isGenerating: false,
               status: 'error',
               error: cardError?.message || 'Failed to generate card'
             }

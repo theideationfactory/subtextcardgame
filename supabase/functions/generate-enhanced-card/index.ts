@@ -1,79 +1,53 @@
-// Supabase Edge Functions use Deno runtime
-// Suppress TypeScript errors for Deno-specific imports
-// @ts-ignore: Deno-specific import
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3?deno-std=0.177.0';
-// @ts-ignore: Deno-specific import
-import OpenAI from 'npm:openai@4.24.1';
-
-// @ts-ignore: Deno namespace
-declare const Deno: {
-  env: {
-    get(key: string): string | undefined;
-  };
-  serve(handler: (req: Request) => Promise<Response>): void;
-};
+import { createClient } from 'npm:@supabase/supabase-js@2'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-};
-
-const BUCKET_NAME = 'card_images';
+  'Access-Control-Allow-Methods': 'POST, OPTIONS'
+}
 
 Deno.serve(async (req: Request) => {
+  // Handle CORS preflight
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
+    return new Response('ok', { headers: corsHeaders })
   }
 
   try {
-    const apiKey = Deno.env.get('OPENAI_API_KEY');
-    if (!apiKey) {
-      throw new Error('OpenAI API key is not configured');
-    }
-
-    const openai = new OpenAI({
-      apiKey: apiKey,
-    });
-
-    const authHeader = req.headers.get('Authorization');
-    if (!authHeader) {
-      throw new Error('No authorization header');
-    }
+    console.log('Processing enhanced card generation request...');
 
     const supabase = createClient(
-      Deno.env.get('SUPABASE_URL')!,
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
-      {
-        auth: {
-          persistSession: false,
-          autoRefreshToken: false,
-        }
-      }
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      { global: { headers: { Authorization: req.headers.get('Authorization')! } } }
     );
 
-    // Get the user's ID from the JWT token
-    const { data: { user }, error: userError } = await supabase.auth.getUser(
-      authHeader.replace('Bearer ', '')
-    );
+    console.log('Supabase client created');
 
+    // Get the current user
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
     if (userError || !user) {
-      throw new Error('Invalid authentication');
+      console.error('Authentication error:', userError);
+      return new Response(
+        JSON.stringify({ error: 'Authentication required' }),
+        {
+          status: 401,
+          headers: {
+            ...corsHeaders,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
     }
 
-    const body = await req.json().catch(() => ({}));
-    const {
-      name,
-      description,
-      type,
-      role,
-      context,
-      format = 'framed',
-      size = '1024x1536', // Closest to 2.5:3.5 card ratio, OpenAI supported
-      quality = 'auto'
-    } = body;
+    console.log('User authenticated:', user.id);
+
+    const requestBody = await req.json();
+    console.log('Request body:', requestBody);
+    
+    const { name, description, type, role, context, format, size, quality } = requestBody;
 
     if (!name || !description) {
+      console.error('Missing required fields:', { name: !!name, description: !!description });
       return new Response(
         JSON.stringify({ 
           error: 'Name and description are required',
@@ -89,152 +63,85 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // Build an enhanced prompt for premium card art - clean image without text overlays
-    const topLabels = [];
-    if (type) topLabels.push(type); // Phenomenon type
-    if (role) topLabels.push(role); // Role/detail
-    
-    const bottomLabels = [];
-    if (context) bottomLabels.push(context); // Context
+    console.log('Request validation passed');
+    console.log('Queueing enhanced card generation for:', name);
 
-    const premiumPrompt = [
-      `Create a premium trading card artwork featuring "${name}" with ${description}.`,
-      `Design as a complete trading card with integrated card name and attribute labels in a fantasy card game style.`,
-      `Include the title "${name}" prominently displayed at the bottom of the card.`,
-      topLabels.length > 0 ? `Show these attributes as elegant text labels in the TOP corners: ${topLabels.join(' in top-left, ')} in top-right.` : '',
-      bottomLabels.length > 0 ? `Show this attribute as an elegant text label in a BOTTOM corner: ${bottomLabels.join(', ')}.` : '',
-      'Style: professional trading card illustration, cinematic lighting, rich colors, sharp details.',
-      'Layout: portrait orientation, decorative borders and frames.',
-      'Quality: print-ready artwork suitable for collectible card game, similar to Magic: The Gathering or Pokémon cards.',
-      'Do not include any creation metadata, timestamps, or technical information in the image.',
-      'Focus purely on the fantasy artwork and card design elements.'
-    ].filter(Boolean).join(' ');
+    // Prepare card data for the queue (including enhanced prompt info)
+    const cardData = {
+      name,
+      description,
+      type,
+      role,
+      context,
+      format,
+      size,
+      quality,
+      generation_type: 'enhanced' // Mark as enhanced generation
+    };
 
-    const abortSignal = AbortSignal.timeout(120_000); // 2 minutes for gpt-image-1
-    let imgResp;
-    try {
-      imgResp = await openai.images.generate(
-        {
-          model: 'gpt-image-1',
-          prompt: premiumPrompt,
-          n: 1,
-          size,
-          quality,
-          user: user.id,
-        },
-        { signal: abortSignal },
-      );
-    } catch (err: any) {
-      console.error('OpenAI API error (enhanced):', err);
-      if (err?.status === 403) {
-        return new Response(
-          JSON.stringify({ 
-            error: 'OpenAI access denied',
-            details: 'Please verify your OpenAI API key and organization settings.'
-          }),
-          {
-            status: 403,
-            headers: {
-              ...corsHeaders,
-              'Content-Type': 'application/json',
-            },
-          },
-        );
-      }
-      return new Response(
-        JSON.stringify({ 
-          error: 'OpenAI request failed',
-          details: err.message || String(err)
-        }),
-        {
-          status: 502,
-          headers: {
-            ...corsHeaders,
-            'Content-Type': 'application/json',
-          },
-        },
-      );
-    }
-
-    if (!imgResp.data?.[0]?.b64_json) {
-      console.error('OpenAI response structure (enhanced):', JSON.stringify(imgResp, null, 2));
-      throw new Error('No image data in OpenAI response');
-    }
-
-    // Convert base64 to binary data
-    const base64Data = imgResp.data[0].b64_json;
-    const binaryString = atob(base64Data);
-    const bytes = new Uint8Array(binaryString.length);
-    for (let i = 0; i < binaryString.length; i++) {
-      bytes[i] = binaryString.charCodeAt(i);
-    }
-    const imageBlob = new Blob([bytes], { type: 'image/png' });
-    const safeName = name.toLowerCase().replace(/[^a-z0-9]/g, '-');
-    const fileName = `${user.id}/${Date.now()}-enhanced-${safeName}.png`;
-
-    // Ensure bucket exists
-    const { data: buckets } = await supabase.storage.listBuckets();
-    // @ts-ignore bucket type
-    const bucketExists = buckets?.some((b) => b.name === BUCKET_NAME);
-
-    if (!bucketExists) {
-      const { error: createBucketError } = await supabase.storage.createBucket(BUCKET_NAME, {
-        public: true,
-        allowedMimeTypes: ['image/png', 'image/jpeg'],
-        fileSizeLimit: 5242880, // 5MB
-      });
-      if (createBucketError) {
-        throw new Error(`Failed to create bucket: ${createBucketError.message}`);
-      }
-    }
-
-    // Ensure user folder exists
-    const userFolder = `${user.id}/`;
-    await supabase.storage.from(BUCKET_NAME).upload(userFolder, new Blob(['']), { upsert: true });
-
-    // Upload the image
-    const { data: uploadData, error: uploadError } = await supabase
-      .storage
-      .from(BUCKET_NAME)
-      .upload(fileName, imageBlob, {
-        contentType: 'image/png',
-        cacheControl: '3600',
-        upsert: true,
-      });
-
-    if (uploadError) {
-      console.error('Upload error (enhanced):', uploadError);
-      throw new Error(`Failed to upload image: ${uploadError.message}`);
-    }
-
-    const { data: { publicUrl } } = supabase.storage.from(BUCKET_NAME).getPublicUrl(fileName);
-    if (!publicUrl) {
-      throw new Error('Failed to get public URL for uploaded image');
-    }
-
-    return new Response(
-      JSON.stringify({ imageUrl: publicUrl }),
+    // Create admin client for queue operations
+    const supabaseAdmin = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
       {
-        headers: {
-          ...corsHeaders,
-          'Content-Type': 'application/json',
-        },
-      },
+        auth: {
+          persistSession: false,
+          autoRefreshToken: false,
+        }
+      }
     );
-  } catch (error: any) {
-    console.error('Enhanced image generation error:', error);
+
+    // Insert into queue using admin client
+    const { data: job, error: queueError } = await supabaseAdmin
+      .from('image_generation_queue')
+      .insert({
+        user_id: user.id,
+        card_data: cardData,
+        status: 'queued',
+        generation_type: 'enhanced'
+      })
+      .select()
+      .single();
+
+    if (queueError) {
+      console.error('❌ Queue error:', queueError);
+      console.error('❌ Error details:', JSON.stringify(queueError, null, 2));
+      throw new Error(`Failed to queue enhanced generation: ${queueError.message}`);
+    }
+
+    console.log('✅ Job inserted successfully:', job);
+
+    // Trigger processing function (don't await)
+    supabaseAdmin.functions.invoke('process-enhanced-card-generation', { 
+      body: { jobId: job.id } 
+    });
+
+    console.log('✅ Enhanced card queued successfully:', job.id);
+
+    // Return job info instead of image URL (for polling)
     return new Response(
       JSON.stringify({ 
-        error: 'Failed to generate enhanced image',
-        details: error?.message || 'Unknown error'
+        jobId: job.id,
+        status: 'queued',
+        message: 'Enhanced card generation queued successfully'
       }),
       {
-        status: 500,
         headers: {
           ...corsHeaders,
           'Content-Type': 'application/json',
         },
+        status: 200,
       },
+    );
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
+    console.error('❌ Error:', errorMessage);
+    return new Response(
+      JSON.stringify({ error: errorMessage }),
+      { 
+        status: 500, 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      }
     );
   }
 });
