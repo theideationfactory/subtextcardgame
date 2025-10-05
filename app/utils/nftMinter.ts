@@ -5,6 +5,7 @@ import axios from 'axios';
 import * as FileSystem from 'expo-file-system';
 import { Platform } from 'react-native';
 import * as ImageManipulator from 'expo-image-manipulator';
+import SubtextNFTABI from '@/app/services/abi/SubtextNFT.json';
 
 // Types for Subtext cards
 interface SubtextCard {
@@ -33,6 +34,8 @@ interface MintResult {
   success: boolean;
   imageNftTxHash?: string;
   cardNftTxHash?: string;
+  imageTokenId?: number;
+  cardTokenId?: number;
   imageIpfsUri?: string;
   imageMetadataUri?: string;
   cardMetadataUri?: string;
@@ -54,40 +57,69 @@ export class SubtextNftMinter {
   
   /**
    * Upload file to IPFS via Pinata
-   * @param fileUri - Local URI of the file to upload
+   * @param fileUri - Local URI or Supabase URL of the file to upload
    * @param fileName - Name of the file
    * @returns IPFS URI (ipfs://...)
    */
   async uploadFileToPinata(fileUri: string, fileName: string): Promise<string> {
     try {
-      // First, ensure we have a file that can be uploaded
+      console.log('📤 Uploading to IPFS...');
+      console.log('  File URI:', fileUri);
+      
       let uploadUri = fileUri;
       
-      // For iOS, convert file:// paths to base64
-      if (Platform.OS === 'ios' && fileUri.startsWith('file://')) {
-        // Resize and compress the image to reduce size
-        const manipResult = await ImageManipulator.manipulateAsync(
-          fileUri,
-          [{ resize: { width: 1000 } }], // Resize to reasonable dimensions
-          { compress: 0.8, format: ImageManipulator.SaveFormat.JPEG }
-        );
-        uploadUri = manipResult.uri;
+      // If it's a Supabase storage URL, download it first
+      if (fileUri.includes('/storage/v1/object/public/') || fileUri.startsWith('http')) {
+        console.log('📥 Downloading from Supabase storage...');
+        
+        // Convert Supabase path to full URL if needed
+        let downloadUrl = fileUri;
+        if (fileUri.startsWith('/storage/')) {
+          // Get Supabase URL from environment
+          const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
+          if (!supabaseUrl) {
+            throw new Error('EXPO_PUBLIC_SUPABASE_URL not configured');
+          }
+          downloadUrl = `${supabaseUrl}${fileUri}`;
+        }
+        
+        console.log('  Download URL:', downloadUrl);
+        
+        // Download to temporary local file
+        const tempPath = `${FileSystem.cacheDirectory}${fileName}`;
+        await FileSystem.downloadAsync(downloadUrl, tempPath);
+        uploadUri = tempPath;
+        console.log('  Downloaded to:', uploadUri);
       }
+      
+      // Resize and compress the image to reduce size
+      console.log('🖼️ Processing image...');
+      const manipResult = await ImageManipulator.manipulateAsync(
+        uploadUri,
+        [{ resize: { width: 1000 } }], // Resize to reasonable dimensions
+        { compress: 0.8, format: ImageManipulator.SaveFormat.JPEG }
+      );
+      uploadUri = manipResult.uri;
+      
+      console.log('  Processed image:', uploadUri);
       
       // Convert image to base64
       const base64 = await FileSystem.readAsStringAsync(uploadUri, {
         encoding: FileSystem.EncodingType.Base64,
       });
       
+      console.log('  Base64 size:', Math.round(base64.length / 1024), 'KB');
+      
       // Create form data for Pinata
       const data = new FormData();
       data.append('file', {
         uri: uploadUri,
         name: fileName,
-        type: 'image/jpeg', // Adjust based on your file type
+        type: 'image/jpeg',
       } as any);
       
       // Upload to Pinata
+      console.log('☁️ Uploading to Pinata...');
       const response = await axios.post('https://api.pinata.cloud/pinning/pinFileToIPFS', data, {
         maxBodyLength: Infinity,
         headers: {
@@ -97,9 +129,12 @@ export class SubtextNftMinter {
         },
       });
       
-      return `ipfs://${response.data.IpfsHash}`;
+      const ipfsUri = `ipfs://${response.data.IpfsHash}`;
+      console.log('✅ Uploaded to IPFS:', ipfsUri);
+      
+      return ipfsUri;
     } catch (error) {
-      console.error('Error uploading file to Pinata:', error);
+      console.error('❌ Error uploading file to Pinata:', error);
       throw error;
     }
   }
@@ -132,44 +167,112 @@ export class SubtextNftMinter {
   
   /**
    * Mint an NFT
-   * @param wallet - Ethers.js wallet instance
+   * @param signer - Ethers.js signer instance (from wallet or WalletConnect)
    * @param recipientAddress - Wallet address to receive the NFT
    * @param tokenURI - IPFS URI for the NFT metadata
-   * @returns Transaction hash
+   * @returns Transaction hash and token ID
    */
   async mintNFT(
-    wallet: ethers.Wallet,
+    signer: ethers.Signer,
     recipientAddress: string,
     tokenURI: string
-  ): Promise<string> {
+  ): Promise<{ txHash: string; tokenId?: number }> {
     try {
+      console.log('🎨 Minting NFT...');
+      console.log('  Recipient:', recipientAddress);
+      console.log('  Token URI:', tokenURI);
+      
       // Convert IPFS URI to HTTP gateway URL if needed
       const gatewayTokenURI = tokenURI.replace(
         'ipfs://',
         'https://gateway.pinata.cloud/ipfs/'
       );
       
-      // ABI for ERC-721 mintNFT function
-      const CONTRACT_ABI = [
-        "function mintNFT(address recipient, string memory tokenURI) public returns (uint256)",
-      ];
-      
-      // Connect to the NFT contract
+      // Connect to the NFT contract using the imported ABI
       const nftContract = new ethers.Contract(
         this.config.contractAddress,
-        CONTRACT_ABI,
-        wallet
+        SubtextNFTABI,
+        signer
       );
       
-      // Mint the NFT
-      const transaction = await nftContract.mintNFT(recipientAddress, gatewayTokenURI);
+      console.log('📝 Sending transaction to contract:', this.config.contractAddress);
       
-      // Wait for transaction to be mined
-      const receipt = await transaction.wait();
+      // Get current gas price from network and add 20% buffer for faster confirmation
+      const provider = signer.provider;
+      if (!provider) {
+        throw new Error('Provider not available');
+      }
+      const currentGasPrice = await provider.getGasPrice();
+      const gasPrice = currentGasPrice.mul(120).div(100); // 20% higher than current
       
-      return receipt.transactionHash;
+      console.log('⛽ Gas price:', ethers.utils.formatUnits(gasPrice, 'gwei'), 'Gwei');
+      
+      // Get correct nonce directly from blockchain
+      const currentNonce = await signer.getTransactionCount('pending');
+      console.log('🔢 Current nonce from blockchain:', currentNonce);
+      
+      // Estimate gas and add 20% buffer
+      const estimatedGas = await nftContract.estimateGas.mintNFT(recipientAddress, gatewayTokenURI);
+      const gasLimit = estimatedGas.mul(120).div(100); // 20% buffer
+      
+      console.log('⛽ Estimated gas:', estimatedGas.toString());
+      console.log('⛽ Gas limit:', gasLimit.toString());
+      
+      // Mint the NFT - the contract returns the token ID
+      // Explicitly set nonce to ensure no gaps
+      const transaction = await nftContract.mintNFT(recipientAddress, gatewayTokenURI, {
+        gasPrice: gasPrice,
+        gasLimit: gasLimit,
+        nonce: currentNonce
+      });
+      
+      console.log('⏳ Transaction sent, waiting for confirmation...');
+      console.log('  TX Hash:', transaction.hash);
+      console.log('  Nonce:', transaction.nonce);
+      console.log('  From:', transaction.from);
+      console.log('  To:', transaction.to);
+      
+      // Verify transaction was broadcast by checking if it exists on the network
+      try {
+        const provider = signer.provider;
+        if (provider) {
+          const txCheck = await provider.getTransaction(transaction.hash);
+          if (txCheck) {
+            console.log('✅ Transaction found on network');
+          } else {
+            console.log('⚠️ Transaction NOT found on network - may not have been broadcast');
+          }
+        }
+      } catch (checkError) {
+        console.log('⚠️ Could not verify transaction on network:', checkError);
+      }
+      
+      // Wait for transaction to be mined with timeout
+      console.log('⏰ Waiting for confirmation (max 5 minutes)...');
+      const receipt = await Promise.race([
+        transaction.wait(),
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Transaction confirmation timeout after 5 minutes')), 300000)
+        )
+      ]) as any;
+      
+      console.log('✅ NFT minted successfully!');
+      console.log('  Block:', receipt.blockNumber);
+      console.log('  Gas used:', receipt.gasUsed.toString());
+      
+      // Extract token ID from the CardMinted event
+      let tokenId: number | undefined;
+      if (receipt.events && receipt.events.length > 0) {
+        const mintEvent = receipt.events.find((e: any) => e.event === 'CardMinted');
+        if (mintEvent && mintEvent.args) {
+          tokenId = mintEvent.args.tokenId.toNumber();
+          console.log('  Token ID:', tokenId);
+        }
+      }
+      
+      return { txHash: receipt.transactionHash, tokenId };
     } catch (error) {
-      console.error('Error minting NFT:', error);
+      console.error('❌ Error minting NFT:', error);
       throw error;
     }
   }
@@ -177,13 +280,13 @@ export class SubtextNftMinter {
   /**
    * Create and mint NFTs for a Subtext card
    * @param card - The Subtext card data
-   * @param wallet - Ethers.js wallet instance
+   * @param signer - Ethers.js signer instance (from wallet or WalletConnect)
    * @param recipientAddress - Wallet address to receive the NFT
    * @returns Result of the minting process
    */
   async mintSubtextCardNFTs(
     card: SubtextCard,
-    wallet: ethers.Wallet,
+    signer: ethers.Signer,
     recipientAddress: string
   ): Promise<MintResult> {
     try {
@@ -228,17 +331,19 @@ export class SubtextNftMinter {
       console.log(`Card metadata uploaded to IPFS: ${cardMetadataUri}`);
       
       // 4. Mint the image NFT
-      console.log("Minting image NFT...");
-      const imageNftTxHash = await this.mintNFT(wallet, recipientAddress, imageMetadataUri);
+      console.log("🖼️ Minting image NFT...");
+      const imageResult = await this.mintNFT(signer, recipientAddress, imageMetadataUri);
       
       // 5. Mint the card data NFT
-      console.log("Minting card data NFT...");
-      const cardNftTxHash = await this.mintNFT(wallet, recipientAddress, cardMetadataUri);
+      console.log("🎴 Minting card data NFT...");
+      const cardResult = await this.mintNFT(signer, recipientAddress, cardMetadataUri);
       
       return {
         success: true,
-        imageNftTxHash,
-        cardNftTxHash,
+        imageNftTxHash: imageResult.txHash,
+        cardNftTxHash: cardResult.txHash,
+        imageTokenId: imageResult.tokenId,
+        cardTokenId: cardResult.tokenId,
         imageIpfsUri,
         imageMetadataUri,
         cardMetadataUri
