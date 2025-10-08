@@ -54,9 +54,14 @@ Deno.serve(async (req: Request) => {
 
     console.log('✅ Job inserted successfully:', job);
 
-    // Asynchronously trigger the processing function without waiting for it to complete.
+    // Asynchronously trigger the appropriate processing function based on isPremium flag
     // We don't await this call.
-    supabaseClient.functions.invoke('process-image-generation', { body: { jobId: job.id } });
+    const processorFunction = cardData.isPremium 
+      ? 'process-enhanced-card-generation' 
+      : 'process-image-generation';
+    
+    console.log(`🎯 Routing to ${processorFunction} for job ${job.id}`);
+    supabaseClient.functions.invoke(processorFunction, { body: { jobId: job.id } });
 
     return new Response(
       JSON.stringify({ 

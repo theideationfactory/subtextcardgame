@@ -1319,6 +1319,7 @@ export default function CardCreationNewScreen() {
                   onPress={() => {
                     console.log('🎨 Standard generation selected');
                     setShowGenChoiceModal(false);
+                    setFormat('framed'); // Legacy uses framed format
                     queueImageGeneration(false);
                   }}
                   disabled={isGenerating}
@@ -1331,6 +1332,7 @@ export default function CardCreationNewScreen() {
                   onPress={() => {
                     console.log('💎 Premium generation selected');
                     setShowGenChoiceModal(false);
+                    setFormat('fullBleed'); // Premium uses fullBleed format
                     queueImageGeneration(true);
                   }}
                   disabled={isGenerating}
