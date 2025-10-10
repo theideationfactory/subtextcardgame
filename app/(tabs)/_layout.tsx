@@ -1,27 +1,47 @@
 import { Tabs } from 'expo-router';
 import { Plus, Car as Cards, Settings, LayoutGrid as Layout, Users } from 'lucide-react-native';
 import { router } from 'expo-router';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Platform } from 'react-native';
+import { Platform, Dimensions } from 'react-native';
 import { SafeAreaWrapper } from '@/components/SafeAreaWrapper';
 import { TouchableOpacity } from 'react-native';
 
 export default function TabLayout() {
   const { fetchCards } = useAuth();
   const insets = useSafeAreaInsets();
+  const [isLandscape, setIsLandscape] = useState(false);
 
   useEffect(() => {
     fetchCards();
   }, [fetchCards]);
+
+  useEffect(() => {
+    const updateOrientation = () => {
+      const { width, height } = Dimensions.get('window');
+      setIsLandscape(width > height);
+    };
+
+    // Set initial orientation
+    updateOrientation();
+
+    // Listen for orientation changes
+    const subscription = Dimensions.addEventListener('change', updateOrientation);
+
+    return () => {
+      subscription?.remove();
+    };
+  }, []);
 
   return (
     <SafeAreaWrapper>
       <Tabs
         screenOptions={{
           headerShown: false,
-          tabBarStyle: {
+          tabBarStyle: isLandscape ? {
+            display: 'none',
+          } : {
             backgroundColor: '#1a1a1a',
             borderTopWidth: 0,
             elevation: 0,

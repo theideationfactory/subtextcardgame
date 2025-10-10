@@ -19,16 +19,18 @@ function useProtectedRoute() {
     if (loading || !segments.length || isNavigating) return;
 
     const inAuthGroup = segments[0] === '(tabs)';
-    const inPublicGroup = segments[0] === 'welcome' || segments[0] === 'login' || segments[0] === 'drafts' || segments[0] === 'inbox' || segments[0] === 'chat';
+    const inPublicGroup = segments[0] === 'welcome' || segments[0] === 'login' || segments[0] === 'drafts' || segments[0] === 'inbox' || segments[0] === 'chat' || segments[0] === 'upgrade-account';
 
     const navigate = async () => {
       setIsNavigating(true);
       try {
         if (!user && inAuthGroup) {
-          // console.log('No user, redirecting to login');
+          // No user at all, redirect to login
+          console.log('No user, redirecting to login');
           await router.replace('/login');
         } else if (user && !inAuthGroup && !inPublicGroup) {
-          // console.log('User authenticated, redirecting to tabs');
+          // User exists (authenticated or anonymous), allow access to tabs
+          console.log('User authenticated, redirecting to tabs');
           await router.replace('/(tabs)');
         }
       } finally {
@@ -64,6 +66,13 @@ function RootLayoutNav() {
         />
         <Stack.Screen 
           name="inbox" 
+          options={{
+            presentation: 'card',
+            headerShown: false,
+          }}
+        />
+        <Stack.Screen 
+          name="upgrade-account" 
           options={{
             presentation: 'card',
             headerShown: false,

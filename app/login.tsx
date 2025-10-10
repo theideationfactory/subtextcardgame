@@ -15,7 +15,7 @@ export default function LoginScreen() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const router = useRouter();
-  const { refreshSession } = useAuth();
+  const { refreshSession, signInAnonymously } = useAuth();
 
   const [fontsLoaded] = useFonts({
     'Inter-Regular': Inter_400Regular,
@@ -117,6 +117,35 @@ export default function LoginScreen() {
     }
   };
 
+  const handleGuestMode = async () => {
+    setLoading(true);
+    setError('');
+
+    try {
+      console.log('Creating guest session...');
+      const user = await signInAnonymously();
+      
+      if (user) {
+        console.log('✅ Guest session created, navigating to AI card flow...');
+        
+        if (Platform.OS !== 'web') {
+          // Small delay for mobile to ensure session is properly set
+          await new Promise(resolve => setTimeout(resolve, 300));
+        }
+        
+        // Navigate directly to AI card flow step 1
+        router.replace('/(tabs)/ai-card-flow');
+      } else {
+        throw new Error('Failed to create guest session');
+      }
+    } catch (err: any) {
+      console.error('Guest mode error:', err);
+      setError(err.message || 'Failed to start guest mode');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   if (!fontsLoaded) {
     return null;
   }
@@ -185,6 +214,20 @@ export default function LoginScreen() {
             disabled={loading}
           >
             <Text style={styles.buttonText}>Create Account</Text>
+          </TouchableOpacity>
+
+          <View style={styles.divider}>
+            <View style={styles.dividerLine} />
+            <Text style={styles.dividerText}>or</Text>
+            <View style={styles.dividerLine} />
+          </View>
+
+          <TouchableOpacity
+            style={[styles.guestButton, loading && styles.buttonDisabled]}
+            onPress={handleGuestMode}
+            disabled={loading}
+          >
+            <Text style={styles.guestButtonText}>Continue as Guest</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -280,5 +323,18 @@ const styles = StyleSheet.create({
     color: '#666',
     fontSize: 14,
     fontFamily: 'Inter-Regular',
+  },
+  guestButton: {
+    backgroundColor: 'transparent',
+    borderRadius: 12,
+    padding: 16,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#6366f1',
+  },
+  guestButtonText: {
+    color: '#6366f1',
+    fontSize: 16,
+    fontFamily: 'Inter-Bold',
   },
 });

@@ -14,7 +14,32 @@ export class ChatService {
 
       if (error) throw error;
 
-      return data || [];
+      const conversations = data || [];
+
+      // Fetch missing friend emails from friend_requests table
+      const conversationsWithEmails = await Promise.all(
+        conversations.map(async (conv: Conversation) => {
+          if (!conv.friend_email) {
+            console.log('Missing friend_email for friend_id:', conv.friend_id);
+            
+            // Try to get email from friend_requests table
+            const { data: friends } = await supabase.rpc('get_friends', { 
+              user_id: user.id 
+            });
+            
+            if (friends) {
+              const friend = friends.find((f: any) => f.friend_id === conv.friend_id);
+              if (friend?.email) {
+                conv.friend_email = friend.email;
+                console.log('Found friend_email from get_friends:', friend.email);
+              }
+            }
+          }
+          return conv;
+        })
+      );
+
+      return conversationsWithEmails;
     } catch (error) {
       console.error('Error fetching conversations:', error);
       throw error;

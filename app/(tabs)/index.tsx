@@ -10,6 +10,7 @@ import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import { Spacer } from '@/components/Spacer';
 import { isIPad, isTablet, isIPadMini } from '@/utils/deviceDimensions';
+import GuestModeBanner from '@/components/GuestModeBanner';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import ViewShot from 'react-native-view-shot';
 import * as Sharing from 'expo-sharing';
@@ -64,7 +65,7 @@ const getCardRoleIcon = (role: string) => {
 };
 
 export default function CollectionScreen() {
-  const { user } = useAuth();
+  const { user, isAnonymous } = useAuth();
   const insets = useSafeAreaInsets();
   // Define Card type to fix TypeScript errors
   type Card = {
@@ -2242,6 +2243,11 @@ export default function CollectionScreen() {
           />
         </View>
       </View>
+
+      {/* Guest Mode Banner - only show for anonymous users on personal tab */}
+      {isAnonymous && selectedType === 'personal' && (
+        <GuestModeBanner />
+      )}
 
       {/* No column selector UI - automatically set based on device type */}
       

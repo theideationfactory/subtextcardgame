@@ -454,14 +454,22 @@ export default function FriendsScreen() {
 
     const getDisplayName = () => {
       const email = getDisplayEmail();
-      return email.split('@')[0];
+      return email ? email.split('@')[0] : 'Unknown';
     };
 
     const handleItemPress = () => {
       if (isConversation(item)) {
-        openChat(item.friend_id, item.friend_email);
+        if (item.friend_email) {
+          openChat(item.friend_id, item.friend_email);
+        } else {
+          Alert.alert('Error', 'Friend email is missing for this conversation');
+        }
       } else if (isFriend(item)) {
-        openChat(item.friend_id, item.email);
+        if (item.email) {
+          openChat(item.friend_id, item.email);
+        } else {
+          Alert.alert('Error', 'Friend email is missing');
+        }
       }
     };
   

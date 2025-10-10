@@ -26,22 +26,96 @@ type AuthContextType = {
   user: User | null;
   loading: boolean;
   cards: Card[];
+  isAnonymous: boolean;
   refreshSession: () => Promise<Session | null | undefined>;
   fetchCards: (page?: number, limit?: number, useCache?: boolean, scope?: string) => Promise<Card[]>;
+  signInAnonymously: () => Promise<User | null>;
+  upgradeAnonymousAccount: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
 };
 
 const AuthContext = createContext<AuthContextType>({
   user: null,
   loading: true,
   cards: [],
+  isAnonymous: false,
   refreshSession: async () => null,
   fetchCards: async () => [],
+  signInAnonymously: async () => null,
+  upgradeAnonymousAccount: async () => ({ success: false }),
 });
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [cards, setCards] = useState<Card[]>([]);
+  const [isAnonymous, setIsAnonymous] = useState(false);
+
+  const signInAnonymously = useCallback(async () => {
+    try {
+      console.log('👤 Creating anonymous session...');
+      const { data, error } = await supabase.auth.signInAnonymously();
+
+      if (error) {
+        console.error('❌ Anonymous sign-in error:', error.message);
+        return null;
+      }
+
+      if (data?.user) {
+        console.log('✅ Anonymous user created:', data.user.id);
+        setUser(data.user);
+        setIsAnonymous(true);
+        return data.user;
+      }
+
+      return null;
+    } catch (e) {
+      console.error('❌ Unexpected error during anonymous sign-in:', e);
+      return null;
+    }
+  }, []);
+
+  const upgradeAnonymousAccount = useCallback(async (email: string, password: string) => {
+    try {
+      if (!isAnonymous || !user) {
+        return { success: false, error: 'Not an anonymous user' };
+      }
+
+      console.log('⬆️ Upgrading anonymous account to full account...');
+      
+      // Update user with both email and password in one call
+      // This works when manual linking is enabled in Supabase
+      const { data, error } = await supabase.auth.updateUser({
+        email,
+        password,
+      });
+
+      if (error) {
+        console.error('❌ Account upgrade error:', error.message);
+        
+        // Provide helpful error messages
+        if (error.message.includes('already registered')) {
+          return { success: false, error: 'This email is already registered. Please sign in instead.' };
+        }
+        if (error.message.includes('manual linking')) {
+          return { success: false, error: 'Manual linking must be enabled in Supabase Dashboard. Go to Authentication → Settings → Enable Manual Linking.' };
+        }
+        
+        return { success: false, error: error.message };
+      }
+
+      if (data?.user) {
+        console.log('✅ Account upgraded successfully:', data.user.email);
+        setUser(data.user);
+        setIsAnonymous(false);
+        return { success: true };
+      }
+
+      return { success: false, error: 'Unknown error' };
+    } catch (e) {
+      console.error('❌ Unexpected error during account upgrade:', e);
+      return { success: false, error: e instanceof Error ? e.message : 'Unknown error' };
+    }
+  }, [isAnonymous, user]);
 
   const refreshSession = useCallback(async () => {
     try {
@@ -54,8 +128,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       if (session?.user) {
-        console.log('✅ Session refreshed successfully for user:', session.user.email);
+        console.log('✅ Session refreshed successfully for user:', session.user.email || 'anonymous');
         setUser(session.user);
+        setIsAnonymous(session.user.is_anonymous || false);
         return session;
       }
 
@@ -70,8 +145,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const fetchCards = useCallback(
     async (page = 0, limit = 20, useCache = true, scope = 'personal'): Promise<Card[]> => {
       try {
-        setLoading(true);
-
         // Early return if no user for scopes that require authentication
         const uid = user?.id;
         if (!uid) {
@@ -120,14 +193,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       } catch (e) {
         console.error('Unexpected error fetching cards:', e);
         return [];
-      } finally {
-        setLoading(false);
       }
     },
     [user?.id]
   );
 
   useEffect(() => {
+    let mounted = true;
+    
     // Initial session check
     const initAuth = async () => {
       try {
@@ -136,6 +209,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // Get current session from storage
         const { data: { session }, error } = await supabase.auth.getSession();
         
+        if (!mounted) return;
+        
         if (error) {
           console.error('❌ Error getting session:', error);
           setLoading(false);
@@ -143,65 +218,118 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
         
         if (session?.user) {
-          console.log('✅ Found existing session for user:', session.user.email);
-          setUser(session.user);
+          // If it's an anonymous session, sign out and show login screen
+          if (session.user.is_anonymous) {
+            console.log('⚠️ Found existing anonymous session, signing out...');
+            await supabase.auth.signOut();
+            if (!mounted) return;
+            setUser(null);
+            setIsAnonymous(false);
+            setLoading(false);
+            return;
+          }
           
-          // Check if session is still valid by making a test query
+          console.log('✅ Found existing session for user:', session.user.email || 'anonymous');
+          setUser(session.user);
+          setIsAnonymous(session.user.is_anonymous || false);
+          
+          // Validate session with a lightweight query
           try {
-            await supabase.from('users').select('id').limit(1);
-            console.log('✅ Session is valid, fetching cards...');
-            await fetchCards();
+            const { error: testError } = await supabase
+              .from('users')
+              .select('id')
+              .limit(1)
+              .single();
+            
+            if (!mounted) return;
+            
+            if (testError && testError.code === 'PGRST301') {
+              // Session expired, attempt refresh
+              console.log('⚠️ Session expired, attempting refresh...');
+              const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
+              
+              if (!mounted) return;
+              
+              if (refreshError || !refreshData.session) {
+                console.log('❌ Session refresh failed, user needs to sign in again');
+                setUser(null);
+                setIsAnonymous(false);
+              } else {
+                console.log('✅ Session refreshed successfully');
+                setUser(refreshData.session.user);
+                setIsAnonymous(refreshData.session.user.is_anonymous || false);
+              }
+            } else {
+              console.log('✅ Session is valid');
+            }
           } catch (sessionError) {
-            console.log('⚠️ Session expired, attempting refresh...');
-            // Session expired, try to refresh
+            console.error('⚠️ Session validation error:', sessionError);
+            if (!mounted) return;
+            
+            // Try to refresh on any error
             const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
             
+            if (!mounted) return;
+            
             if (refreshError || !refreshData.session) {
-              console.log('❌ Session refresh failed, user needs to sign in again');
+              console.log('❌ Session refresh failed');
               setUser(null);
+              setIsAnonymous(false);
             } else {
-              console.log('✅ Session refreshed successfully');
+              console.log('✅ Session refreshed after error');
               setUser(refreshData.session.user);
-              await fetchCards();
+              setIsAnonymous(refreshData.session.user.is_anonymous || false);
             }
           }
         } else {
           console.log('ℹ️ No existing session found');
+          // Don't auto-create anonymous session - let user choose via "Continue as Guest" button
           setUser(null);
+          setIsAnonymous(false);
         }
       } catch (error) {
         console.error('❌ Auth initialization error:', error);
-        setUser(null);
+        if (mounted) {
+          setUser(null);
+        }
       } finally {
-        setLoading(false);
+        if (mounted) {
+          setLoading(false);
+        }
       }
     };
 
     initAuth();
 
-    // Listen for auth changes
+    // Listen for auth changes - this should NOT depend on fetchCards
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (!mounted) return;
+      
       console.log('🔄 Auth state changed:', event, session?.user?.email || 'no user');
       
       if (event === 'SIGNED_IN' && session?.user) {
-        console.log('✅ User signed in:', session.user.email);
+        console.log('✅ User signed in:', session.user.email || 'anonymous');
         setUser(session.user);
-        await fetchCards();
+        setIsAnonymous(session.user.is_anonymous || false);
       } else if (event === 'SIGNED_OUT') {
         console.log('👋 User signed out');
         setUser(null);
+        setIsAnonymous(false);
         setCards([]);
       } else if (event === 'TOKEN_REFRESHED' && session?.user) {
-        console.log('🔄 Token refreshed for user:', session.user.email);
+        console.log('🔄 Token refreshed for user:', session.user.email || 'anonymous');
         setUser(session.user);
+        setIsAnonymous(session.user.is_anonymous || false);
         // Don't refetch cards on token refresh, just update user state
       } else if (event === 'USER_UPDATED' && session?.user) {
-        console.log('👤 User updated:', session.user.email);
+        console.log('👤 User updated:', session.user.email || 'anonymous');
         setUser(session.user);
+        setIsAnonymous(session.user.is_anonymous || false);
       }
     });
 
     return () => {
+      mounted = false;
       subscription.unsubscribe();
     };
   }, []);
@@ -210,9 +338,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     user,
     loading,
     cards,
+    isAnonymous,
     refreshSession,
     fetchCards,
-  }), [user, loading, cards, refreshSession, fetchCards]);
+    signInAnonymously,
+    upgradeAnonymousAccount,
+  }), [user, loading, cards, isAnonymous, refreshSession, fetchCards, signInAnonymously, upgradeAnonymousAccount]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

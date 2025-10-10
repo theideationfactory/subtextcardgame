@@ -1221,7 +1221,13 @@ export default function SpreadScreen() {
                   onPress={() => handleCardPress(card, zone.name)}
                 >
                   {showFullCardView ? (
-                    <View style={[styles.fullCardInner, { borderColor: card.color || '#6366f1' }]}>
+                    <View style={[
+                      styles.fullCardInner, 
+                      { 
+                        borderColor: card.color || '#6366f1',
+                        backgroundColor: card.is_premium_generation ? '#000000' : '#1a1a1a'
+                      }
+                    ]}>
                       <Image
                         source={{ uri: card.image_url }}
                         style={[
@@ -1271,7 +1277,10 @@ export default function SpreadScreen() {
                       )}
                     </View>
                   ) : (
-                    <View style={styles.gridCardInner}>
+                    <View style={[
+                      styles.gridCardInner,
+                      card.is_premium_generation && { backgroundColor: '#000000' }
+                    ]}>
                       <Image
                         source={{ uri: card.image_url }}
                         style={styles.gridCardImage}
@@ -1336,7 +1345,10 @@ export default function SpreadScreen() {
               {cards.map((card, index) => (
                 <TouchableOpacity 
                   key={`${card.id}-${index}`} 
-                  style={styles.miniCard}
+                  style={[
+                    styles.miniCard,
+                    card.is_premium_generation && { backgroundColor: '#000000' }
+                  ]}
                   onPress={() => handleCardPress(card, zone.name)}
                 >
                   <Image

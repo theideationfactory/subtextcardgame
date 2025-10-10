@@ -110,7 +110,10 @@ export const shouldShowDateSeparator = (currentMessage: string, previousMessage?
   return currentDate !== previousDate;
 };
 
-export const getInitials = (email: string): string => {
+export const getInitials = (email: string | null | undefined): string => {
+  if (!email) {
+    return '??';
+  }
   const parts = email.split('@')[0].split('.');
   if (parts.length >= 2) {
     return (parts[0][0] + parts[1][0]).toUpperCase();

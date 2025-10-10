@@ -3,7 +3,7 @@
     "name": "Subtext",
     "slug": "subtext-card-game",
     "version": "1.0.1",
-    "orientation": "portrait",
+    "orientation": "default",
     "icon": "./assets/images/icon.png",
     "scheme": "myapp",
     "userInterfaceStyle": "automatic",

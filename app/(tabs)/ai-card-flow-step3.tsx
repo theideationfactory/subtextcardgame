@@ -139,7 +139,7 @@ export default function AICardFlowStep3() {
   }, [params.cardData]);
 
   const generateCardsInForeground = async (parsedCards: any[]) => {
-    // Get current user
+    // Get current user (works for both authenticated and anonymous users)
     const { data: { user } } = await supabase.auth.getUser();
     
     for (const card of parsedCards) {
