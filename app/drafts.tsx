@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { 
   View, 
   Text, 
@@ -11,11 +11,11 @@ import {
   Alert,
 } from 'react-native';
 import { useFonts, Inter_400Regular, Inter_700Bold } from '@expo-google-fonts/inter';
-import { useRouter } from 'expo-router';
-import { createClient } from '@supabase/supabase-js';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { ArrowLeft, FileText, Trash2, Send, Check, X } from 'lucide-react-native';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { supabase } from '@/lib/supabase';
 
 // Define the structure of a draft object
 interface Draft {
@@ -33,10 +33,7 @@ interface Friend {
   created_at: string;
 }
 
-const supabase = createClient(
-  process.env.EXPO_PUBLIC_SUPABASE_URL!,
-  process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY!
-);
+// Use shared Supabase client from lib to avoid multiple auth/session streams
 
 export default function DraftsScreen() {
   const insets = useSafeAreaInsets();
@@ -59,35 +56,91 @@ export default function DraftsScreen() {
     'Inter-Bold': Inter_700Bold,
   });
 
+  const isFetchingRef = useRef(false);
+  const lastFetchAtRef = useRef(0);
+  const hasFetchedOnFocusRef = useRef(false);
+  const userIdRef = useRef<string | null>(null);
+  const initialLoadDoneRef = useRef(false);
+
+  // Keep a stable user id ref to avoid recreating callbacks
   useEffect(() => {
-    const checkAuthAndFetchDrafts = async () => {
-      try {
-        // Wait for auth loading to complete
-        if (authLoading) return;
-        
-        // Check if we have a valid user
-        if (!user) {
-          console.error('No authenticated user');
-          setError('Please log in to view your drafts');
-          // Redirect to login screen after a short delay
-          setTimeout(() => {
-            router.replace('/login');
-          }, 2000);
-          return;
-        }
-        
-        // If we have a user, fetch drafts
-        await fetchDrafts();
-      } catch (err) {
-        console.error('Error in auth check:', err);
-        setError('Authentication error. Please log in again.');
-      } finally {
-        setLoading(false);
+    userIdRef.current = user?.id ?? null;
+  }, [user?.id]);
+
+  const fetchDrafts = useCallback(async () => {
+    // Prevent duplicate fetches
+    const now = Date.now();
+    if (isFetchingRef.current || now - lastFetchAtRef.current < 1500) {
+      // console.log('Already fetching or throttled, skipping...');
+      return;
+    }
+
+    try {
+      isFetchingRef.current = true;
+      lastFetchAtRef.current = now;
+      console.log('[Drafts] fetch start at', now);
+      const showSpinner = !initialLoadDoneRef.current;
+      if (showSpinner) setLoading(true);
+      setError('');
+      
+      // Ensure user is available
+      const uid = userIdRef.current;
+      if (!uid) {
+        throw new Error('Not authenticated');
       }
-    };
-    
-    checkAuthAndFetchDrafts();
-  }, [user, authLoading]);
+      
+      console.log('Fetching drafts for user:', uid);
+      
+      const { data, error: fetchError } = await supabase
+        .from('spreads')
+        .select('*')
+        .eq('user_id', uid)
+        .eq('is_draft', true)
+        .order('last_modified', { ascending: false });
+
+      if (fetchError) throw fetchError;
+      
+      console.log('[Drafts] fetch success, count:', data?.length || 0);
+      setDrafts((prev) => {
+        const next = data || [];
+        return JSON.stringify(prev) === JSON.stringify(next) ? prev : next;
+      });
+      
+    } catch (err) {
+      console.error('[Drafts] fetch error:', err);
+      const errorMessage = err instanceof Error ? err.message : 'Failed to load drafts';
+      setError(errorMessage);
+      
+      // If unauthorized, redirect to login
+      if (errorMessage.includes('auth') || errorMessage.includes('authenticated')) {
+        setTimeout(() => {
+          router.replace('/login');
+        }, 2000);
+      }
+    } finally {
+      console.log('[Drafts] fetch end');
+      if (!initialLoadDoneRef.current) {
+        setLoading(false);
+        initialLoadDoneRef.current = true;
+      }
+      isFetchingRef.current = false;
+    }
+  }, []);
+
+  // Fetch once per focus while screen is active
+  useFocusEffect(
+    useCallback(() => {
+      if (!fontsLoaded) return;
+      if (!userIdRef.current) return;
+      if (!hasFetchedOnFocusRef.current) {
+        hasFetchedOnFocusRef.current = true;
+        fetchDrafts();
+      }
+      return () => {
+        hasFetchedOnFocusRef.current = false;
+      };
+    }, [fontsLoaded, fetchDrafts])
+  );
 
   const fetchFriendsForModal = useCallback(async () => {
     if (!user) return;
@@ -229,58 +282,26 @@ export default function DraftsScreen() {
     }
   };
 
-  const fetchDrafts = async () => {
-    try {
-      setLoading(true);
-      setError('');
-      
-      // Ensure user is available
-      if (!user) {
-        throw new Error('Not authenticated');
-      }
-      
-      console.log('Fetching drafts for user:', user.id);
-      
-      const { data, error: fetchError } = await supabase
-        .from('spreads')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('last_modified', { ascending: false });
-
-      if (fetchError) throw fetchError;
-      
-      console.log('Fetched drafts:', data?.length || 0);
-      setDrafts(data || []);
-      
-    } catch (err) {
-      console.error('Error fetching drafts:', err);
-      const errorMessage = err instanceof Error ? err.message : 'Failed to load drafts';
-      setError(errorMessage);
-      
-      // If unauthorized, redirect to login
-      if (errorMessage.includes('auth') || errorMessage.includes('authenticated')) {
-        setTimeout(() => {
-          router.replace('/login');
-        }, 2000);
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const handleDelete = async (draftId: string) => {
     try {
       setDeleting(draftId);
-      const { error: deleteError } = await supabase
-        .from('spreads')
-        .delete()
-        .eq('id', draftId);
 
-      if (deleteError) throw deleteError;
-      setDrafts(drafts.filter(draft => draft.id !== draftId));
+      // Use RPC that bypasses RLS (SECURITY DEFINER) to safely unlink all cards
+      // and delete the spread in one transaction to avoid FK violations
+      const { error: rpcError } = await supabase
+        .rpc('delete_spread_and_unlink_cards', { target_spread_id: draftId });
+
+      if (rpcError) {
+        console.error('RPC delete_spread_and_unlink_cards error:', rpcError);
+        throw rpcError;
+      }
+
+      setDrafts(prev => prev.filter(draft => draft.id !== draftId));
+      setError('');
     } catch (err) {
       console.error('Error deleting draft:', err);
-      setError('Failed to delete draft');
+      const msg = (err as any)?.message || 'Failed to delete draft';
+      setError(msg);
     } finally {
       setDeleting(null);
     }

@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState } from 'react';
+import { createContext, useContext, useEffect, useState, useCallback, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
 import type { User, Session, PostgrestError } from '@supabase/supabase-js';
 
@@ -43,89 +43,89 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [cards, setCards] = useState<Card[]>([]);
 
-  const refreshSession = async () => {
+  const refreshSession = useCallback(async () => {
     try {
       console.log('🔄 Refreshing session...');
       const { data: { session }, error } = await supabase.auth.refreshSession();
-      
+
       if (error) {
         console.error('❌ Session refresh error:', error.message);
         return null;
       }
-      
+
       if (session?.user) {
         console.log('✅ Session refreshed successfully for user:', session.user.email);
         setUser(session.user);
         return session;
-      } else {
-        console.log('⚠️ No session returned after refresh');
-        return null;
       }
-    } catch (error) {
-      console.error('❌ Unexpected error during session refresh:', error);
+
+      console.log('⚠️ No session returned after refresh');
+      return null;
+    } catch (e) {
+      console.error('❌ Unexpected error during session refresh:', e);
       return null;
     }
-  };
+  }, []);
 
-  const fetchCards = async (page = 0, limit = 20, useCache = true, scope = 'personal'): Promise<Card[]> => {
-    try {
-      setLoading(true);
-      
-      // Early return if no user for scopes that require authentication
-      if (!user?.id) {
-        console.log('No authenticated user, returning empty cards array');
-        setCards([]);
-        return [];
-      }
-      
-      // Return cached cards if available and cache is enabled
-      if (useCache && !scope && cards.length > 0 && page === 0) {
-        return cards; // CACHED RESULT!
-      }
-      
-      // Rest of fetchCards implementation...
-      let query = supabase
-        .from('cards')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .range(page * limit, (page + 1) * limit - 1);
+  const fetchCards = useCallback(
+    async (page = 0, limit = 20, useCache = true, scope = 'personal'): Promise<Card[]> => {
+      try {
+        setLoading(true);
 
-      // Apply scope filtering with proper null checks
-      if (scope === 'personal') {
-        query = query.eq('user_id', user.id);
-      } else if (scope === 'friends') {
-        // Friend filtering logic...
-        const { data: friends } = await supabase
-          .from('friend_requests')
-          .select('sender_id, receiver_id')
-          .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`)
-          .eq('status', 'accepted');
-
-        if (friends) {
-          const friendIds = friends.flatMap(f => [f.sender_id, f.receiver_id]).filter(id => id !== user.id);
-          query = query.in('user_id', friendIds).eq('is_shared_with_friends', true);
+        // Early return if no user for scopes that require authentication
+        const uid = user?.id;
+        if (!uid) {
+          console.log('No authenticated user, returning empty cards array');
+          setCards([]);
+          return [];
         }
-      } else if (scope === 'public') {
-        query = query.eq('is_public', true).neq('user_id', user.id);
+
+        // Base query
+        let query = supabase
+          .from('cards')
+          .select('*')
+          .order('created_at', { ascending: false })
+          .range(page * limit, (page + 1) * limit - 1);
+
+        // Apply scope filtering with proper null checks
+        if (scope === 'personal') {
+          query = query.eq('user_id', uid);
+        } else if (scope === 'friends') {
+          const { data: friends } = await supabase
+            .from('friend_requests')
+            .select('sender_id, receiver_id')
+            .or(`sender_id.eq.${uid},receiver_id.eq.${uid}`)
+            .eq('status', 'accepted');
+
+          if (friends) {
+            const friendIds = friends
+              .flatMap(f => [f.sender_id, f.receiver_id])
+              .filter(id => id !== uid);
+            query = query.in('user_id', friendIds).eq('is_shared_with_friends', true);
+          }
+        } else if (scope === 'public') {
+          query = query.eq('is_public', true).neq('user_id', uid);
+        }
+
+        const { data, error } = await query;
+
+        if (error) {
+          console.error('Error fetching cards:', error);
+          return [];
+        }
+
+        const fetchedCards = (data || []) as Card[];
+        setCards(prev => (JSON.stringify(prev) === JSON.stringify(fetchedCards) ? prev : fetchedCards));
+        return fetchedCards;
+      } catch (e) {
+        console.error('Unexpected error fetching cards:', e);
+        return [];
+      } finally {
+        setLoading(false);
       }
-
-      const { data, error } = await query;
-
-      if (error) {
-        console.error('Error fetching cards:', error);
-        return []; // Return empty array on error
-      }
-
-      const fetchedCards = data || [];
-      setCards(fetchedCards);
-      return fetchedCards;
-    } catch (error) {
-      console.error('Unexpected error fetching cards:', error);
-      return []; // Return empty array on error
-    } finally {
-      setLoading(false);
-    }
-  };
+    },
+    [user?.id]
+  );
 
   useEffect(() => {
     // Initial session check
@@ -206,13 +206,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
-  const value = {
+  const value = useMemo(() => ({
     user,
     loading,
     cards,
     refreshSession,
     fetchCards,
-  };
+  }), [user, loading, cards, refreshSession, fetchCards]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

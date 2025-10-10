@@ -94,13 +94,6 @@ export default function TabLayout() {
           }}
         />
         <Tabs.Screen
-          name="inbox"
-          options={{
-            href: null, // This screen is not a tab itself
-            headerShown: false, // Hide header for this screen
-          }}
-        />
-        <Tabs.Screen
           name="ai-card-flow"
           options={{
             href: null, // This screen is not a tab itself

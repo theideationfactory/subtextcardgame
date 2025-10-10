@@ -16,7 +16,6 @@ import {
   Pressable,
 } from 'react-native';
 import { useFonts, Inter_400Regular, Inter_700Bold } from '@expo-google-fonts/inter';
-import { createClient } from '@supabase/supabase-js';
 import { LinearGradient } from 'expo-linear-gradient';
 import { 
   Target, 
@@ -43,6 +42,7 @@ import {
   Send, // Added for Send button
 } from 'lucide-react-native';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
+import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import { Spacer } from '@/components/Spacer';
 import { hasDynamicIsland } from '@/utils/deviceDimensions';
@@ -69,10 +69,7 @@ interface Spread {
   last_modified: string;
 }
 
-const supabase = createClient(
-  process.env.EXPO_PUBLIC_SUPABASE_URL!,
-  process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY!
-);
+// Use shared authenticated Supabase client from lib to ensure RLS uses the active session
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -248,7 +245,7 @@ export default function SpreadScreen() {
   const [cardToRemove, setCardToRemove] = useState<{card: any, zone: string} | null>(null);
   const [autoAddCardData, setAutoAddCardData] = useState<string | null>(null);
   const [autoAddZone, setAutoAddZone] = useState<string | null>(null);
-  const [wordsRemembered, setWordsRemembered] = useState({ self: '', other: '', situation: '' });
+  const [wordsRemembered, setWordsRemembered] = useState<Record<string, string>>({});
 
   const [fontsLoaded] = useFonts({
     'Inter-Regular': Inter_400Regular,
@@ -519,11 +516,27 @@ export default function SpreadScreen() {
         setSpreadName(draft.name || SPREADS[draft.draft_data.type as SpreadType].name);
         setCurrentSpreadId(draft.id);
 
-        // Create a fresh cardsById map with the latest cards
+        // Fetch cards specifically linked to this spread so recipients can see them
+        const { data: spreadCards, error: spreadCardsError } = await supabase
+          .from('cards')
+          .select('*')
+          .eq('spread_id', draft.id);
+
+        if (spreadCardsError) {
+          console.error('Error fetching cards for spread:', spreadCardsError);
+        }
+
+        // Build a fresh map from spread-scoped cards, with a fallback to currentCards
         const cardsById: Record<string, any> = {};
-        currentCards.forEach(card => {
+        (spreadCards || []).forEach(card => {
           cardsById[card.id] = card;
         });
+        if ((!spreadCards || spreadCards.length === 0) && currentCards && currentCards.length > 0) {
+          // Fallback: use existing cards list
+          currentCards.forEach(card => {
+            cardsById[card.id] = card;
+          });
+        }
         console.log('Available card IDs in cardMap:', Object.keys(cardsById));
         setCardMap(cardsById);
 
@@ -1384,7 +1397,7 @@ export default function SpreadScreen() {
             <FileText size={20} color="#6366f1" />
             <Text style={styles.draftsButtonText}>Drafts</Text> 
           </TouchableOpacity>
-          <TouchableOpacity onPress={() => router.replace('/inbox')} style={styles.draftsButton}> 
+          <TouchableOpacity onPress={() => router.push('/inbox')} style={styles.draftsButton}> 
             <Mail size={24} color="#fff" />
             <Text style={styles.draftsButtonText}>Inbox</Text> 
           </TouchableOpacity>

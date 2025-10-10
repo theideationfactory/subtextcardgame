@@ -58,8 +58,15 @@ function RootLayoutNav() {
         <Stack.Screen 
           name="drafts" 
           options={{
-            presentation: 'modal',
-            animation: 'slide_from_bottom',
+            presentation: 'card',
+            headerShown: false,
+          }}
+        />
+        <Stack.Screen 
+          name="inbox" 
+          options={{
+            presentation: 'card',
+            headerShown: false,
           }}
         />
         <Stack.Screen name="+not-found" options={{ title: 'Oops!' }} />
