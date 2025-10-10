@@ -54,6 +54,9 @@ interface Card {
   name: string;
   description: string;
   image_url: string;
+  is_premium_generation?: boolean;
+  card_type?: string;
+  color?: string;
 }
 
 interface Spread {
@@ -943,16 +946,19 @@ export default function SpreadScreen() {
       <Image
         source={{ uri: item.image_url }}
         style={styles.galleryImage}
-        resizeMode="cover"
+        resizeMode={item.is_premium_generation ? "contain" : "cover"}
       />
-      <LinearGradient
-        colors={['transparent', 'rgba(0,0,0,0.8)']}
-        style={styles.galleryItemOverlay}
-      >
-        <Text style={styles.galleryItemName} numberOfLines={2}>
-          {item.name}
-        </Text>
-      </LinearGradient>
+      {/* Hide name overlay for premium generation cards */}
+      {!item.is_premium_generation && (
+        <LinearGradient
+          colors={['transparent', 'rgba(0,0,0,0.8)']}
+          style={styles.galleryItemOverlay}
+        >
+          <Text style={styles.galleryItemName} numberOfLines={2}>
+            {item.name}
+          </Text>
+        </LinearGradient>
+      )}
     </TouchableOpacity>
   );
 
@@ -1224,77 +1230,83 @@ export default function SpreadScreen() {
                             height: numColumns === 1 ? 200 : numColumns === 2 ? 150 : numColumns === 3 ? 100 : 70
                           }
                         ]}
-                        resizeMode="cover"
+                        resizeMode={card.is_premium_generation ? "contain" : "cover"}
                       />
-                      <View style={[
-                        styles.fullCardContent,
-                        {
-                          padding: numColumns === 1 ? 12 : numColumns === 2 ? 8 : numColumns === 3 ? 6 : 4
-                        }
-                      ]}>
-                        <Text style={[
-                          styles.fullCardName,
+                      {/* Hide text content for premium generation cards */}
+                      {!card.is_premium_generation && (
+                        <View style={[
+                          styles.fullCardContent,
                           {
-                            fontSize: numColumns === 1 ? 16 : numColumns === 2 ? 13 : numColumns === 3 ? 11 : 9
+                            padding: numColumns === 1 ? 12 : numColumns === 2 ? 8 : numColumns === 3 ? 6 : 4
                           }
                         ]}>
-                          {card.name}
-                        </Text>
-                        <Text style={[
-                          styles.fullCardType,
-                          {
-                            fontSize: numColumns === 1 ? 14 : numColumns === 2 ? 11 : numColumns === 3 ? 9 : 8,
-                            marginBottom: numColumns === 1 ? 8 : numColumns === 2 ? 5 : numColumns === 3 ? 3 : 2
-                          }
-                        ]}>
-                          {card.card_type || 'Card'}
-                        </Text>
-                        <Text style={[
-                          styles.fullCardDescription,
-                          {
-                            fontSize: numColumns === 1 ? 14 : numColumns === 2 ? 11 : numColumns === 3 ? 9 : 8,
-                            lineHeight: numColumns === 1 ? 20 : numColumns === 2 ? 15 : numColumns === 3 ? 12 : 10,
-                            marginTop: numColumns === 1 ? 4 : numColumns === 2 ? 3 : numColumns === 3 ? 2 : 1
-                          }
-                        ]}>
-                          {card.description || 'No description available'}
-                        </Text>
-                      </View>
+                          <Text style={[
+                            styles.fullCardName,
+                            {
+                              fontSize: numColumns === 1 ? 16 : numColumns === 2 ? 13 : numColumns === 3 ? 11 : 9
+                            }
+                          ]}>
+                            {card.name}
+                          </Text>
+                          <Text style={[
+                            styles.fullCardType,
+                            {
+                              fontSize: numColumns === 1 ? 14 : numColumns === 2 ? 11 : numColumns === 3 ? 9 : 8,
+                              marginBottom: numColumns === 1 ? 8 : numColumns === 2 ? 5 : numColumns === 3 ? 3 : 2
+                            }
+                          ]}>
+                            {card.card_type || 'Card'}
+                          </Text>
+                          <Text style={[
+                            styles.fullCardDescription,
+                            {
+                              fontSize: numColumns === 1 ? 14 : numColumns === 2 ? 11 : numColumns === 3 ? 9 : 8,
+                              lineHeight: numColumns === 1 ? 20 : numColumns === 2 ? 15 : numColumns === 3 ? 12 : 10,
+                              marginTop: numColumns === 1 ? 4 : numColumns === 2 ? 3 : numColumns === 3 ? 2 : 1
+                            }
+                          ]}>
+                            {card.description || 'No description available'}
+                          </Text>
+                        </View>
+                      )}
                     </View>
                   ) : (
                     <View style={styles.gridCardInner}>
                       <Image
                         source={{ uri: card.image_url }}
                         style={styles.gridCardImage}
-                        resizeMode="cover"
+                        resizeMode={card.is_premium_generation ? "contain" : "cover"}
                       />
-                      <LinearGradient
-                        colors={['transparent', 'rgba(0,0,0,0.8)']}
-                        style={[styles.gridCardOverlay, expandedCardId === card.id && styles.expandedCardOverlay]}
-                      >
-                        <Text 
-                          style={[
-                            styles.gridCardName, 
-                            {
-                              fontSize: numColumns === 1 ? 14 : numColumns === 2 ? 12 : numColumns === 3 ? 10 : 9
-                            }
-                          ]} 
-                          numberOfLines={expandedCardId === card.id ? undefined : 1}
+                      {/* Hide name overlay for premium generation cards */}
+                      {!card.is_premium_generation && (
+                        <LinearGradient
+                          colors={['transparent', 'rgba(0,0,0,0.8)']}
+                          style={[styles.gridCardOverlay, expandedCardId === card.id && styles.expandedCardOverlay]}
                         >
-                          {card.name}
-                        </Text>
-                        
-                        {expandedCardId === card.id && (
-                          <View style={styles.cardDetails}>
-                            <Text style={styles.cardType}>
-                              {card.card_type || 'Card'}
-                            </Text>
-                            <Text style={styles.cardDescription} numberOfLines={4}>
-                              {card.description || 'No description available'}
-                            </Text>
-                          </View>
-                        )}
-                      </LinearGradient>
+                          <Text 
+                            style={[
+                              styles.gridCardName, 
+                              {
+                                fontSize: numColumns === 1 ? 14 : numColumns === 2 ? 12 : numColumns === 3 ? 10 : 9
+                              }
+                            ]} 
+                            numberOfLines={expandedCardId === card.id ? undefined : 1}
+                          >
+                            {card.name}
+                          </Text>
+                          
+                          {expandedCardId === card.id && (
+                            <View style={styles.cardDetails}>
+                              <Text style={styles.cardType}>
+                                {card.card_type || 'Card'}
+                              </Text>
+                              <Text style={styles.cardDescription} numberOfLines={4}>
+                                {card.description || 'No description available'}
+                              </Text>
+                            </View>
+                          )}
+                        </LinearGradient>
+                      )}
                     </View>
                   )}
                 </TouchableOpacity>
@@ -1330,16 +1342,19 @@ export default function SpreadScreen() {
                   <Image
                     source={{ uri: card.image_url }}
                     style={styles.miniCardImage}
-                    resizeMode="cover"
+                    resizeMode={card.is_premium_generation ? "contain" : "cover"}
                   />
-                  <LinearGradient
-                    colors={['transparent', 'rgba(0,0,0,0.8)']}
-                    style={styles.miniCardOverlay}
-                  >
-                    <Text style={styles.miniCardName} numberOfLines={1}>
-                      {card.name}
-                    </Text>
-                  </LinearGradient>
+                  {/* Hide name overlay for premium generation cards */}
+                  {!card.is_premium_generation && (
+                    <LinearGradient
+                      colors={['transparent', 'rgba(0,0,0,0.8)']}
+                      style={styles.miniCardOverlay}
+                    >
+                      <Text style={styles.miniCardName} numberOfLines={1}>
+                        {card.name}
+                      </Text>
+                    </LinearGradient>
+                  )}
                 </TouchableOpacity>
               ))}
             </ScrollView>
