@@ -440,8 +440,8 @@ export default function CardCreationNewScreen() {
 
   // Debug logging removed to reduce console spam
 
-  const queueImageGeneration = async (isPremium: boolean) => {
-    console.log('🚀 queueImageGeneration called with isPremium:', isPremium);
+  const queueImageGeneration = async (generationType: boolean | 'classic') => {
+    console.log('🚀 queueImageGeneration called with generationType:', generationType);
     console.log('📝 Current form state:', { name, imageDescription, type, role, context });
     
     if (!name || !imageDescription) {
@@ -460,14 +460,20 @@ export default function CardCreationNewScreen() {
         throw new Error('Authentication required. Please log in again.');
       }
 
+      // Determine generation parameters based on type
+      const isPremium = generationType === true;
+      const isClassic = generationType === 'classic';
+      
       const cardDetails = {
         name,
-        description: imageDescription,
+        description,
+        imageDescription,
         type,
         role,
         context,
         format,
         isPremium,
+        generationType: isClassic ? 'classic' : (isPremium ? 'premium' : 'legacy'),
       };
 
       console.log('🎨 Starting image generation for:', cardDetails);
@@ -489,7 +495,7 @@ export default function CardCreationNewScreen() {
       }
 
       setGenerationJobId(data.jobId);
-      setIsPremiumGeneration(isPremium);
+      setIsPremiumGeneration(isPremium || isClassic);
 
       Alert.alert(
         'Generation Started!',
@@ -1338,6 +1344,19 @@ export default function CardCreationNewScreen() {
                   disabled={isGenerating}
                 >
                   <Text style={[styles.genChoiceButtonText, styles.genChoiceButtonSecondaryText]}>New: Premium Prompt</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.genChoiceButton, styles.genChoiceButtonClassic]}
+                  onPress={() => {
+                    console.log('🃏 Classic trading card generation selected');
+                    setShowGenChoiceModal(false);
+                    setFormat('fullBleed'); // Classic uses fullBleed format
+                    queueImageGeneration('classic');
+                  }}
+                  disabled={isGenerating}
+                >
+                  <Text style={[styles.genChoiceButtonText, styles.genChoiceButtonClassicText]}>Classic: Trading Card</Text>
                 </TouchableOpacity>
               </View>
             </TouchableOpacity>
@@ -2208,6 +2227,14 @@ const styles = StyleSheet.create({
   },
   genChoiceButtonSecondaryText: {
     color: '#6366f1',
+  },
+  genChoiceButtonClassic: {
+    backgroundColor: 'transparent',
+    borderWidth: 2,
+    borderColor: '#10b981',
+  },
+  genChoiceButtonClassicText: {
+    color: '#10b981',
   },
   dropdownItem: {
     flexDirection: 'row',

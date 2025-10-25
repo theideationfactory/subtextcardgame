@@ -54,11 +54,16 @@ Deno.serve(async (req: Request) => {
 
     console.log('✅ Job inserted successfully:', job);
 
-    // Asynchronously trigger the appropriate processing function based on isPremium flag
+    // Asynchronously trigger the appropriate processing function based on generation type
     // We don't await this call.
-    const processorFunction = cardData.isPremium 
-      ? 'process-enhanced-card-generation' 
-      : 'process-image-generation';
+    let processorFunction;
+    if (cardData.generationType === 'classic') {
+      processorFunction = 'process-classic-card-generation';
+    } else if (cardData.isPremium) {
+      processorFunction = 'process-enhanced-card-generation';
+    } else {
+      processorFunction = 'process-image-generation';
+    }
     
     console.log(`🎯 Routing to ${processorFunction} for job ${job.id}`);
     supabaseClient.functions.invoke(processorFunction, { body: { jobId: job.id } });
