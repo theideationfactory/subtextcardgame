@@ -72,6 +72,22 @@ interface Spread {
   last_modified: string;
 }
 
+interface CustomSpreadZone {
+  id: string;
+  name: string;
+  title: string;
+  description: string;
+  color: string;
+  icon: string;
+}
+
+interface CustomSpread {
+  name: string;
+  description: string;
+  color: string;
+  zones: CustomSpreadZone[];
+}
+
 // Use shared authenticated Supabase client from lib to ensure RLS uses the active session
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
@@ -249,6 +265,8 @@ export default function SpreadScreen() {
   const [autoAddCardData, setAutoAddCardData] = useState<string | null>(null);
   const [autoAddZone, setAutoAddZone] = useState<string | null>(null);
   const [wordsRemembered, setWordsRemembered] = useState<Record<string, string>>({});
+  const [customSpread, setCustomSpread] = useState<CustomSpread | null>(null);
+  const [savedCustomSpreads, setSavedCustomSpreads] = useState<any[]>([]);
 
   const [fontsLoaded] = useFonts({
     'Inter-Regular': Inter_400Regular,
@@ -298,12 +316,68 @@ export default function SpreadScreen() {
     }
   }, [autoAddCardData, autoAddZone]);
 
+  // Handle custom spread data from custom spread builder
+  useEffect(() => {
+    const handleCustomSpreadData = async () => {
+      const customSpreadParam = Array.isArray(params.customSpread) ? params.customSpread[0] : params.customSpread;
+      if (customSpreadParam && customSpreadParam !== 'undefined' && customSpreadParam.trim() !== '') {
+        try {
+          const decodedData = decodeURIComponent(customSpreadParam);
+          const customSpreadData = JSON.parse(decodedData);
+          setCustomSpread(customSpreadData);
+          setSelectedSpread(null); // Custom spreads don't use predefined spread types
+          setSpreadName(customSpreadData.name);
+          
+          // Initialize zone cards for custom spread
+          const initialZoneCards: Record<string, any[]> = {};
+          customSpreadData.zones.forEach((zone: CustomSpreadZone) => {
+            initialZoneCards[zone.name] = [];
+          });
+          setZoneCards(initialZoneCards);
+          
+          // Refresh saved custom spreads to show the newly created one
+          await loadSavedCustomSpreads();
+          
+          // Clear params to prevent re-processing by navigating without the parameter
+          router.replace('/(tabs)/spread');
+        } catch (error) {
+          console.error('Error parsing custom spread data:', error);
+          console.error('Raw params.customSpread:', params.customSpread);
+          console.error('Type of params.customSpread:', typeof params.customSpread);
+          setError('Failed to load custom spread data. Please try creating the spread again.');
+        }
+      }
+    };
+
+    handleCustomSpreadData();
+  }, [params.customSpread]);
+
+  const loadSavedCustomSpreads = async () => {
+    if (!user) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from('custom_spread_templates')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      
+      setSavedCustomSpreads(data || []);
+    } catch (error) {
+      console.error('Error loading saved custom spreads:', error);
+    }
+  };
+
   useEffect(() => {
     const initializeScreen = async () => {
       try {
         setLoading(true);
         // Fetch all cards initially to populate the base `cards` state
         await fetchCards();
+        // Load saved custom spreads
+        await loadSavedCustomSpreads();
       } catch (err) {
         console.error('Error initializing screen:', err);
         setError('Failed to initialize screen');
@@ -313,7 +387,7 @@ export default function SpreadScreen() {
     };
 
     initializeScreen();
-  }, []); // Run only once on mount
+  }, [user]); // Run only once on mount
 
   // This effect reacts to gallery visibility and scope changes to fetch the correct cards.
   // Load phenomena types when gallery opens
@@ -515,8 +589,20 @@ export default function SpreadScreen() {
           setWordsRemembered(draft.draft_data.wordsRemembered);
         }
         console.log('Setting spread type to:', draft.draft_data.type);
-        setSelectedSpread(draft.draft_data.type);
-        setSpreadName(draft.name || SPREADS[draft.draft_data.type as SpreadType].name);
+        
+        // Handle custom spreads vs predefined spreads
+        if (draft.draft_data.type === 'custom' && draft.draft_data.customSpread) {
+          // This is a custom spread
+          setCustomSpread(draft.draft_data.customSpread);
+          setSelectedSpread(null);
+          setSpreadName(draft.name || draft.draft_data.customSpread.name);
+        } else {
+          // This is a predefined spread
+          setCustomSpread(null);
+          setSelectedSpread(draft.draft_data.type as SpreadType);
+          setSpreadName(draft.name || SPREADS[draft.draft_data.type as SpreadType].name);
+        }
+        
         setCurrentSpreadId(draft.id);
 
         // Fetch cards specifically linked to this spread so recipients can see them
@@ -573,7 +659,7 @@ export default function SpreadScreen() {
   };
 
   const saveDraft = async (name?: string) => {
-    if (!selectedSpread) {
+    if (!selectedSpread && !customSpread) {
       console.error('No spread selected');
       return false;
     }
@@ -598,14 +684,15 @@ export default function SpreadScreen() {
       });
 
       const draftData = {
-        type: selectedSpread,
+        type: selectedSpread || 'custom',
         zoneCards: zoneCardIds,
         wordsRemembered,
+        ...(customSpread && { customSpread }), // Include custom spread data if it exists
       };
 
       console.log('Prepared draft data:', JSON.stringify(draftData, null, 2));
 
-      const spreadNameToUse = (name && name.trim()) || spreadName || (selectedSpread ? SPREADS[selectedSpread].name : 'Untitled Spread');
+      const spreadNameToUse = (name && name.trim()) || spreadName || (selectedSpread ? SPREADS[selectedSpread].name : customSpread?.name || 'Untitled Spread');
       const iconName = (selectedSpread && SPREADS[selectedSpread]?.icon?.name) || 'Sparkles';
       const currentTimestamp = new Date().toISOString();
       const spreadZones = selectedSpread ? 
@@ -614,13 +701,19 @@ export default function SpreadScreen() {
           title: zone.title, 
           color: zone.color, 
           description: zone.description 
+        })) : 
+        customSpread ? customSpread.zones.map(zone => ({
+          name: zone.name,
+          title: zone.title,
+          color: zone.color,
+          description: zone.description
         })) : [];
 
       // Prepare the data to save
       const dataToSave = {
         name: spreadNameToUse,
-        description: selectedSpread ? SPREADS[selectedSpread].description : '',
-        color: selectedSpread ? SPREADS[selectedSpread].color : '#000000',
+        description: selectedSpread ? SPREADS[selectedSpread].description : (customSpread?.description || ''),
+        color: selectedSpread ? SPREADS[selectedSpread].color : (customSpread?.color || '#000000'),
         icon: iconName,
         user_id: user.id, // Explicitly set user_id
         zones: spreadZones,
@@ -938,6 +1031,56 @@ export default function SpreadScreen() {
     );
   };
 
+  const handleCustomSpreadSelect = (customSpreadTemplate: any) => {
+    // Convert template to CustomSpread format
+    const customSpreadData: CustomSpread = {
+      name: customSpreadTemplate.name,
+      description: customSpreadTemplate.description,
+      color: customSpreadTemplate.color,
+      zones: customSpreadTemplate.zones
+    };
+
+    setCustomSpread(customSpreadData);
+    setSelectedSpread(null);
+    setSpreadName(customSpreadData.name);
+
+    // Initialize zone cards for custom spread
+    const initialZoneCards: Record<string, any[]> = {};
+    customSpreadData.zones.forEach((zone: CustomSpreadZone) => {
+      initialZoneCards[zone.name] = [];
+    });
+    setZoneCards(initialZoneCards);
+  };
+
+  const renderCustomSpreadOption = (customSpreadTemplate: any) => {
+    const IconComponent = getIconComponent(customSpreadTemplate.zones[0]?.icon || 'Target');
+
+    return (
+      <TouchableOpacity
+        key={customSpreadTemplate.id}
+        style={styles.spreadOption}
+        onPress={() => handleCustomSpreadSelect(customSpreadTemplate)}
+      >
+        <LinearGradient
+          colors={[`${customSpreadTemplate.color}33`, `${customSpreadTemplate.color}11`]}
+          style={styles.spreadOptionGradient}
+        >
+          <View style={styles.customSpreadHeader}>
+            <IconComponent size={24} color={customSpreadTemplate.color} />
+            <View style={styles.customSpreadBadge}>
+              <Text style={styles.customSpreadBadgeText}>Custom</Text>
+            </View>
+          </View>
+          <Text style={styles.spreadOptionTitle}>{customSpreadTemplate.name}</Text>
+          <Text style={styles.spreadOptionDescription}>{customSpreadTemplate.description}</Text>
+          <Text style={styles.customSpreadZoneCount}>
+            {customSpreadTemplate.zones.length} zones
+          </Text>
+        </LinearGradient>
+      </TouchableOpacity>
+    );
+  };
+
   const renderGalleryItem = ({ item }: { item: any }) => (
     <TouchableOpacity 
       style={styles.galleryItem}
@@ -1125,8 +1268,23 @@ export default function SpreadScreen() {
     </Modal>
   );
 
+  // Icon mapping for custom spreads
+  const getIconComponent = (iconName: string) => {
+    const iconMap: Record<string, any> = {
+      Target,
+      Shield,
+      Book,
+      Heart,
+      MessageCircle,
+      Lightbulb,
+      Users,
+      Sparkles,
+    };
+    return iconMap[iconName] || Target;
+  };
+
   const renderDropZone = (zone: any) => {
-    const Icon = zone.icon;
+    const Icon = typeof zone.icon === 'string' ? getIconComponent(zone.icon) : zone.icon;
     const cards = zoneCards[zone.name] || [];
     const isFullscreen = fullscreenZone === zone.name;
 
@@ -1411,7 +1569,7 @@ export default function SpreadScreen() {
     );
   }
 
-  if (!selectedSpread) {
+  if (!selectedSpread && !customSpread) {
     return (
       <View style={styles.container}>
         {/* Spacer removed for consistent padding across tabs */}
@@ -1433,7 +1591,35 @@ export default function SpreadScreen() {
           style={styles.spreadSelector}
           contentContainerStyle={styles.spreadSelectorContent}
         >
+          {/* Default Spreads */}
           {Object.keys(SPREADS).map((key) => renderSpreadOption(key as SpreadType))}
+          
+          {/* Saved Custom Spreads */}
+          {savedCustomSpreads.length > 0 && (
+            <>
+              <View style={styles.sectionDivider}>
+                <Text style={styles.sectionTitle}>My Custom Spreads</Text>
+              </View>
+              {savedCustomSpreads.map((customSpreadTemplate) => renderCustomSpreadOption(customSpreadTemplate))}
+            </>
+          )}
+          
+          {/* Custom Spread Builder Button */}
+          <TouchableOpacity
+            style={styles.customSpreadOption}
+            onPress={() => router.push('/(tabs)/custom-spread-builder')}
+          >
+            <LinearGradient
+              colors={['#6366f133', '#6366f111']}
+              style={styles.customSpreadGradient}
+            >
+              <Plus size={32} color="#6366f1" />
+              <Text style={styles.customSpreadTitle}>Create Custom Spread</Text>
+              <Text style={styles.customSpreadDescription}>
+                Design your own spread with custom zones and prompts
+              </Text>
+            </LinearGradient>
+          </TouchableOpacity>
         </ScrollView>
       </View>
     );
@@ -1452,11 +1638,18 @@ export default function SpreadScreen() {
             </TouchableOpacity>
             <View style={styles.titleContainer}>
               <Text style={styles.spreadTitle}>
-                {SPREADS[selectedSpread!].zones.find(z => z.name === fullscreenZone)?.title || ''}
+                {customSpread ? 
+                  customSpread.zones.find(z => z.name === fullscreenZone)?.title || '' :
+                  SPREADS[selectedSpread!].zones.find(z => z.name === fullscreenZone)?.title || ''
+                }
               </Text>
             </View>
           </View>
-          {renderDropZone(SPREADS[selectedSpread!].zones.find(z => z.name === fullscreenZone)!)}
+          {renderDropZone(
+            customSpread ? 
+              customSpread.zones.find(z => z.name === fullscreenZone)! :
+              SPREADS[selectedSpread!].zones.find(z => z.name === fullscreenZone)!
+          )}
         </SafeAreaView>
       ) : (
         <>
@@ -1465,6 +1658,7 @@ export default function SpreadScreen() {
               style={styles.backButton}
               onPress={() => {
                 setSelectedSpread(null);
+                setCustomSpread(null);
                 setCurrentSpreadId(null);
                 setZoneCards({});
                 setSpreadName('');
@@ -1477,7 +1671,7 @@ export default function SpreadScreen() {
             </TouchableOpacity>
             <View style={styles.titleContainer}>
               <Text style={styles.spreadTitle}>
-                {spreadName || SPREADS[selectedSpread!].name}
+                {spreadName || (selectedSpread ? SPREADS[selectedSpread].name : customSpread?.name || 'Custom Spread')}
               </Text>
               <TouchableOpacity
                 style={styles.resetButton}
@@ -1510,7 +1704,10 @@ export default function SpreadScreen() {
 
           <ScrollView style={styles.dropZonesScroll} contentContainerStyle={styles.dropZonesScrollContent}>
             <View style={styles.dropZonesContainer}>
-              {SPREADS[selectedSpread!].zones.map((zone) => renderDropZone(zone))}
+              {customSpread ? 
+                customSpread.zones.map((zone) => renderDropZone(zone)) :
+                SPREADS[selectedSpread!].zones.map((zone) => renderDropZone(zone))
+              }
             </View>
           </ScrollView>
         </>
@@ -1888,6 +2085,76 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: 'Inter-Regular',
     textAlign: 'center',
+  },
+  customSpreadOption: {
+    borderRadius: 16,
+    overflow: 'hidden',
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    marginTop: 8,
+  },
+  customSpreadGradient: {
+    padding: 20,
+    alignItems: 'center',
+    gap: 12,
+    borderWidth: 2,
+    borderColor: '#6366f1',
+    borderStyle: 'dashed',
+  },
+  customSpreadTitle: {
+    color: '#fff',
+    fontSize: 20,
+    fontFamily: 'Inter-Bold',
+  },
+  customSpreadDescription: {
+    color: 'rgba(255,255,255,0.7)',
+    fontSize: 14,
+    fontFamily: 'Inter-Regular',
+    textAlign: 'center',
+  },
+  sectionDivider: {
+    marginVertical: 16,
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#333',
+  },
+  sectionTitle: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: 'bold',
+    fontFamily: 'Inter-Bold',
+    textAlign: 'center',
+  },
+  customSpreadHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginBottom: 8,
+  },
+  customSpreadBadge: {
+    backgroundColor: 'rgba(99, 102, 241, 0.3)',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#6366f1',
+  },
+  customSpreadBadgeText: {
+    color: '#6366f1',
+    fontSize: 10,
+    fontWeight: 'bold',
+    fontFamily: 'Inter-Bold',
+  },
+  customSpreadZoneCount: {
+    color: 'rgba(255,255,255,0.5)',
+    fontSize: 12,
+    fontFamily: 'Inter-Regular',
+    textAlign: 'center',
+    marginTop: 4,
   },
   backButton: {
     padding: 6,

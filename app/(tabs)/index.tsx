@@ -3,7 +3,7 @@ import { useCallback, useEffect, useState, useRef } from 'react';
 import { useFonts, Inter_400Regular, Inter_700Bold } from '@expo-google-fonts/inter';
 import * as SplashScreen from 'expo-splash-screen';
 import { useRouter } from 'expo-router';
-import { Settings2, CreditCard as Edit3, Trash2, Swords, Shield, Sparkles, Users, Globe as Globe2, Lock, Wallet, Plus, Share2 } from 'lucide-react-native';
+import { Settings2, CreditCard as Edit3, Trash2, Swords, Shield, Sparkles, Users, Globe as Globe2, Lock, Wallet, Plus, Share2, Coins, Heart, Globe, Star, Wand2, Zap, Target, User, Briefcase, Palette, Upload, X, Check } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { supabase } from '@/lib/supabase';
@@ -14,6 +14,7 @@ import GuestModeBanner from '@/components/GuestModeBanner';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import ViewShot from 'react-native-view-shot';
 import * as Sharing from 'expo-sharing';
+import * as ImagePicker from 'expo-image-picker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { WalletService } from '@/app/services/walletService';
 import { SubtextNftMinter } from '@/app/utils/nftMinter';
@@ -92,6 +93,7 @@ export default function CollectionScreen() {
     collections?: any;
     shadow_card_id?: string;
     shadow_card?: Card | Card[] | null;
+    isDeck?: boolean; // Add deck flag
   };
 
   const { width: screenWidth } = useWindowDimensions();
@@ -121,6 +123,21 @@ export default function CollectionScreen() {
   const viewShotRefs = useRef<Map<string, ViewShot | null>>(new Map());
   const { height: screenHeight } = useWindowDimensions();
   const router = useRouter();
+  
+  // New deck viewing state
+  const [viewMode, setViewMode] = useState<'cards' | 'decks'>('cards');
+  const [customDeckImages, setCustomDeckImages] = useState<Record<string, string>>({});
+  
+  // Deck management state
+  const [showDeckActions, setShowDeckActions] = useState(false);
+  const [selectedDeck, setSelectedDeck] = useState<Card | null>(null);
+  const [showImageModal, setShowImageModal] = useState(false);
+  const [selectedDeckForImage, setSelectedDeckForImage] = useState<string | null>(null);
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [generatingImage, setGeneratingImage] = useState(false);
+  const [imagePrompt, setImagePrompt] = useState('');
+  const [showAddDeck, setShowAddDeck] = useState(false);
+  const [newDeckName, setNewDeckName] = useState('');
   
   // Double tap timing ref
   const lastTapRef = useRef<number>(0);
@@ -293,9 +310,10 @@ export default function CollectionScreen() {
     }
   }, [user, fetchCards]);
 
-  // Load phenomena types on component mount
+  // Load phenomena types and deck images on component mount
   useEffect(() => {
     loadPhenomenaTypes();
+    loadCustomDeckImages();
   }, []);
   
   const onRefresh = useCallback(() => {
@@ -359,31 +377,336 @@ export default function CollectionScreen() {
     }
   };
 
-  // Filter cards based on selected phenomena type and search query
-  const filterCards = useCallback((cardsToFilter: Card[]) => {
-    let filtered = cardsToFilter;
+  // Load custom deck images from database
+  const loadCustomDeckImages = async () => {
+    try {
+      if (!user) {
+        return;
+      }
+
+      const { data: userData, error } = await supabase
+        .from('users')
+        .select('custom_deck_images')
+        .eq('id', user.id)
+        .single();
+
+      if (error) {
+        console.error('Error loading custom deck images:', error);
+        return;
+      }
+
+      if (userData?.custom_deck_images) {
+        setCustomDeckImages(userData.custom_deck_images);
+      }
+    } catch (error) {
+      console.error('Error loading custom deck images:', error);
+    }
+  };
+
+  // Save custom deck images to database
+  const saveCustomDeckImages = async (images: Record<string, string>) => {
+    try {
+      if (!user) {
+        console.error('No user found for saving deck images');
+        return;
+      }
+
+      const { error } = await supabase
+        .from('users')
+        .update({ custom_deck_images: images })
+        .eq('id', user.id);
+
+      if (error) {
+        console.error('Error saving deck images to database:', error);
+      }
+    } catch (error) {
+      console.error('Error saving deck images:', error);
+    }
+  };
+
+  // Save phenomena types to database
+  const savePhenomenaTypes = async (types: string[]) => {
+    try {
+      if (!user) {
+        console.error('No user found for saving phenomena types');
+        return;
+      }
+
+      // Save to database
+      const { error } = await supabase
+        .from('users')
+        .update({ custom_phenomena_types: types })
+        .eq('id', user.id);
+
+      if (error) {
+        console.error('Error saving phenomena types to database:', error);
+        // Fall back to AsyncStorage
+        await AsyncStorage.setItem('@phenomena_types', JSON.stringify(types));
+      }
+    } catch (error) {
+      console.error('Error saving phenomena types:', error);
+      // Fall back to AsyncStorage
+      try {
+        await AsyncStorage.setItem('@phenomena_types', JSON.stringify(types));
+      } catch (storageError) {
+        console.error('Error saving to AsyncStorage:', storageError);
+      }
+    }
+  };
+
+  // Add new deck (phenomena type)
+  const addNewDeck = async () => {
+    if (!newDeckName.trim()) {
+      Alert.alert('Error', 'Please enter a deck name');
+      return;
+    }
+
+    const trimmedName = newDeckName.trim();
     
-    // Filter by phenomena type
-    if (selectedPhenomena !== 'All') {
-      filtered = filtered.filter(card => card.type === selectedPhenomena);
+    if (phenomenaTypes.includes(trimmedName)) {
+      Alert.alert('Error', 'This deck type already exists');
+      return;
+    }
+
+    const updatedTypes = [...phenomenaTypes, trimmedName];
+    setPhenomenaTypes(updatedTypes);
+    await savePhenomenaTypes(updatedTypes);
+    setNewDeckName('');
+    setShowAddDeck(false);
+    
+    if (Platform.OS !== 'web') {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    }
+  };
+
+  // Remove deck (phenomena type)
+  const removeDeck = async (deckName: string) => {
+    // Prevent removal of default phenomena types
+    const DEFAULT_PHENOMENA = ['Intention', 'Context', 'Impact', 'Accuracy', 'Agenda', 'Needs', 'Emotion', 'Role'];
+    if (DEFAULT_PHENOMENA.includes(deckName)) {
+      Alert.alert('Cannot Remove', 'Default deck types cannot be removed');
+      return;
+    }
+
+    Alert.alert(
+      'Remove Deck',
+      `Are you sure you want to remove "${deckName}"? This will also remove its custom image.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Remove',
+          style: 'destructive',
+          onPress: async () => {
+            const updatedTypes = phenomenaTypes.filter(type => type !== deckName);
+            setPhenomenaTypes(updatedTypes);
+            await savePhenomenaTypes(updatedTypes);
+            
+            // Also remove custom image for this deck
+            const updatedImages = { ...customDeckImages };
+            delete updatedImages[deckName];
+            setCustomDeckImages(updatedImages);
+            await saveCustomDeckImages(updatedImages);
+            
+            setShowDeckActions(false);
+            setSelectedDeck(null);
+            
+            if (Platform.OS !== 'web') {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+            }
+          }
+        }
+      ]
+    );
+  };
+
+  // Handle deck image upload
+  const handleDeckImageUpload = async () => {
+    try {
+      // Request permission
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission needed', 'Please allow access to your photo library to upload images.');
+        return;
+      }
+
+      setUploadingImage(true);
+
+      // Launch image picker
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [2.5, 3.5], // Card aspect ratio
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets[0] && selectedDeckForImage) {
+        const imageUri = result.assets[0].uri;
+        
+        // Update custom deck images
+        const updatedImages = {
+          ...customDeckImages,
+          [selectedDeckForImage]: imageUri
+        };
+        
+        setCustomDeckImages(updatedImages);
+        await saveCustomDeckImages(updatedImages);
+        
+        if (Platform.OS !== 'web') {
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+        }
+        
+        setShowImageModal(false);
+        setSelectedDeckForImage(null);
+        setImagePrompt('');
+      }
+    } catch (error) {
+      console.error('Error uploading image:', error);
+      Alert.alert('Error', 'Failed to upload image. Please try again.');
+    } finally {
+      setUploadingImage(false);
+    }
+  };
+
+  // Remove deck custom image
+  const handleRemoveDeckImage = async () => {
+    if (!selectedDeckForImage) return;
+    
+    const updatedImages = { ...customDeckImages };
+    delete updatedImages[selectedDeckForImage];
+    
+    setCustomDeckImages(updatedImages);
+    await saveCustomDeckImages(updatedImages);
+    
+    if (Platform.OS !== 'web') {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     }
     
-    // Filter by search query (card name)
+    setShowImageModal(false);
+    setSelectedDeckForImage(null);
+    setImagePrompt('');
+  };
+
+  // Generate deck image with AI
+  const handleGenerateDeckImage = async () => {
+    if (!selectedDeckForImage) return;
+    if (!imagePrompt.trim()) {
+      Alert.alert('Add a description', 'Please describe the image you want for this deck.');
+      return;
+    }
+    try {
+      setGeneratingImage(true);
+      // Invoke the same edge function used in card creation
+      const { data, error } = await supabase.functions.invoke('generate-card-image', {
+        body: {
+          name: `${selectedDeckForImage} Deck`,
+          description: imagePrompt.trim(),
+          userId: user?.id,
+        },
+      });
+
+      if (error) {
+        console.error('Generate image error:', error);
+        throw new Error(error.message || 'Failed to generate image');
+      }
+
+      if (!data?.imageUrl) {
+        throw new Error('No image URL returned from generator');
+      }
+
+      const updatedImages = {
+        ...customDeckImages,
+        [selectedDeckForImage]: data.imageUrl as string,
+      };
+      setCustomDeckImages(updatedImages);
+      await saveCustomDeckImages(updatedImages);
+
+      if (Platform.OS !== 'web') {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      }
+
+      // Close modal and reset prompt
+      setShowImageModal(false);
+      setSelectedDeckForImage(null);
+      setImagePrompt('');
+    } catch (err) {
+      console.error('AI generation failed:', err);
+      Alert.alert('Generation failed', err instanceof Error ? err.message : 'Please try again.');
+    } finally {
+      setGeneratingImage(false);
+    }
+  };
+
+  // Generate deck objects that can be displayed like cards
+  const generateDecks = useCallback((): Card[] => {
+    if (!phenomenaTypes) return [];
+    
+    // Filter out 'All' from phenomena types for decks
+    const deckTypes = phenomenaTypes.filter(type => type !== 'All');
+    
+    return deckTypes.map(deckType => {
+      const customImage = customDeckImages[deckType];
+      const defaultGradients: Record<string, [string, string]> = {
+        'Intention': ['#6366f1', '#8b5cf6'],
+        'Context': ['#0ea5e9', '#06b6d4'],
+        'Impact': ['#f59e0b', '#ef4444'],
+        'Accuracy': ['#10b981', '#059669'],
+        'Agenda': ['#ec4899', '#be185d'],
+        'Needs': ['#8b5cf6', '#6366f1'],
+        'Emotion': ['#ef4444', '#dc2626'],
+        'Role': ['#06b6d4', '#0891b2'],
+      };
+      
+      const gradientColors = defaultGradients[deckType] || ['#374151', '#1f2937'];
+      
+      return {
+        id: `deck_${deckType}`,
+        name: deckType,
+        description: `${deckType} phenomenon deck`,
+        type: 'Deck',
+        image_url: customImage || '', // Use custom image or empty for gradient
+        user_id: user?.id || '',
+        format: 'fullBleed' as const,
+        background_gradient: JSON.stringify(gradientColors),
+        // Mark as deck for special handling
+        isDeck: true,
+      } as Card & { isDeck: boolean };
+    });
+  }, [phenomenaTypes, customDeckImages, user?.id]);
+
+  // Filter cards or decks based on view mode and search query
+  const filterItems = useCallback((itemsToFilter: Card[]) => {
+    let filtered = itemsToFilter;
+    
+    if (viewMode === 'cards') {
+      // Filter by phenomena type
+      if (selectedPhenomena !== 'All') {
+        filtered = filtered.filter(card => card.type === selectedPhenomena);
+      }
+    }
+    
+    // Filter by search query (name)
     if (searchQuery.trim()) {
       const query = searchQuery.trim().toLowerCase();
-      filtered = filtered.filter(card => 
-        card.name.toLowerCase().includes(query)
+      filtered = filtered.filter(item => 
+        item.name.toLowerCase().includes(query)
       );
     }
     
     return filtered;
-  }, [selectedPhenomena, searchQuery]);
+  }, [selectedPhenomena, searchQuery, viewMode]);
 
-  // Update filtered cards when phenomena selection or search query changes
+  // Update displayed items based on view mode and filters
   useEffect(() => {
-    const filteredCards = filterCards(allCards);
-    setCards(filteredCards);
-  }, [selectedPhenomena, searchQuery, allCards, filterCards]);
+    if (viewMode === 'cards') {
+      const filteredCards = filterItems(allCards);
+      setCards(filteredCards);
+    } else {
+      // Generate and filter decks
+      const decks = generateDecks();
+      const filteredDecks = filterItems(decks);
+      setCards(filteredDecks);
+    }
+  }, [viewMode, selectedPhenomena, searchQuery, allCards, phenomenaTypes, customDeckImages, filterItems, generateDecks]);
 
   const handleDelete = async (cardId: string) => {
     if (!cardId) {
@@ -827,42 +1150,55 @@ export default function CollectionScreen() {
     
     const backgroundGradient = getBackgroundGradient();
     
-    // Double tap detection for modal - NOW FLIP-STATE AWARE!
+    // Double tap detection - handles both cards and decks
     const handleDoubleTapCard = () => {
       const now = Date.now();
       const DOUBLE_PRESS_DELAY = 300;
       if (lastTapRef.current && (now - lastTapRef.current) < DOUBLE_PRESS_DELAY) {
-        // Determine which card to edit based on current flip state
-        let targetCard: Card;
+        // Check if this is a deck
+        const isDeck = (item as any).isDeck;
         
-        if (!isFlipped) {
-          // User is viewing FRONT side → always edit original card
-          targetCard = item;
-          console.log('🟢 FRONT SIDE DOUBLE TAP - editing original card:', item.name, item.id);
-        } else {
-          // User is viewing BACK side → edit what's displayed on back
-          const shadowCard = item.shadow_card 
-            ? (Array.isArray(item.shadow_card) ? item.shadow_card[0] : item.shadow_card)
-            : null;
-          
-          if (shadowCard) {
-            // Shadow exists and is displayed → edit shadow
-            targetCard = shadowCard;
-            console.log('🔵 BACK SIDE DOUBLE TAP (with shadow) - editing shadow card:', shadowCard.name, shadowCard.id);
-          } else {
-            // No shadow, showing default back → edit original
-            targetCard = item;
-            console.log('🟡 BACK SIDE DOUBLE TAP (no shadow) - editing original card:', item.name, item.id);
+        if (isDeck) {
+          // Show deck management actions modal
+          console.log('🎯 DECK DOUBLE TAP - showing deck actions:', item.name);
+          setSelectedDeck(item);
+          setShowDeckActions(true);
+          if (Platform.OS !== 'web') {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
           }
-        }
-        
-        // Double tap detected - show modal for the contextually correct card
-        console.log('🎯 Setting selectedCard to:', targetCard.name, targetCard.id);
-        setSelectedCard(targetCard);
-        setShowActions(true);
-        setDeleteError('');
-        if (Platform.OS !== 'web') {
-          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+        } else {
+          // Handle normal card double tap - flip-state aware
+          let targetCard: Card;
+          
+          if (!isFlipped) {
+            // User is viewing FRONT side → always edit original card
+            targetCard = item;
+            console.log('🟢 FRONT SIDE DOUBLE TAP - editing original card:', item.name, item.id);
+          } else {
+            // User is viewing BACK side → edit what's displayed on back
+            const shadowCard = item.shadow_card 
+              ? (Array.isArray(item.shadow_card) ? item.shadow_card[0] : item.shadow_card)
+              : null;
+            
+            if (shadowCard) {
+              // Shadow exists and is displayed → edit shadow
+              targetCard = shadowCard;
+              console.log('🔵 BACK SIDE DOUBLE TAP (with shadow) - editing shadow card:', shadowCard.name, shadowCard.id);
+            } else {
+              // No shadow, showing default back → edit original
+              targetCard = item;
+              console.log('🟡 BACK SIDE DOUBLE TAP (no shadow) - editing original card:', item.name, item.id);
+            }
+          }
+          
+          // Double tap detected - show modal for the contextually correct card
+          console.log('🎯 Setting selectedCard to:', targetCard.name, targetCard.id);
+          setSelectedCard(targetCard);
+          setShowActions(true);
+          setDeleteError('');
+          if (Platform.OS !== 'web') {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+          }
         }
       } else {
         // Single tap - reserved for future interactions
@@ -873,8 +1209,20 @@ export default function CollectionScreen() {
       lastTapRef.current = now;
     };
     
-    // Long press handler for animated card flip
+    // Long press handling - flip animation for cards, image upload for decks
     const handleLongPress = () => {
+      const isDeck = (item as any).isDeck;
+      
+      if (isDeck) {
+        // Deck long press - open image upload modal
+        console.log('🔗 DECK LONG PRESS - opening image modal:', item.name);
+        setSelectedDeckForImage(item.name);
+        setShowImageModal(true);
+        if (Platform.OS !== 'web') {
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+        }
+        return;
+      }
       // Get or create animation value for this card
       let animValue = flipAnimations.get(item.id);
       if (!animValue) {
@@ -1051,6 +1399,43 @@ export default function CollectionScreen() {
               }} 
               resizeMode="cover" // Use cover to fill entire container
             />
+          </Pressable>
+        );
+      }
+      
+      // Check if this is a deck
+      const isDeck = (item as any).isDeck;
+      
+      if (isDeck) {
+        // Deck rendering - show custom image or gradient background
+        return (
+          <Pressable
+            style={[styles.fullBleedCard, { width: cardWidth, height: cardHeight }]}
+            onPress={() => handleDoubleTapCard()}
+            onLongPress={handleLongPress}
+          >
+            {item.image_url ? (
+              // Show custom deck image
+              <Image source={{ uri: item.image_url }} style={styles.fullBleedImage} resizeMode="cover" />
+            ) : (
+              // Show gradient background for decks without custom images
+              <LinearGradient
+                colors={backgroundGradient || ['#374151', '#1f2937']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.fullBleedImage}
+              />
+            )}
+            
+            {/* Deck title overlay */}
+            <View style={styles.deckOverlay}>
+              <Text style={[styles.deckTitle, { fontSize: Math.max(20, nameFontSize + 4) }]}>
+                {item.name}
+              </Text>
+              <Text style={[styles.deckLabel, { fontSize: Math.max(14, typeFontSize) }]}>
+                Deck
+              </Text>
+            </View>
           </Pressable>
         );
       }
@@ -2130,7 +2515,7 @@ export default function CollectionScreen() {
   if (loading) {
     return (
       <LinearGradient
-        colors={['#1a1a1a', '#2a2a2a']}
+        colors={['#090909', '#090909']}
         style={[styles.container, styles.centerContent]}>
         <Text style={styles.loadingText}>Loading your collection...</Text>
       </LinearGradient>
@@ -2140,7 +2525,7 @@ export default function CollectionScreen() {
   if (error) {
     return (
       <LinearGradient
-        colors={['#1a1a1a', '#2a2a2a']}
+        colors={['#090909', '#090909']}
         style={[styles.container, styles.centerContent]}>
         <Text style={styles.errorText}>{error}</Text>
       </LinearGradient>
@@ -2152,7 +2537,7 @@ export default function CollectionScreen() {
 
   return (
     <LinearGradient
-      colors={['#1a1a1a', '#2a2a2a']}
+      colors={['#090909', '#090909']}
       style={styles.container}
       onLayout={onLayoutRootView}>
       {/* Experiment: Removed Spacer to reduce top padding */}
@@ -2193,53 +2578,80 @@ export default function CollectionScreen() {
           )}
         </View>
 
-        {/* Phenomena filter dropdown */}
-        <View style={styles.dropdownButtonContainer}>
-          <TouchableOpacity 
-            style={styles.topBarButton}
-            onPress={() => {
-              setShowPhenomenaMenu(!showPhenomenaMenu);
-              if (Platform.OS !== 'web') {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              }
-            }}
-          >
-            <Text style={styles.topBarButtonText}>
-              {selectedPhenomena === 'All' ? 'All Decks' : selectedPhenomena}
-            </Text>
-          </TouchableOpacity>
-          
-          {showPhenomenaMenu && (
-            <View style={styles.dropdownMenu}>
-              {phenomenaTypes.map((phenomena) => (
-                <TouchableOpacity
-                  key={phenomena}
-                  style={styles.dropdownItem}
-                  onPress={() => {
-                    setSelectedPhenomena(phenomena);
-                    setShowPhenomenaMenu(false);
-                    if (Platform.OS !== 'web') {
-                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                    }
-                  }}
-                >
-                  <Text style={[
-                    styles.dropdownItemText,
-                    selectedPhenomena === phenomena && { color: '#6366f1' }
-                  ]}>
-                    {phenomena === 'All' ? 'All Decks' : phenomena}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          )}
-        </View>
+        {/* View Mode Toggle: Cards vs Decks */}
+        <TouchableOpacity 
+          style={[
+            styles.topBarButton,
+            viewMode === 'decks' && { backgroundColor: '#6366f1' }
+          ]}
+          onPress={() => {
+            const newMode = viewMode === 'cards' ? 'decks' : 'cards';
+            setViewMode(newMode);
+            // Reset search and phenomena filter when switching modes
+            setSearchQuery('');
+            setSelectedPhenomena('All');
+            if (Platform.OS !== 'web') {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+            }
+          }}
+        >
+          <Text style={[
+            styles.topBarButtonText,
+            viewMode === 'decks' && { color: '#ffffff' }
+          ]}>
+            {viewMode === 'cards' ? 'View Decks' : 'View Cards'}
+          </Text>
+        </TouchableOpacity>
+
+        {/* Phenomena filter - only show in cards mode */}
+        {viewMode === 'cards' && (
+          <View style={styles.dropdownButtonContainer}>
+            <TouchableOpacity 
+              style={styles.topBarButton}
+              onPress={() => {
+                setShowPhenomenaMenu(!showPhenomenaMenu);
+                if (Platform.OS !== 'web') {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                }
+              }}
+            >
+              <Text style={styles.topBarButtonText}>
+                {selectedPhenomena === 'All' ? 'All Types' : selectedPhenomena}
+              </Text>
+            </TouchableOpacity>
+            
+            {showPhenomenaMenu && (
+              <View style={styles.dropdownMenu}>
+                {phenomenaTypes.map((phenomena) => (
+                  <TouchableOpacity
+                    key={phenomena}
+                    style={styles.dropdownItem}
+                    onPress={() => {
+                      setSelectedPhenomena(phenomena);
+                      setShowPhenomenaMenu(false);
+                      if (Platform.OS !== 'web') {
+                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                      }
+                    }}
+                  >
+                    <Text style={[
+                      styles.dropdownItemText,
+                      selectedPhenomena === phenomena && { color: '#6366f1' }
+                    ]}>
+                      {phenomena === 'All' ? 'All Types' : phenomena}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+          </View>
+        )}
 
         {/* Search box */}
         <View style={styles.searchContainer}>
           <TextInput
             style={styles.searchInput}
-            placeholder="Search cards..."
+            placeholder={viewMode === 'cards' ? "Search cards..." : "Search decks..."}
             placeholderTextColor="#6b7280"
             value={searchQuery}
             onChangeText={setSearchQuery}
@@ -2428,21 +2840,260 @@ export default function CollectionScreen() {
         </Pressable>
       </Modal>
 
-      {/* Floating Plus Button for Quick Card Creation */}
+      {/* Deck Actions Modal */}
+      <Modal
+        visible={showDeckActions}
+        transparent
+        animationType="fade"
+        onRequestClose={() => {
+          setShowDeckActions(false);
+          setSelectedDeck(null);
+        }}
+      >
+        <Pressable 
+          style={styles.modalOverlay}
+          onPress={() => {
+            setShowDeckActions(false);
+            setSelectedDeck(null);
+          }}
+        >
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>
+              {selectedDeck?.name || 'Deck'} Options
+            </Text>
+            
+            <TouchableOpacity
+              style={styles.modalButton}
+              onPress={() => {
+                if (selectedDeck) {
+                  setSelectedDeckForImage(selectedDeck.name);
+                  setShowImageModal(true);
+                  setShowDeckActions(false);
+                }
+              }}
+            >
+              <Upload size={20} color="#10b981" />
+              <Text style={styles.modalButtonText}>Manage Cover Image</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity
+              style={styles.modalButton}
+              onPress={() => {
+                if (selectedDeck) {
+                  router.push({
+                    pathname: '/deck-detail',
+                    params: {
+                      phenomenaType: selectedDeck.name
+                    }
+                  });
+                  setShowDeckActions(false);
+                  setSelectedDeck(null);
+                }
+              }}
+            >
+              <Edit3 size={20} color="#3b82f6" />
+              <Text style={styles.modalButtonText}>Edit Deck Details</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity
+              style={[styles.modalButton, styles.deleteButton]}
+              onPress={() => {
+                if (selectedDeck) {
+                  removeDeck(selectedDeck.name);
+                }
+              }}
+            >
+              <Trash2 size={20} color="#ff4444" />
+              <Text style={[styles.modalButtonText, styles.deleteText]}>
+                Remove Deck
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </Pressable>
+      </Modal>
+
+      {/* Deck Image Upload Modal */}
+      <Modal
+        visible={showImageModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => {
+          setShowImageModal(false);
+          setSelectedDeckForImage(null);
+          setImagePrompt('');
+        }}
+      >
+        <Pressable 
+          style={styles.modalOverlay}
+          onPress={() => {
+            setShowImageModal(false);
+            setSelectedDeckForImage(null);
+            setImagePrompt('');
+          }}
+        >
+          <View style={[styles.modalContent, { maxHeight: '80%' }]}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>
+                {selectedDeckForImage} Cover Image
+              </Text>
+              <TouchableOpacity
+                onPress={() => {
+                  setShowImageModal(false);
+                  setSelectedDeckForImage(null);
+                  setImagePrompt('');
+                }}
+              >
+                <X size={24} color="#fff" />
+              </TouchableOpacity>
+            </View>
+            
+            {/* Current image preview */}
+            {selectedDeckForImage && customDeckImages[selectedDeckForImage] && (
+              <View style={styles.imagePreview}>
+                <Text style={styles.imagePreviewLabel}>Current Image:</Text>
+                <Image 
+                  source={{ uri: customDeckImages[selectedDeckForImage] }} 
+                  style={styles.previewImage}
+                  resizeMode="cover"
+                />
+              </View>
+            )}
+            
+            {/* Image prompt input */}
+            <TextInput
+              style={styles.promptInput}
+              placeholder="Describe the image you want for this deck..."
+              placeholderTextColor="#6b7280"
+              value={imagePrompt}
+              onChangeText={setImagePrompt}
+              multiline
+              numberOfLines={3}
+            />
+            
+            {/* Action buttons */}
+            <View style={styles.imageButtonsContainer}>
+              <TouchableOpacity
+                style={[styles.modalButton, { flex: 1 }]}
+                onPress={handleGenerateDeckImage}
+                disabled={generatingImage}
+              >
+                {generatingImage ? (
+                  <Text style={styles.modalButtonText}>Generating...</Text>
+                ) : (
+                  <>
+                    <Wand2 size={20} color="#8b5cf6" />
+                    <Text style={styles.modalButtonText}>Generate</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                style={[styles.uploadButton, { flex: 1 }]}
+                onPress={handleDeckImageUpload}
+                disabled={uploadingImage}
+              >
+                {uploadingImage ? (
+                  <Text style={styles.uploadButtonText}>Uploading...</Text>
+                ) : (
+                  <>
+                    <Upload size={20} color="#6366f1" />
+                    <Text style={styles.uploadButtonText}>Upload</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            </View>
+            
+            {/* Remove image button - only show if image exists */}
+            {selectedDeckForImage && customDeckImages[selectedDeckForImage] && (
+              <TouchableOpacity
+                style={[styles.modalButton, styles.deleteButton]}
+                onPress={handleRemoveDeckImage}
+              >
+                <Trash2 size={20} color="#ff4444" />
+                <Text style={[styles.modalButtonText, styles.deleteText]}>
+                  Remove Image
+                </Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        </Pressable>
+      </Modal>
+
+      {/* Add New Deck Modal */}
+      <Modal
+        visible={showAddDeck}
+        transparent
+        animationType="fade"
+        onRequestClose={() => {
+          setShowAddDeck(false);
+          setNewDeckName('');
+        }}
+      >
+        <Pressable 
+          style={styles.modalOverlay}
+          onPress={() => {
+            setShowAddDeck(false);
+            setNewDeckName('');
+          }}
+        >
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Create New Deck</Text>
+            
+            <TextInput
+              style={styles.deckNameInput}
+              placeholder="Enter deck name..."
+              placeholderTextColor="#6b7280"
+              value={newDeckName}
+              onChangeText={setNewDeckName}
+              autoFocus
+              returnKeyType="done"
+              onSubmitEditing={addNewDeck}
+            />
+            
+            <View style={styles.imageButtonsContainer}>
+              <TouchableOpacity
+                style={[styles.uploadButton, { flex: 1 }]}
+                onPress={() => {
+                  setShowAddDeck(false);
+                  setNewDeckName('');
+                }}
+              >
+                <X size={20} color="#6366f1" />
+                <Text style={styles.uploadButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                style={[styles.modalButton, { flex: 1 }]}
+                onPress={addNewDeck}
+              >
+                <Check size={20} color="#10b981" />
+                <Text style={styles.modalButtonText}>Create</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Pressable>
+      </Modal>
+
+      {/* Floating Plus Button - context aware */}
       {selectedType === 'personal' && (
         <TouchableOpacity
           style={styles.floatingButton}
           onPress={() => {
-            // Always route directly to card creation screen
-            if (selectedPhenomena === 'All') {
-              router.push('/card-creation-new');
+            if (viewMode === 'cards') {
+              // Card creation
+              if (selectedPhenomena === 'All') {
+                router.push('/card-creation-new');
+              } else {
+                router.push({
+                  pathname: '/card-creation-new',
+                  params: {
+                    preselected_type: selectedPhenomena
+                  }
+                });
+              }
             } else {
-              router.push({
-                pathname: '/card-creation-new',
-                params: {
-                  preselected_type: selectedPhenomena
-                }
-              });
+              // Deck creation
+              setShowAddDeck(true);
             }
             
             if (Platform.OS !== 'web') {
@@ -2460,7 +3111,7 @@ export default function CollectionScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#121212',
+    backgroundColor: '#090909',
     padding: Platform.OS === 'web' ? 16 : 8,
   },
   // Column selector styles
@@ -2989,5 +3640,102 @@ const styles = StyleSheet.create({
     textShadowColor: 'rgba(0,0,0,0.7)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 3,
+  },
+  deckOverlay: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    paddingHorizontal: 20,
+    paddingVertical: 20,
+    alignItems: 'center',
+  },
+  deckTitle: {
+    fontFamily: 'Inter-Bold',
+    color: '#ffffff',
+    textAlign: 'center',
+    textShadowColor: 'rgba(0,0,0,0.8)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 4,
+    marginBottom: 4,
+  },
+  deckLabel: {
+    fontFamily: 'Inter-Regular',
+    color: '#ffffff',
+    textAlign: 'center',
+    opacity: 0.8,
+    textShadowColor: 'rgba(0,0,0,0.8)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
+  },
+  modalTitle: {
+    fontFamily: 'Inter-Bold',
+    fontSize: 18,
+    color: '#ffffff',
+    marginBottom: 20,
+    textAlign: 'center',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  imagePreview: {
+    marginBottom: 16,
+  },
+  imagePreviewLabel: {
+    fontFamily: 'Inter-Regular',
+    fontSize: 14,
+    color: '#ffffff',
+    marginBottom: 8,
+  },
+  previewImage: {
+    width: '100%',
+    height: 120,
+    borderRadius: 8,
+    backgroundColor: '#2a2a2a',
+  },
+  promptInput: {
+    backgroundColor: '#2a2a2a',
+    borderRadius: 8,
+    padding: 12,
+    color: '#ffffff',
+    fontFamily: 'Inter-Regular',
+    fontSize: 16,
+    marginBottom: 16,
+    textAlignVertical: 'top',
+    minHeight: 80,
+  },
+  imageButtonsContainer: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 12,
+  },
+  uploadButton: {
+    backgroundColor: 'transparent',
+    borderWidth: 2,
+    borderColor: '#6366f1',
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  uploadButtonText: {
+    color: '#6366f1',
+    fontFamily: 'Inter-Bold',
+    fontSize: 16,
+  },
+  deckNameInput: {
+    backgroundColor: '#2a2a2a',
+    borderRadius: 8,
+    padding: 12,
+    color: '#ffffff',
+    fontFamily: 'Inter-Regular',
+    fontSize: 16,
+    marginBottom: 20,
   },
 });
