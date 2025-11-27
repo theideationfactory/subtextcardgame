@@ -122,10 +122,18 @@ export default function CardCreationNewScreen() {
 
   
   // Dropdown states
-  const [showTypeDropdown, setShowTypeDropdown] = useState(false);
-  const [showRoleDropdown, setShowRoleDropdown] = useState(false);
-  const [showContextDropdown, setShowContextDropdown] = useState(false);
   const [showBackgroundDropdown, setShowBackgroundDropdown] = useState(false);
+  
+  // Inline creation states
+  const [newTypeInput, setNewTypeInput] = useState('');
+  const [newDetailInput, setNewDetailInput] = useState('');
+  const [newContextInput, setNewContextInput] = useState('');
+  const [showNewTypeInput, setShowNewTypeInput] = useState(false);
+  const [showNewDetailInput, setShowNewDetailInput] = useState(false);
+  const [showNewContextInput, setShowNewContextInput] = useState(false);
+  
+  // Custom contexts state (make contexts dynamic like types)
+  const [customContexts, setCustomContexts] = useState<string[]>([]);
   
   // Chat functionality states
   const [showChat, setShowChat] = useState(false);
@@ -183,7 +191,19 @@ export default function CardCreationNewScreen() {
   }, [customDetailOptions]);
 
   const roleOptions = useMemo(() => subOptionsMap[type] || [], [type]);
-  const contextOptions = ['TBD', 'Self', 'Family', 'Friendship', 'Therapy', 'Peer', 'Work', 'Art', 'Politics'];
+  // Default contexts - will be merged with custom ones
+  const defaultContexts = ['TBD', 'Self', 'Family', 'Friendship', 'Therapy', 'Peer', 'Work', 'Art', 'Politics'];
+  
+  // Combined context options (defaults + custom)
+  const contextOptions = useMemo(() => {
+    const allContexts = [...defaultContexts];
+    customContexts.forEach(customContext => {
+      if (!allContexts.includes(customContext)) {
+        allContexts.push(customContext);
+      }
+    });
+    return allContexts;
+  }, [customContexts]);
 
 
   const [fontsLoaded] = useFonts({
@@ -217,9 +237,15 @@ export default function CardCreationNewScreen() {
 
     // Reset UI states
     setShowVisibility(false);
-    setShowTypeDropdown(false);
-    setShowRoleDropdown(false);
-    setShowContextDropdown(false);
+    setShowBackgroundDropdown(false);
+    
+    // Reset inline creation states
+    setNewTypeInput('');
+    setNewDetailInput('');
+    setNewContextInput('');
+    setShowNewTypeInput(false);
+    setShowNewDetailInput(false);
+    setShowNewContextInput(false);
   };
 
   // Load phenomena types from database, fallback to AsyncStorage
@@ -308,6 +334,38 @@ export default function CardCreationNewScreen() {
     }
   };
 
+  // Load custom contexts from database
+  const loadCustomContexts = async () => {
+    try {
+      if (!user) {
+        console.log('No user found, using default contexts');
+        return;
+      }
+
+      const { data: userData, error: dbError } = await supabase
+        .from('users')
+        .select('custom_contexts')
+        .eq('id', user.id)
+        .single();
+
+      if (dbError) {
+        console.error('Error loading custom contexts from database:', dbError);
+        return;
+      }
+
+      if (userData?.custom_contexts) {
+        console.log('Loaded custom contexts from database:', userData.custom_contexts);
+        setCustomContexts(userData.custom_contexts);
+      } else {
+        console.log('No custom contexts found, using defaults only');
+        setCustomContexts([]);
+      }
+    } catch (error) {
+      console.error('Error loading custom contexts:', error);
+      setCustomContexts([]);
+    }
+  };
+
   // Reset form state when the screen is focused for creating a new card
   useFocusEffect(
     useCallback(() => {
@@ -329,12 +387,14 @@ export default function CardCreationNewScreen() {
   useEffect(() => {
     if (params.id) {
       console.log('Loading edit data for card:', params.id);
+      console.log('📋 All params received:', JSON.stringify(params, null, 2));
       setName(params.name?.toString() || '');
       setDescription(params.description?.toString() || '');
       setType(params.type?.toString() || '');
       setRole(params.role?.toString() || '');
       setContext(params.context?.toString() || '');
       setCardImage(params.image_url?.toString() || '');
+      console.log('📋 Card data loaded successfully for editing');
       
       // Load visibility settings
       const loadVisibilitySettings = async () => {
@@ -420,17 +480,19 @@ export default function CardCreationNewScreen() {
     checkAuthStatus();
   }, []);
 
-  // Load phenomena types and custom detail options on component mount
+  // Load phenomena types, custom detail options, and custom contexts on component mount
   useEffect(() => {
     loadPhenomenaTypes();
     loadCustomDetailOptions();
+    loadCustomContexts();
   }, []);
 
-  // Also reload phenomena types and custom detail options when screen is focused (in case they were updated in deck creation)
+  // Also reload all custom data when screen is focused (in case they were updated elsewhere)
   useFocusEffect(
     useCallback(() => {
       loadPhenomenaTypes();
       loadCustomDetailOptions();
+      loadCustomContexts();
     }, [])
   );
 
@@ -1090,6 +1152,178 @@ export default function CardCreationNewScreen() {
     }
   };
 
+  // Functions for adding new items inline
+  const addNewType = async () => {
+    const trimmedInput = newTypeInput.trim();
+    if (!trimmedInput) {
+      setError('Please enter a type name');
+      return;
+    }
+
+    if (typeOptions.includes(trimmedInput)) {
+      setError('This type already exists');
+      return;
+    }
+
+    try {
+      const updatedTypes = [...typeOptions, trimmedInput];
+      setTypeOptions(updatedTypes);
+      
+      // Save to database
+      await savePhenomenaTypes(updatedTypes);
+      
+      // Select the new type and clear input
+      setType(trimmedInput);
+      setRole(''); // Reset detail when type changes
+      setNewTypeInput('');
+      setShowNewTypeInput(false);
+      
+      if (Platform.OS !== 'web') {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      }
+    } catch (error) {
+      console.error('Error adding new type:', error);
+      setError('Failed to add new type. Please try again.');
+    }
+  };
+
+  const addNewDetail = async () => {
+    const trimmedInput = newDetailInput.trim();
+    if (!trimmedInput || !type) {
+      setError('Please enter a detail name and select a type first');
+      return;
+    }
+
+    if (roleOptions.includes(trimmedInput)) {
+      setError('This detail already exists for this type');
+      return;
+    }
+
+    try {
+      const updatedCustomOptions = {
+        ...customDetailOptions,
+        [type]: [...(customDetailOptions[type] || []), trimmedInput]
+      };
+      
+      setCustomDetailOptions(updatedCustomOptions);
+      
+      // Save to database
+      await saveCustomDetailOptions(updatedCustomOptions);
+      
+      // Select the new detail and clear input
+      setRole(trimmedInput);
+      setNewDetailInput('');
+      setShowNewDetailInput(false);
+      
+      if (Platform.OS !== 'web') {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      }
+    } catch (error) {
+      console.error('Error adding new detail:', error);
+      setError('Failed to add new detail. Please try again.');
+    }
+  };
+
+  const addNewContext = async () => {
+    const trimmedInput = newContextInput.trim();
+    if (!trimmedInput) {
+      setError('Please enter a context name');
+      return;
+    }
+
+    if (contextOptions.includes(trimmedInput)) {
+      setError('This context already exists');
+      return;
+    }
+
+    try {
+      const updatedContexts = [...customContexts, trimmedInput];
+      setCustomContexts(updatedContexts);
+      
+      // Save to database
+      await saveCustomContexts(updatedContexts);
+      
+      // Select the new context and clear input
+      setContext(trimmedInput);
+      setNewContextInput('');
+      setShowNewContextInput(false);
+      
+      if (Platform.OS !== 'web') {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      }
+    } catch (error) {
+      console.error('Error adding new context:', error);
+      setError('Failed to add new context. Please try again.');
+    }
+  };
+
+  // Save functions for database persistence
+  const savePhenomenaTypes = async (types: string[]) => {
+    try {
+      if (!user) {
+        console.error('No user found for saving phenomena types');
+        return;
+      }
+
+      const { error } = await supabase
+        .from('users')
+        .update({ custom_phenomena_types: types })
+        .eq('id', user.id);
+
+      if (error) {
+        console.error('Error saving phenomena types to database:', error);
+        throw error;
+      }
+    } catch (error) {
+      console.error('Error saving phenomena types:', error);
+      throw error;
+    }
+  };
+
+  const saveCustomDetailOptions = async (options: Record<string, string[]>) => {
+    try {
+      if (!user) {
+        console.error('No user found for saving detail options');
+        return;
+      }
+
+      const { error } = await supabase
+        .from('users')
+        .update({ custom_detail_options: options })
+        .eq('id', user.id);
+
+      if (error) {
+        console.error('Error saving detail options to database:', error);
+        throw error;
+      }
+    } catch (error) {
+      console.error('Error saving detail options:', error);
+      throw error;
+    }
+  };
+
+  const saveCustomContexts = async (contexts: string[]) => {
+    try {
+      if (!user) {
+        console.error('No user found for saving contexts');
+        return;
+      }
+
+      const { error } = await supabase
+        .from('users')
+        .update({ custom_contexts: contexts })
+        .eq('id', user.id);
+
+      if (error) {
+        console.error('Error saving contexts to database:', error);
+        throw error;
+      }
+    } catch (error) {
+      console.error('Error saving contexts:', error);
+      throw error;
+    }
+  };
+
 
 
   const handleSave = async () => {
@@ -1362,157 +1596,174 @@ export default function CardCreationNewScreen() {
             </TouchableOpacity>
           </Modal>
 
-          {/* Compact Dropdowns Row */}
-          <View style={styles.compactDropdownsContainer}>
-            {/* Phenomena Type */}
-            <View style={styles.compactDropdownGroup}>
-              <Text style={styles.compactLabel}>Type</Text>
-              <TouchableOpacity 
-                style={styles.compactDropdownSelector}
-                onPress={() => setShowTypeDropdown(true)}
+          {/* Type Selection */}
+          <View style={styles.inlineSelectionGroup}>
+            <Text style={styles.inlineSelectionLabel}>Type</Text>
+            <View style={styles.chipContainer}>
+              {typeOptions.map((option) => (
+                <TouchableOpacity
+                  key={option}
+                  style={[
+                    styles.chip,
+                    type === option && styles.chipSelected
+                  ]}
+                  onPress={() => {
+                    setType(option);
+                    setRole(''); // Reset detail when type changes
+                    if (Platform.OS !== 'web') {
+                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    }
+                  }}
+                >
+                  <Text style={[
+                    styles.chipText,
+                    type === option && styles.chipTextSelected
+                  ]}>
+                    {option}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+              <TouchableOpacity
+                style={[styles.chip, styles.addChip]}
+                onPress={() => setShowNewTypeInput(!showNewTypeInput)}
               >
-                <Text style={[styles.compactDropdownText, !type && styles.placeholderText]}>
-                  {type || 'Phenomena'}
-                </Text>
-                <ChevronDown size={16} color="#666" />
+                <Plus size={14} color="#6366f1" />
+                <Text style={styles.addChipText}>Add Type</Text>
               </TouchableOpacity>
             </View>
-
-            {/* Phenomena Detail */}
-            <View style={styles.compactDropdownGroup}>
-              <Text style={styles.compactLabel}>Detail</Text>
-              <TouchableOpacity 
-                style={styles.compactDropdownSelector}
-                onPress={() => setShowRoleDropdown(true)}
-              >
-                <Text style={[styles.compactDropdownText, !role && styles.placeholderText]}>
-                  {role || 'Detail'}
-                </Text>
-                <ChevronDown size={16} color="#666" />
-              </TouchableOpacity>
-            </View>
-
-            {/* Context */}
-            <View style={styles.compactDropdownGroup}>
-              <Text style={styles.compactLabel}>Context</Text>
-              <TouchableOpacity 
-                style={styles.compactDropdownSelector}
-                onPress={() => setShowContextDropdown(true)}
-              >
-                <Text style={[styles.compactDropdownText, !context && styles.placeholderText]}>
-                  {context || 'Context'}
-                </Text>
-                <ChevronDown size={16} color="#666" />
-              </TouchableOpacity>
-            </View>
+            {showNewTypeInput && (
+              <View style={styles.newItemInput}>
+                <TextInput
+                  style={styles.newItemTextInput}
+                  value={newTypeInput}
+                  onChangeText={setNewTypeInput}
+                  placeholder="Enter new type name"
+                  placeholderTextColor="#666"
+                  onSubmitEditing={() => addNewType()}
+                  returnKeyType="done"
+                />
+                <TouchableOpacity
+                  style={styles.addItemButton}
+                  onPress={addNewType}
+                >
+                  <Check size={16} color="#fff" />
+                </TouchableOpacity>
+              </View>
+            )}
           </View>
 
-          {/* Modals for all three dropdowns */}
-          <Modal
-            visible={showTypeDropdown}
-            transparent={true}
-            animationType="fade"
-            onRequestClose={() => setShowTypeDropdown(false)}
-          >
-            <TouchableOpacity 
-              style={styles.modalOverlay}
-              activeOpacity={1}
-              onPress={() => setShowTypeDropdown(false)}
-            >
-              <View style={styles.dropdownModal}>
-                <FlatList
-                  data={typeOptions}
-                  keyExtractor={(item) => item}
-                  renderItem={({ item }) => (
-                    <TouchableOpacity
-                      style={styles.dropdownItem}
-                      onPress={() => {
-                        setType(item);
-                        setRole('');
-                        setShowTypeDropdown(false);
-                        if (Platform.OS !== 'web') {
-                          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                        }
-                      }}
-                    >
-                      <Text style={styles.dropdownItemText}>{item}</Text>
-                      {type === item && <Check size={20} color="#6366f1" />}
-                    </TouchableOpacity>
-                  )}
+          {/* Detail Selection */}
+          <View style={styles.inlineSelectionGroup}>
+            <Text style={styles.inlineSelectionLabel}>Detail {type ? `(${type})` : ''}</Text>
+            <View style={styles.chipContainer}>
+              {roleOptions.map((option) => (
+                <TouchableOpacity
+                  key={option}
+                  style={[
+                    styles.chip,
+                    role === option && styles.chipSelected
+                  ]}
+                  onPress={() => {
+                    setRole(option);
+                    if (Platform.OS !== 'web') {
+                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    }
+                  }}
+                >
+                  <Text style={[
+                    styles.chipText,
+                    role === option && styles.chipTextSelected
+                  ]}>
+                    {option}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+              {type && (
+                <TouchableOpacity
+                  style={[styles.chip, styles.addChip]}
+                  onPress={() => setShowNewDetailInput(!showNewDetailInput)}
+                >
+                  <Plus size={14} color="#6366f1" />
+                  <Text style={styles.addChipText}>Add Detail</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+            {showNewDetailInput && type && (
+              <View style={styles.newItemInput}>
+                <TextInput
+                  style={styles.newItemTextInput}
+                  value={newDetailInput}
+                  onChangeText={setNewDetailInput}
+                  placeholder={`Enter new ${type} detail`}
+                  placeholderTextColor="#666"
+                  onSubmitEditing={() => addNewDetail()}
+                  returnKeyType="done"
                 />
+                <TouchableOpacity
+                  style={styles.addItemButton}
+                  onPress={addNewDetail}
+                >
+                  <Check size={16} color="#fff" />
+                </TouchableOpacity>
               </View>
-            </TouchableOpacity>
-          </Modal>
+            )}
+          </View>
 
-          <Modal
-            visible={showRoleDropdown}
-            transparent={true}
-            animationType="fade"
-            onRequestClose={() => setShowRoleDropdown(false)}
-          >
-            <TouchableOpacity 
-              style={styles.modalOverlay}
-              activeOpacity={1}
-              onPress={() => setShowRoleDropdown(false)}
-            >
-              <View style={styles.dropdownModal}>
-                <FlatList
-                  data={roleOptions}
-                  keyExtractor={(item) => item}
-                  renderItem={({ item }) => (
-                    <TouchableOpacity
-                      style={styles.dropdownItem}
-                      onPress={() => {
-                        setRole(item);
-                        setShowRoleDropdown(false);
-                        if (Platform.OS !== 'web') {
-                          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                        }
-                      }}
-                    >
-                      <Text style={styles.dropdownItemText}>{item}</Text>
-                      {role === item && <Check size={20} color="#6366f1" />}
-                    </TouchableOpacity>
-                  )}
+          {/* Context Selection */}
+          <View style={styles.inlineSelectionGroup}>
+            <Text style={styles.inlineSelectionLabel}>Context</Text>
+            <View style={styles.chipContainer}>
+              {contextOptions.map((option) => (
+                <TouchableOpacity
+                  key={option}
+                  style={[
+                    styles.chip,
+                    context === option && styles.chipSelected
+                  ]}
+                  onPress={() => {
+                    setContext(option);
+                    if (Platform.OS !== 'web') {
+                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    }
+                  }}
+                >
+                  <Text style={[
+                    styles.chipText,
+                    context === option && styles.chipTextSelected
+                  ]}>
+                    {option}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+              <TouchableOpacity
+                style={[styles.chip, styles.addChip]}
+                onPress={() => setShowNewContextInput(!showNewContextInput)}
+              >
+                <Plus size={14} color="#6366f1" />
+                <Text style={styles.addChipText}>Add Context</Text>
+              </TouchableOpacity>
+            </View>
+            {showNewContextInput && (
+              <View style={styles.newItemInput}>
+                <TextInput
+                  style={styles.newItemTextInput}
+                  value={newContextInput}
+                  onChangeText={setNewContextInput}
+                  placeholder="Enter new context name"
+                  placeholderTextColor="#666"
+                  onSubmitEditing={() => addNewContext()}
+                  returnKeyType="done"
                 />
+                <TouchableOpacity
+                  style={styles.addItemButton}
+                  onPress={addNewContext}
+                >
+                  <Check size={16} color="#fff" />
+                </TouchableOpacity>
               </View>
-            </TouchableOpacity>
-          </Modal>
+            )}
+          </View>
 
-          <Modal
-            visible={showContextDropdown}
-            transparent={true}
-            animationType="fade"
-            onRequestClose={() => setShowContextDropdown(false)}
-          >
-            <TouchableOpacity 
-              style={styles.modalOverlay}
-              activeOpacity={1}
-              onPress={() => setShowContextDropdown(false)}
-            >
-              <View style={styles.dropdownModal}>
-                <FlatList
-                  data={contextOptions}
-                  keyExtractor={(item) => item}
-                  renderItem={({ item }) => (
-                    <TouchableOpacity
-                      style={styles.dropdownItem}
-                      onPress={() => {
-                        setContext(item);
-                        setShowContextDropdown(false);
-                        if (Platform.OS !== 'web') {
-                          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                        }
-                      }}
-                    >
-                      <Text style={styles.dropdownItemText}>{item}</Text>
-                      {context === item && <Check size={20} color="#6366f1" />}
-                    </TouchableOpacity>
-                  )}
-                />
-              </View>
-            </TouchableOpacity>
-          </Modal>
 
           {/* Image Section */}
           <View style={[styles.cardPreview, format === 'fullBleed' && styles.cardPreviewFullBleed]}>
@@ -2589,5 +2840,78 @@ const styles = StyleSheet.create({
     color: '#6366f1',
     fontSize: 18,
     fontFamily: 'Inter-Bold',
+  },
+  
+  // Inline selection UI styles
+  inlineSelectionGroup: {
+    marginBottom: 24,
+  },
+  inlineSelectionLabel: {
+    fontSize: 16,
+    fontFamily: 'Inter-Bold',
+    color: '#fff',
+    marginBottom: 12,
+  },
+  chipContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  chip: {
+    backgroundColor: '#1a1a1a',
+    borderWidth: 1,
+    borderColor: '#333',
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  chipSelected: {
+    backgroundColor: '#6366f1',
+    borderColor: '#6366f1',
+  },
+  chipText: {
+    fontSize: 14,
+    fontFamily: 'Inter-Regular',
+    color: '#ccc',
+  },
+  chipTextSelected: {
+    color: '#fff',
+  },
+  addChip: {
+    borderColor: '#6366f1',
+    borderStyle: 'dashed',
+  },
+  addChipText: {
+    fontSize: 14,
+    fontFamily: 'Inter-Regular',
+    color: '#6366f1',
+  },
+  newItemInput: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 8,
+    gap: 8,
+  },
+  newItemTextInput: {
+    flex: 1,
+    backgroundColor: '#1a1a1a',
+    borderWidth: 1,
+    borderColor: '#6366f1',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    fontSize: 14,
+    fontFamily: 'Inter-Regular',
+    color: '#fff',
+  },
+  addItemButton: {
+    backgroundColor: '#6366f1',
+    borderRadius: 8,
+    padding: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

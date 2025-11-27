@@ -470,6 +470,9 @@ export default function CollectionScreen() {
     // Close modal
     setShowActions(false);
     
+    console.log('📝 handleEdit called with card:', card.name, card.id);
+    console.log('📝 Current selectedCard state:', selectedCard?.name, selectedCard?.id);
+    
     // Navigate to Edit page
     router.push({
       pathname: '/card-creation-new',
@@ -764,33 +767,33 @@ export default function CollectionScreen() {
   // Calculate scaling factor based on number of columns
   const scaleFactor = getScaleFactor();
   
-  // Calculate card dimensions to fit completely on screen
+  // Calculate card dimensions to fit completely on screen with larger size
   const getCardDimensions = () => {
     // Calculate available height (subtract space for top controls and bottom tab bar)
     // Top controls: collection type buttons (~60px) + phenomena filter (~60px) + padding
     // Bottom tab bar: (~80px)
-    // Additional padding and margins: (~40px)
-    const reservedHeight = 240;
+    // Reduced padding for larger cards: (~20px)
+    const reservedHeight = 180; // Reduced from 240 to 180 for larger cards
     const availableHeight = screenHeight - reservedHeight;
     
     // Calculate available width (subtract horizontal padding)
-    const horizontalPadding = 32; // 16px on each side
+    const horizontalPadding = 24; // Reduced from 32 to 24 for larger cards
     const availableWidth = screenWidth - horizontalPadding;
     
-    // Calculate card dimensions based on 2.5:3.5 aspect ratio
+    // Calculate card dimensions based on 2.3:3.6 aspect ratio (slightly taller and narrower for premium cards)
     // Try height-constrained first
     let cardHeight = availableHeight;
-    let cardWidth = cardHeight * (2.5 / 3.5);
+    let cardWidth = cardHeight * (2.3 / 3.6);
     
     // If width exceeds available space, constrain by width instead
     if (cardWidth > availableWidth) {
       cardWidth = availableWidth;
-      cardHeight = cardWidth * (3.5 / 2.5);
+      cardHeight = cardWidth * (3.6 / 2.3);
     }
     
-    // Ensure minimum readable size
-    const minCardHeight = 400;
-    const minCardWidth = minCardHeight * (2.5 / 3.5);
+    // Increased minimum readable size for better visibility
+    const minCardHeight = 510; // Sweet spot between 500 and 520
+    const minCardWidth = minCardHeight * (2.3 / 3.6);
     
     cardHeight = Math.max(minCardHeight, cardHeight);
     cardWidth = Math.max(minCardWidth, cardWidth);
@@ -852,6 +855,7 @@ export default function CollectionScreen() {
         }
         
         // Double tap detected - show modal for the contextually correct card
+        console.log('🎯 Setting selectedCard to:', targetCard.name, targetCard.id);
         setSelectedCard(targetCard);
         setShowActions(true);
         setDeleteError('');
@@ -1043,7 +1047,7 @@ export default function CollectionScreen() {
                 height: '100%',
                 borderRadius: 12,
               }} 
-              resizeMode="contain" // Use contain for complete trading cards
+              resizeMode="cover" // Use cover to fill entire container
             />
           </Pressable>
         );
