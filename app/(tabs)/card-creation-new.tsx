@@ -73,7 +73,6 @@ export default function CardCreationNewScreen() {
   const [successMessage, setSuccessMessage] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [authChecking, setAuthChecking] = useState(false);
-  const [showGenChoiceModal, setShowGenChoiceModal] = useState(false);
   const [isPremiumGeneration, setIsPremiumGeneration] = useState(false);
   const [generationJobId, setGenerationJobId] = useState<string | null>(null);
 
@@ -123,6 +122,7 @@ export default function CardCreationNewScreen() {
   
   // Dropdown states
   const [showBackgroundDropdown, setShowBackgroundDropdown] = useState(false);
+  const [showGenerationTypeDropdown, setShowGenerationTypeDropdown] = useState(false);
   
   // Inline creation states
   const [newTypeInput, setNewTypeInput] = useState('');
@@ -134,6 +134,21 @@ export default function CardCreationNewScreen() {
   
   // Custom contexts state (make contexts dynamic like types)
   const [customContexts, setCustomContexts] = useState<string[]>([]);
+  
+  // Collapsible section states
+  const [showTypeOptions, setShowTypeOptions] = useState(false);
+  const [showDetailOptions, setShowDetailOptions] = useState(false);
+  const [showContextOptions, setShowContextOptions] = useState(false);
+  
+  // Generation type selection
+  const [selectedGenerationType, setSelectedGenerationType] = useState<'legacy' | 'premium' | 'classic'>('premium');
+  
+  // Generation type options
+  const generationTypeOptions = [
+    { key: 'legacy', label: 'Legacy: Background Image', description: 'Traditional background generation' },
+    { key: 'premium', label: 'Premium: Full Prompt', description: 'Enhanced prompt processing' },
+    { key: 'classic', label: 'Elite: Premium Card', description: 'Sophisticated premium card with signature accent colors' }
+  ] as const;
   
   // Chat functionality states
   const [showChat, setShowChat] = useState(false);
@@ -238,6 +253,7 @@ export default function CardCreationNewScreen() {
     // Reset UI states
     setShowVisibility(false);
     setShowBackgroundDropdown(false);
+    setShowGenerationTypeDropdown(false);
     
     // Reset inline creation states
     setNewTypeInput('');
@@ -246,6 +262,11 @@ export default function CardCreationNewScreen() {
     setShowNewTypeInput(false);
     setShowNewDetailInput(false);
     setShowNewContextInput(false);
+    
+    // Reset collapsible states
+    setShowTypeOptions(false);
+    setShowDetailOptions(false);
+    setShowContextOptions(false);
   };
 
   // Load phenomena types from database, fallback to AsyncStorage
@@ -390,6 +411,7 @@ export default function CardCreationNewScreen() {
       console.log('📋 All params received:', JSON.stringify(params, null, 2));
       setName(params.name?.toString() || '');
       setDescription(params.description?.toString() || '');
+      setImageDescription(params.image_description?.toString() || ''); // Load image description for editing
       setType(params.type?.toString() || '');
       setRole(params.role?.toString() || '');
       setContext(params.context?.toString() || '');
@@ -1386,6 +1408,7 @@ export default function CardCreationNewScreen() {
       const cardData = {
         name,
         description: description || '',
+        image_description: imageDescription || '', // Save image description for editing
         type: type || 'Card',
         phenomena: type || null,
         role: role || 'General',
@@ -1539,98 +1562,159 @@ export default function CardCreationNewScreen() {
             />
           </View>
 
-          {/* Generation Choice Modal */}
-          <Modal
-            visible={showGenChoiceModal}
-            transparent={true}
-            animationType="fade"
-            onRequestClose={() => setShowGenChoiceModal(false)}
-          >
+          {/* Generation Type Selector */}
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Generation Type</Text>
             <TouchableOpacity 
-              style={styles.modalOverlay}
-              activeOpacity={1}
-              onPress={() => setShowGenChoiceModal(false)}
+              style={styles.dropdownSelector}
+              onPress={() => setShowGenerationTypeDropdown(!showGenerationTypeDropdown)}
             >
-              <View style={styles.genChoiceModal}>
-                <Text style={styles.genChoiceTitle}>Choose generation method</Text>
-
-                <TouchableOpacity
-                  style={styles.genChoiceButton}
-                  onPress={() => {
-                    console.log('🎨 Standard generation selected');
-                    setShowGenChoiceModal(false);
-                    setFormat('framed'); // Legacy uses framed format
-                    queueImageGeneration(false);
-                  }}
-                  disabled={isGenerating}
-                >
-                  <Text style={styles.genChoiceButtonText}>Legacy: Background Image</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[styles.genChoiceButton, styles.genChoiceButtonSecondary]}
-                  onPress={() => {
-                    console.log('💎 Premium generation selected');
-                    setShowGenChoiceModal(false);
-                    setFormat('fullBleed'); // Premium uses fullBleed format
-                    queueImageGeneration(true);
-                  }}
-                  disabled={isGenerating}
-                >
-                  <Text style={[styles.genChoiceButtonText, styles.genChoiceButtonSecondaryText]}>New: Premium Prompt</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[styles.genChoiceButton, styles.genChoiceButtonClassic]}
-                  onPress={() => {
-                    console.log('🃏 Classic trading card generation selected');
-                    setShowGenChoiceModal(false);
-                    setFormat('fullBleed'); // Classic uses fullBleed format
-                    queueImageGeneration('classic');
-                  }}
-                  disabled={isGenerating}
-                >
-                  <Text style={[styles.genChoiceButtonText, styles.genChoiceButtonClassicText]}>Classic: Trading Card</Text>
-                </TouchableOpacity>
-              </View>
+              <Text style={styles.dropdownSelectorText}>
+                {generationTypeOptions.find(option => option.key === selectedGenerationType)?.label}
+              </Text>
+              <ChevronDown size={20} color="#666" />
             </TouchableOpacity>
-          </Modal>
+            
+            {showGenerationTypeDropdown && (
+              <View style={styles.dropdown}>
+                {generationTypeOptions.map((option) => (
+                  <TouchableOpacity
+                    key={option.key}
+                    style={styles.dropdownItem}
+                    onPress={() => {
+                      setSelectedGenerationType(option.key);
+                      setShowGenerationTypeDropdown(false);
+                      if (Platform.OS !== 'web') {
+                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                      }
+                    }}
+                  >
+                    <View style={styles.dropdownItemContent}>
+                      <Text style={styles.dropdownItemTitle}>{option.label}</Text>
+                      <Text style={styles.dropdownItemDescription}>{option.description}</Text>
+                    </View>
+                    {selectedGenerationType === option.key && (
+                      <Check size={20} color="#6366f1" />
+                    )}
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+          </View>
+
+          {/* Background Color Selector - Only for Legacy generation */}
+          {selectedGenerationType === 'legacy' && (
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Background Color</Text>
+              <TouchableOpacity 
+                style={styles.dropdownSelector}
+                onPress={() => setShowBackgroundDropdown(!showBackgroundDropdown)}
+              >
+                <View style={styles.backgroundDropdownContent}>
+                  <LinearGradient
+                    colors={backgroundGradient as [string, string, ...string[]]}
+                    style={styles.backgroundPreviewSmall}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                  />
+                  <Text style={styles.dropdownText}>
+                    {GRADIENT_OPTIONS.find(g => JSON.stringify(g.colors) === JSON.stringify(backgroundGradient))?.name || 'Select background'}
+                  </Text>
+                </View>
+                <ChevronDown size={20} color="#666" />
+              </TouchableOpacity>
+              
+              {showBackgroundDropdown && (
+                <View style={styles.dropdown}>
+                  {GRADIENT_OPTIONS.map((item, index) => (
+                    <TouchableOpacity
+                      key={index}
+                      style={styles.dropdownItem}
+                      onPress={() => {
+                        setBackgroundGradient(item.colors);
+                        setShowBackgroundDropdown(false);
+                        if (Platform.OS !== 'web') {
+                          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                        }
+                      }}
+                    >
+                      <View style={styles.backgroundDropdownItemContent}>
+                        <LinearGradient
+                          colors={item.colors as [string, string, ...string[]]}
+                          style={styles.backgroundPreviewSmall}
+                          start={{ x: 0, y: 0 }}
+                          end={{ x: 1, y: 1 }}
+                        />
+                        <Text style={styles.dropdownItemText}>{item.name}</Text>
+                      </View>
+                      {JSON.stringify(backgroundGradient) === JSON.stringify(item.colors) && (
+                        <Check size={20} color="#6366f1" />
+                      )}
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
+            </View>
+          )}
 
           {/* Type Selection */}
           <View style={styles.inlineSelectionGroup}>
-            <Text style={styles.inlineSelectionLabel}>Type</Text>
-            <View style={styles.chipContainer}>
-              {typeOptions.map((option) => (
+            <TouchableOpacity 
+              style={styles.collapsibleHeader}
+              onPress={() => {
+                setShowTypeOptions(!showTypeOptions);
+                if (Platform.OS !== 'web') {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                }
+              }}
+            >
+              <Text style={styles.inlineSelectionLabel}>Type</Text>
+              <View style={styles.collapsibleHeaderRight}>
+                <Text style={styles.selectedValueText}>{type || 'Select type'}</Text>
+                <ChevronDown 
+                  size={16} 
+                  color="#666" 
+                  style={[styles.chevronIcon, showTypeOptions && styles.chevronIconRotated]} 
+                />
+              </View>
+            </TouchableOpacity>
+            
+            {showTypeOptions && (
+              <View style={styles.chipContainer}>
+                {typeOptions.map((option) => (
+                  <TouchableOpacity
+                    key={option}
+                    style={[
+                      styles.chip,
+                      type === option && styles.chipSelected
+                    ]}
+                    onPress={() => {
+                      setType(option);
+                      setRole(''); // Reset detail when type changes
+                      setShowTypeOptions(false); // Collapse after selection
+                      if (Platform.OS !== 'web') {
+                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                      }
+                    }}
+                  >
+                    <Text style={[
+                      styles.chipText,
+                      type === option && styles.chipTextSelected
+                    ]}>
+                      {option}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
                 <TouchableOpacity
-                  key={option}
-                  style={[
-                    styles.chip,
-                    type === option && styles.chipSelected
-                  ]}
-                  onPress={() => {
-                    setType(option);
-                    setRole(''); // Reset detail when type changes
-                    if (Platform.OS !== 'web') {
-                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                    }
-                  }}
+                  style={[styles.chip, styles.addChip]}
+                  onPress={() => setShowNewTypeInput(!showNewTypeInput)}
                 >
-                  <Text style={[
-                    styles.chipText,
-                    type === option && styles.chipTextSelected
-                  ]}>
-                    {option}
-                  </Text>
+                  <Plus size={14} color="#6366f1" />
+                  <Text style={styles.addChipText}>Add Type</Text>
                 </TouchableOpacity>
-              ))}
-              <TouchableOpacity
-                style={[styles.chip, styles.addChip]}
-                onPress={() => setShowNewTypeInput(!showNewTypeInput)}
-              >
-                <Plus size={14} color="#6366f1" />
-                <Text style={styles.addChipText}>Add Type</Text>
-              </TouchableOpacity>
-            </View>
+              </View>
+            )}
+            
             {showNewTypeInput && (
               <View style={styles.newItemInput}>
                 <TextInput
@@ -1654,40 +1738,63 @@ export default function CardCreationNewScreen() {
 
           {/* Detail Selection */}
           <View style={styles.inlineSelectionGroup}>
-            <Text style={styles.inlineSelectionLabel}>Detail {type ? `(${type})` : ''}</Text>
-            <View style={styles.chipContainer}>
-              {roleOptions.map((option) => (
-                <TouchableOpacity
-                  key={option}
-                  style={[
-                    styles.chip,
-                    role === option && styles.chipSelected
-                  ]}
-                  onPress={() => {
-                    setRole(option);
-                    if (Platform.OS !== 'web') {
-                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                    }
-                  }}
-                >
-                  <Text style={[
-                    styles.chipText,
-                    role === option && styles.chipTextSelected
-                  ]}>
-                    {option}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-              {type && (
-                <TouchableOpacity
-                  style={[styles.chip, styles.addChip]}
-                  onPress={() => setShowNewDetailInput(!showNewDetailInput)}
-                >
-                  <Plus size={14} color="#6366f1" />
-                  <Text style={styles.addChipText}>Add Detail</Text>
-                </TouchableOpacity>
-              )}
-            </View>
+            <TouchableOpacity 
+              style={styles.collapsibleHeader}
+              onPress={() => {
+                setShowDetailOptions(!showDetailOptions);
+                if (Platform.OS !== 'web') {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                }
+              }}
+            >
+              <Text style={styles.inlineSelectionLabel}>Detail {type ? `(${type})` : ''}</Text>
+              <View style={styles.collapsibleHeaderRight}>
+                <Text style={styles.selectedValueText}>{role || 'Select detail'}</Text>
+                <ChevronDown 
+                  size={16} 
+                  color="#666" 
+                  style={[styles.chevronIcon, showDetailOptions && styles.chevronIconRotated]} 
+                />
+              </View>
+            </TouchableOpacity>
+            
+            {showDetailOptions && (
+              <View style={styles.chipContainer}>
+                {roleOptions.map((option) => (
+                  <TouchableOpacity
+                    key={option}
+                    style={[
+                      styles.chip,
+                      role === option && styles.chipSelected
+                    ]}
+                    onPress={() => {
+                      setRole(option);
+                      setShowDetailOptions(false); // Collapse after selection
+                      if (Platform.OS !== 'web') {
+                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                      }
+                    }}
+                  >
+                    <Text style={[
+                      styles.chipText,
+                      role === option && styles.chipTextSelected
+                    ]}>
+                      {option}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+                {type && (
+                  <TouchableOpacity
+                    style={[styles.chip, styles.addChip]}
+                    onPress={() => setShowNewDetailInput(!showNewDetailInput)}
+                  >
+                    <Plus size={14} color="#6366f1" />
+                    <Text style={styles.addChipText}>Add Detail</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            )}
+            
             {showNewDetailInput && type && (
               <View style={styles.newItemInput}>
                 <TextInput
@@ -1711,38 +1818,61 @@ export default function CardCreationNewScreen() {
 
           {/* Context Selection */}
           <View style={styles.inlineSelectionGroup}>
-            <Text style={styles.inlineSelectionLabel}>Context</Text>
-            <View style={styles.chipContainer}>
-              {contextOptions.map((option) => (
+            <TouchableOpacity 
+              style={styles.collapsibleHeader}
+              onPress={() => {
+                setShowContextOptions(!showContextOptions);
+                if (Platform.OS !== 'web') {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                }
+              }}
+            >
+              <Text style={styles.inlineSelectionLabel}>Context</Text>
+              <View style={styles.collapsibleHeaderRight}>
+                <Text style={styles.selectedValueText}>{context || 'Select context'}</Text>
+                <ChevronDown 
+                  size={16} 
+                  color="#666" 
+                  style={[styles.chevronIcon, showContextOptions && styles.chevronIconRotated]} 
+                />
+              </View>
+            </TouchableOpacity>
+            
+            {showContextOptions && (
+              <View style={styles.chipContainer}>
+                {contextOptions.map((option) => (
+                  <TouchableOpacity
+                    key={option}
+                    style={[
+                      styles.chip,
+                      context === option && styles.chipSelected
+                    ]}
+                    onPress={() => {
+                      setContext(option);
+                      setShowContextOptions(false); // Collapse after selection
+                      if (Platform.OS !== 'web') {
+                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                      }
+                    }}
+                  >
+                    <Text style={[
+                      styles.chipText,
+                      context === option && styles.chipTextSelected
+                    ]}>
+                      {option}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
                 <TouchableOpacity
-                  key={option}
-                  style={[
-                    styles.chip,
-                    context === option && styles.chipSelected
-                  ]}
-                  onPress={() => {
-                    setContext(option);
-                    if (Platform.OS !== 'web') {
-                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                    }
-                  }}
+                  style={[styles.chip, styles.addChip]}
+                  onPress={() => setShowNewContextInput(!showNewContextInput)}
                 >
-                  <Text style={[
-                    styles.chipText,
-                    context === option && styles.chipTextSelected
-                  ]}>
-                    {option}
-                  </Text>
+                  <Plus size={14} color="#6366f1" />
+                  <Text style={styles.addChipText}>Add Context</Text>
                 </TouchableOpacity>
-              ))}
-              <TouchableOpacity
-                style={[styles.chip, styles.addChip]}
-                onPress={() => setShowNewContextInput(!showNewContextInput)}
-              >
-                <Plus size={14} color="#6366f1" />
-                <Text style={styles.addChipText}>Add Context</Text>
-              </TouchableOpacity>
-            </View>
+              </View>
+            )}
+            
             {showNewContextInput && (
               <View style={styles.newItemInput}>
                 <TextInput
@@ -1799,10 +1929,24 @@ export default function CardCreationNewScreen() {
             <TouchableOpacity 
               style={[styles.generateButton, (!name || !imageDescription || isGenerating) && styles.generateButtonDisabled]} 
               onPress={() => {
-                console.log('🎯 Generate Image button pressed - MAIN BUTTON');
+                console.log(`🎯 Generate Image button pressed - ${selectedGenerationType.toUpperCase()}`);
                 console.log('📋 Button state:', { name: !!name, imageDescription: !!imageDescription, isGenerating });
                 console.log('📝 Form values:', { name, imageDescription });
-                setShowGenChoiceModal(true);
+                
+                // Execute the selected generation type directly
+                if (selectedGenerationType === 'legacy') {
+                  console.log('🎨 Legacy generation selected');
+                  setFormat('framed');
+                  queueImageGeneration(false);
+                } else if (selectedGenerationType === 'premium') {
+                  console.log('🃏 Premium generation selected (using basic full prompt)');
+                  setFormat('fullBleed');
+                  queueImageGeneration('classic'); // Swap: Premium label now uses classic function
+                } else if (selectedGenerationType === 'classic') {
+                  console.log('💎 Elite generation selected (using enhanced prompt)');
+                  setFormat('fullBleed');
+                  queueImageGeneration(true); // Swap: Elite label now uses premium function
+                }
               }}
               disabled={!name || !imageDescription || isGenerating}
             >
@@ -1908,69 +2052,6 @@ export default function CardCreationNewScreen() {
 
 
 
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Background Color</Text>
-            <TouchableOpacity 
-              style={styles.dropdownSelector}
-              onPress={() => setShowBackgroundDropdown(true)}
-            >
-              <View style={styles.backgroundDropdownContent}>
-                <LinearGradient
-                  colors={backgroundGradient as [string, string, ...string[]]}
-                  style={styles.backgroundPreviewSmall}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                />
-                <Text style={styles.dropdownText}>
-                  {GRADIENT_OPTIONS.find(g => JSON.stringify(g.colors) === JSON.stringify(backgroundGradient))?.name || 'Select background'}
-                </Text>
-              </View>
-              <ChevronDown size={20} color="#666" />
-            </TouchableOpacity>
-            
-            <Modal
-              visible={showBackgroundDropdown}
-              transparent={true}
-              animationType="fade"
-              onRequestClose={() => setShowBackgroundDropdown(false)}
-            >
-              <TouchableOpacity 
-                style={styles.modalOverlay}
-                activeOpacity={1}
-                onPress={() => setShowBackgroundDropdown(false)}
-              >
-                <View style={styles.dropdownModal}>
-                  <FlatList
-                    data={GRADIENT_OPTIONS}
-                    keyExtractor={(item, index) => index.toString()}
-                    renderItem={({ item }) => (
-                      <TouchableOpacity
-                        style={styles.dropdownItem}
-                        onPress={() => {
-                          setBackgroundGradient(item.colors);
-                          setShowBackgroundDropdown(false);
-                          if (Platform.OS !== 'web') {
-                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                          }
-                        }}
-                      >
-                        <View style={styles.backgroundDropdownItemContent}>
-                          <LinearGradient
-                            colors={item.colors as [string, string, ...string[]]}
-                            style={styles.backgroundPreviewSmall}
-                            start={{ x: 0, y: 0 }}
-                            end={{ x: 1, y: 1 }}
-                          />
-                          <Text style={styles.dropdownItemText}>{item.name}</Text>
-                        </View>
-                        {JSON.stringify(backgroundGradient) === JSON.stringify(item.colors) && <Check size={20} color="#6366f1" />}
-                      </TouchableOpacity>
-                    )}
-                  />
-                </View>
-              </TouchableOpacity>
-            </Modal>
-          </View>
 
           <View style={styles.inputGroup}>
             <Text style={styles.label}>Visibility Settings</Text>
@@ -2913,5 +2994,62 @@ const styles = StyleSheet.create({
     padding: 8,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  
+  // Collapsible section styles
+  collapsibleHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#1a1a1a',
+    borderWidth: 1,
+    borderColor: '#333',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 8,
+  },
+  collapsibleHeaderRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  selectedValueText: {
+    fontSize: 14,
+    fontFamily: 'Inter-Regular',
+    color: '#ccc',
+  },
+  chevronIcon: {
+    transform: [{ rotate: '0deg' }],
+  },
+  chevronIconRotated: {
+    transform: [{ rotate: '180deg' }],
+  },
+  
+  dropdownSelectorText: {
+    color: '#fff',
+    fontSize: 16,
+    fontFamily: 'Inter-Regular',
+  },
+  dropdown: {
+    backgroundColor: '#1a1a1a',
+    borderWidth: 1,
+    borderColor: '#333',
+    borderRadius: 8,
+    marginTop: 4,
+    overflow: 'hidden',
+  },
+  dropdownItemContent: {
+    flex: 1,
+  },
+  dropdownItemTitle: {
+    color: '#fff',
+    fontSize: 16,
+    fontFamily: 'Inter-Bold',
+    marginBottom: 2,
+  },
+  dropdownItemDescription: {
+    color: '#999',
+    fontSize: 14,
+    fontFamily: 'Inter-Regular',
   },
 });

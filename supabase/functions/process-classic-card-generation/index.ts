@@ -1,5 +1,5 @@
-// Classic trading card processing function - PREMIUM FANTASY LAYOUT
-// Title top, top-right diamond context, central art, bottom-left role badge, parchment description box.
+// Premium Elite trading card processing function - SOPHISTICATED DARK PREMIUM LAYOUT  
+// Elite dark design with premium typography, signature accent colors, refined textures, distinctive identity.
 //
 // @ts-ignore: Deno-specific import
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3?deno-std=0.177.0';
@@ -35,66 +35,76 @@ function buildPremiumPrompt(card: CardData) {
   const art = (card.imageDescription || card.description || 'fantasy creature').trim();
   const theme = card.themeHint?.trim();
 
-  // Cathedral window inspired premium trading card layout
+  // Premium dark elite trading card layout
   const layoutSpec = `
-LAYOUT SPEC (cathedral window inspired premium fantasy trading card):
-- BACKDROP: Deep atmospheric background that breathes - dark charcoal to black gradient that makes the card feel forged rather than printed.
-- FRAME: THICK BEVELED BORDERS in brushed metallic tone (brass/bronze/steel) with substantial heft and weight. Gently rounded corners that feel collectible, not cursed. Sharp enough to feel dangerous but refined enough to be premium.
+LAYOUT SPEC (premium dark elite trading card design):
+- BACKDROP: MANDATORY deep black (#000000) background with subtle dark gray gradient. NEVER use white or light colors for the background.
+- FRAME: Sophisticated rounded rectangular border with faint outer rim light and micro-texture (brushed metal, carbon fiber, or soft holographic sheen) for elevated visual hierarchy. Dark gray (#2a2a2a) to black (#000000) gradient with premium finish.
 - TITLE BAR (TOP FULL-WIDTH):
-  • Text: "${title}" in elegant serif font with perfect spacing, centered, single line only.
-  • Background: Ornate metallic panel that echoes the border craftsmanship with subtle carved details.
-  • Typography: Disciplined grid system with symmetrical margins and confident spacing.
-  • IMPORTANT: Ensure full title text is completely visible and readable with high contrast.
-- TOP-RIGHT DIAMOND TAG:
-  • Rune-like diamond badge positioned in TOP RIGHT CORNER, carefully placed to NOT overlap title text.
-  • Text: "${topRight || ' '}" in carved uppercase lettering that hints at ancient secrets.
-  • Style: Metallic accent panel that feels screwed onto a vault door - manufactured mysticism.
+  • Text: "${title}" in premium display font (sleek serif, techno-lux, or minimalist geometric), centered, single line only.
+  • Typography: Distinctive, intentional, elite-level font treatment with subtle metallic or neon-edge glow.
+  • Background: Dark gray panel (#2a2a2a to #1a1a1a gradient) with refined edges and premium styling.
+  • Text Effect: Subtle glow or metallic finish to read as intentional and elite, not neutral.
+  • IMPORTANT: Ensure full title text is completely visible and readable with premium contrast.
+- SIGNATURE ACCENT COLOR:
+  • Each card features one unique signature accent color as a thin line or micro-glow for identity and pizzazz.
+  • Color should be vibrant but restrained (electric blue, neon purple, gold, cyan, or emerald).
+  • Applied as subtle accent line along frame edge or micro-glow on key elements.
+  • Maintains modern, restrained overall style while adding distinctive character.
+- TOP-RIGHT CORNER TAG:
+  • Refined rounded rectangle badge positioned in TOP RIGHT CORNER, carefully placed to NOT overlap title text.
+  • Text: "${topRight || ' '}" in premium uppercase lettering with sophisticated typography.
+  • Style: Dark background with signature accent color highlight - elite and distinctive.
   • Position in empty space to the right of title, preserving full title visibility.
 - CENTRAL ART WINDOW (UPPER ~60% HEIGHT - DOMINATES):
-  • Atmospheric illustration: ${art}.
-  • Framing: Faux-ancient metallic lines that hint at runes, vaults, and locked secrets.
-  • Palette: Deep blues and warm brass, pushing the subject forward like a stage actor in spotlight.
-  • Style: Atmospheric rather than busy - space around the subject breathes with ominous presence.
-  • Lighting: Single dramatic spotlight effect with rich shadows and depth.
+  • Clear, well-lit illustration: ${art}.
+  • Framing: Premium rectangular border with subtle premium frame treatment and refined depth.
+  • Palette: Vibrant colors that pop against the sophisticated dark frame and background.
+  • Style: Well-lit central subject with premium dark framing - emphasizes content with elegance.
+  • Lighting: Excellent contrast lighting that showcases the subject clearly against sophisticated surroundings.
 - ROLE ACCENT PANEL (BOTTOM-LEFT):
-  • Small metallic plate that looks screwed onto vault door: "${bottomLeft || ' '}".
-  • Style: Visually pegged metal accent that adds hierarchy without hogging attention.
-  • Typography: Clean, disciplined lettering that signals role/class with manufactured mysticism.
-  • Integration: Ties to overall forged aesthetic while maintaining visual balance.
+  • Premium rectangular badge with refined corners: "${bottomLeft || ' '}".
+  • Style: Dark background with signature accent color trim and premium text treatment.
+  • Typography: Distinctive, premium lettering that's instantly readable and sophisticated.
+  • Integration: Harmonizes with overall elite aesthetic while maintaining clear hierarchy.
 - DESCRIPTION FIELD (LOWER THIRD):
-  • Calm parchment field where card mechanics live - provides visual exhale after dramatic art.
-  • Body text: "${desc}" in clean, well-spaced typography.
-  • Design: Subtle corner notches and carved inner lines echo ornate top without clutter.
-  • Typography: Centered, symmetrical margins, disciplined grid system - nothing bleeds where it shouldn't.
+  • Premium dark field (#2a2a2a) with sophisticated text area for card information.
+  • Body text: "${desc}" in refined typography with proper line spacing and premium feel.
+  • Text Color: High-contrast white with subtle premium glow for excellent readability.
+  • Design: Sophisticated rectangular field with premium border and balanced spacing.
+  • Typography: Left-aligned, premium margins, refined grid system - optimized for elite readability.
 - BOTTOM TYPE INTEGRATION:
-  • Text: "${bottomCenter || ' '}" integrated into the bottom border's metallic framework.
-  • Style: Carved into the border itself as part of the cathedral window architecture.
-  • Typography: Confident lettering that knows its grid system and maintains perfect alignment.
-MANUFACTURED MYSTICISM AESTHETIC:
-- Premium fantasy vibes with discipline - born in forgotten catacombs, designed with precision.
-- Thick, substantial borders that feel forged and collectible.
-- Cathedral window composition with dramatic art dominating, calm rule-space below.
-- Deep blues and warm brass palette with atmospheric lighting.
-- Everything aligns cleanly with symmetrical margins and disciplined typography.
-- DO: Beveled metallic borders, atmospheric depth, carved details, rune-like accents, parchment textures.
-- DO NOT: Flat colors, cartoon styling, busy compositions, poor typography hierarchy.
-- CRITICAL: All text elements perfectly aligned and readable - manufactured precision meets mystical atmosphere.
+  • Text: "${bottomCenter || ' '}" displayed in premium typography with signature accent color at bottom center.
+  • Style: Sophisticated text treatment integrated into the premium bottom border area.
+  • Typography: Elite lettering with precise alignment and premium spacing.
+PREMIUM DARK ELITE AESTHETIC:
+- Sophisticated, contemporary dark design focused on premium quality and distinctive identity.
+- Subtle premium textures (brushed metal, carbon fiber, holographic) and refined glows for elevated depth.
+- Balanced composition with clear hierarchy and premium dark theme readability.
+- Signature accent color system: each card gets one distinctive accent for identity while maintaining restraint.
+- Everything aligns with premium dark UI principles and elite presentation standards.
+- DO: Premium fonts, signature accent colors, refined textures, sophisticated glows, elite spacing, distinctive identity.
+- DO NOT: Plain sans-serif fonts, neutral appearance, overly flashy effects, gaudy colors, amateur styling.
+- CRITICAL: All text elements perfectly readable with premium contrast and distinctive, intentional styling.
 MATERIALS & FINISH:
-- Borders: Thick beveled metallic (brass/bronze/steel) with brushed finish and substantial weight.
-- Text: High contrast elegant typography with perfect spacing and grid discipline.
-- Accents: Carved metallic details that feel screwed-on rather than printed.
-- Overall: Premium collectible that whispers ancient secrets while maintaining typographic confidence.
+- Borders: Premium rounded rectangles with sophisticated textures and refined outer rim lights.
+- Text: Elite display fonts with metallic/neon glow effects and excellent readability.
+- Accents: Signature color system with premium backgrounds and sophisticated contrast.
+- Overall: Premium, elite dark card design with distinctive identity and sophisticated modern restraint.
 OUTPUT:
-- Single cathedral window inspired trading card, front face only, premium fantasy with manufactured mysticism and disciplined design.
+- Single premium dark elite trading card, front face only, sophisticated design with signature accent color and distinctive identity.
   `.trim();
 
   // Optional stylistic hinting
   const extraFlavor = theme ? `ADDITIONAL ART DIRECTION: ${theme}` : '';
 
   return [
-    'PROFESSIONAL TRADING CARD (front face).',
+    'PROFESSIONAL TRADING CARD (front face) - MUST HAVE DARK BLACK BACKGROUND.',
+    'CRITICAL: The entire card background MUST be dark black or very dark gray - NO WHITE BACKGROUNDS.',
+    'IMPORTANT: All card elements (borders, panels, backgrounds) must use dark colors only.',
     layoutSpec,
-    extraFlavor
+    extraFlavor,
+    'FINAL REMINDER: Generate a card with DARK BLACK background - absolutely no white or light backgrounds anywhere on the card.'
   ].filter(Boolean).join('\n\n');
 }
 
@@ -132,7 +142,7 @@ Deno.serve(async (req) => {
     // cardData.role     -> bottom-left badge (e.g., "Protector")
     // name/description/imageDescription behave as before
     const prompt = buildPremiumPrompt(cardData);
-    console.log('🎯 Premium card prompt for:', cardData.name);
+    console.log('🎯 Premium dark elite card prompt for:', cardData.name);
 
     // Generate with OpenAI
     console.log('🎨 Calling OpenAI image generation…');

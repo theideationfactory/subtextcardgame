@@ -111,9 +111,17 @@ Deno.serve(async (req: Request) => {
 
     console.log('✅ Job inserted successfully:', job);
 
-    // Trigger processing function (don't await)
+    // Trigger processing function (don't await, but log any errors)
     supabaseAdmin.functions.invoke('process-enhanced-card-generation', { 
       body: { jobId: job.id } 
+    }).then(({ data, error }) => {
+      if (error) {
+        console.error('❌ Failed to trigger processing function:', error);
+      } else {
+        console.log('✅ Processing function triggered successfully');
+      }
+    }).catch(err => {
+      console.error('❌ Error triggering processing function:', err);
     });
 
     console.log('✅ Enhanced card queued successfully:', job.id);

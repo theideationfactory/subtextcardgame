@@ -72,6 +72,7 @@ export default function CollectionScreen() {
     id: string;
     name: string;
     description: string;
+    image_description?: string; // Add image description field
     type: string;
     role?: string;
     context?: string;
@@ -159,7 +160,7 @@ export default function CollectionScreen() {
           const { data: personalCards, error: personalError } = await supabase
             .from('cards')
             .select(`
-              id, name, description, type, role, context, image_url, frame_width, frame_color, 
+              id, name, description, image_description, type, role, context, image_url, frame_width, frame_color, 
               name_color, type_color, description_color, context_color, format, background_gradient, 
               is_premium_generation, user_id, collection_id, shadow_card_id,
               shadow_card:shadow_card_id(
@@ -480,6 +481,7 @@ export default function CollectionScreen() {
         id: card.id,
         name: card.name,
         description: card.description,
+        image_description: card.image_description || '', // Include image description for editing
         type: card.type,
         role: card.role || '',
         context: card.context || '',

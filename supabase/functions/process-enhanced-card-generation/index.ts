@@ -24,7 +24,8 @@ Deno.serve(async (req: Request) => {
     }
 
     const openai = new OpenAI({ apiKey });
-    const { jobId } = await req.json();
+    const requestData = await req.json();
+    const { jobId } = requestData;
     if (!jobId) throw new Error('No job ID provided');
 
     const supabaseClient = createClient(
@@ -59,16 +60,37 @@ Deno.serve(async (req: Request) => {
     if (context) bottomLabels.push(context);
 
     const premiumPrompt = [
-      `Create a premium trading card artwork featuring "${name}" with ${description}.`,
-      `Design as a complete trading card with integrated card name and attribute labels in a fantasy card game style.`,
-      `Include the title "${name}" prominently displayed at the bottom of the card.`,
-      topLabels.length > 0 ? `Show these attributes as elegant text labels in the TOP corners: ${topLabels.join(' in top-left, ')} in top-right.` : '',
-      bottomLabels.length > 0 ? `Show this attribute as an elegant text label in a BOTTOM corner: ${bottomLabels.join(', ')}.` : '',
-      'Style: professional trading card illustration, cinematic lighting, rich colors, sharp details.',
-      'Layout: portrait orientation, decorative borders and frames.',
-      'Quality: print-ready artwork suitable for collectible card game, similar to Magic: The Gathering or Pokémon cards.',
+      `Create a premium elite trading card artwork featuring "${name}" with ${description}.`,
+      `Design as a complete professional trading card with sophisticated integrated badge system and premium typography.`,
+      `Include the title "${name}" prominently displayed in premium display font with subtle metallic or refined glow effect.`,
+      
+      // Professional badge specifications
+      topLabels.length > 0 ? 
+        `Create professional integrated badges for: ${topLabels.join(', ')}. Style these as sophisticated rounded rectangular badges with:
+         - Dark semi-transparent backgrounds with subtle gradient
+         - Clean modern typography in contrasting light text
+         - Subtle drop shadows and refined border treatments
+         - Positioned organically in TOP corners without overlapping the main artwork
+         - Each badge should feel like a premium UI element, not just text overlay` : '',
+      
+      bottomLabels.length > 0 ? 
+        `Create professional integrated badge for: ${bottomLabels.join(', ')}. Style as sophisticated rounded rectangular badge with:
+         - Dark semi-transparent background with subtle gradient
+         - Clean modern typography in contrasting light text
+         - Subtle drop shadow and refined border treatment  
+         - Positioned naturally in BOTTOM corner area
+         - Should feel like a premium UI element integrated into the card design` : '',
+      
+      // Overall elite styling
+      'Visual Style: Elite professional trading card with premium dark theme integration.',
+      'Typography: Modern professional fonts with subtle premium effects (metallic shine, refined glow, sophisticated contrast).',
+      'Badge Integration: All text badges should look like premium UI elements - professional, balanced, and naturally integrated into the card layout.',
+      'Layout: Portrait orientation with sophisticated dark theme, premium borders, and refined depth.',
+      'Quality: Ultra-premium print-ready artwork suitable for elite collectible cards with professional badge system.',
+      'Color Palette: Rich, sophisticated colors that work harmoniously with dark theme integration.',
+      'Professional Standards: Clean, balanced layout with excellent typography hierarchy and premium visual refinement.',
       'Do not include any creation metadata, timestamps, or technical information in the image.',
-      'Focus purely on the fantasy artwork and card design elements.'
+      'Focus on premium artwork with professionally integrated badge elements that enhance rather than distract from the overall design.'
     ].filter(Boolean).join(' ');
 
     console.log('Generated enhanced prompt for:', name);
@@ -159,10 +181,14 @@ Deno.serve(async (req: Request) => {
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     console.error('❌ Error processing enhanced job:', errorMessage);
+    console.error('❌ Full error details:', error);
     
-    // Try to mark job as failed
+    // Try to mark job as failed - get jobId from the already parsed request data
     try {
-      const { jobId } = await req.json();
+      // Re-parse the request to get jobId since we might not have it in scope
+      const clonedReq = req.clone();
+      const { jobId } = await clonedReq.json();
+      
       if (jobId) {
         const supabaseAdmin = createClient(
           Deno.env.get('SUPABASE_URL') ?? '',

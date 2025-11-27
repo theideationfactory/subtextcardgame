@@ -6,6 +6,7 @@ type Card = {
   id: string;
   name: string;
   description: string;
+  image_description?: string;
   type: string;
   role: string;
   context: string;
