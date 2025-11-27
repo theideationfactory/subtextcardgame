@@ -37,63 +37,70 @@ function buildPremiumPrompt(card: CardData) {
 
   // Premium dark elite trading card layout
   const layoutSpec = `
-LAYOUT SPEC (premium dark elite trading card design):
-- BACKDROP: MANDATORY deep black (#000000) background with subtle dark gray gradient. NEVER use white or light colors for the background.
-- FRAME: Sophisticated rounded rectangular border with faint outer rim light and micro-texture (brushed metal, carbon fiber, or soft holographic sheen) for elevated visual hierarchy. Dark gray (#2a2a2a) to black (#000000) gradient with premium finish.
-- TITLE BAR (TOP FULL-WIDTH):
-  • Text: "${title}" in premium display font (sleek serif, techno-lux, or minimalist geometric), centered, single line only.
-  • Typography: Distinctive, intentional, elite-level font treatment with subtle metallic or neon-edge glow.
-  • Background: Dark gray panel (#2a2a2a to #1a1a1a gradient) with refined edges and premium styling.
-  • Text Effect: Subtle glow or metallic finish to read as intentional and elite, not neutral.
-  • IMPORTANT: Ensure full title text is completely visible and readable with premium contrast.
-- SIGNATURE ACCENT COLOR:
-  • Each card features one unique signature accent color as a thin line or micro-glow for identity and pizzazz.
-  • Color should be vibrant but restrained (electric blue, neon purple, gold, cyan, or emerald).
-  • Applied as subtle accent line along frame edge or micro-glow on key elements.
-  • Maintains modern, restrained overall style while adding distinctive character.
-- TOP-RIGHT CORNER TAG:
-  • Refined rounded rectangle badge positioned in TOP RIGHT CORNER, carefully placed to NOT overlap title text.
-  • Text: "${topRight || ' '}" in premium uppercase lettering with sophisticated typography.
-  • Style: Dark background with signature accent color highlight - elite and distinctive.
-  • Position in empty space to the right of title, preserving full title visibility.
-- CENTRAL ART WINDOW (UPPER ~60% HEIGHT - DOMINATES):
-  • Clear, well-lit illustration: ${art}.
-  • Framing: Premium rectangular border with subtle premium frame treatment and refined depth.
-  • Palette: Vibrant colors that pop against the sophisticated dark frame and background.
-  • Style: Well-lit central subject with premium dark framing - emphasizes content with elegance.
-  • Lighting: Excellent contrast lighting that showcases the subject clearly against sophisticated surroundings.
-- ROLE ACCENT PANEL (BOTTOM-LEFT):
-  • Premium rectangular badge with refined corners: "${bottomLeft || ' '}".
-  • Style: Dark background with signature accent color trim and premium text treatment.
-  • Typography: Distinctive, premium lettering that's instantly readable and sophisticated.
-  • Integration: Harmonizes with overall elite aesthetic while maintaining clear hierarchy.
-- DESCRIPTION FIELD (LOWER THIRD):
-  • Premium dark field (#2a2a2a) with sophisticated text area for card information.
-  • Body text: "${desc}" in refined typography with proper line spacing and premium feel.
-  • Text Color: High-contrast white with subtle premium glow for excellent readability.
-  • Design: Sophisticated rectangular field with premium border and balanced spacing.
-  • Typography: Left-aligned, premium margins, refined grid system - optimized for elite readability.
-- BOTTOM TYPE INTEGRATION:
-  • Text: "${bottomCenter || ' '}" displayed in premium typography with signature accent color at bottom center.
-  • Style: Sophisticated text treatment integrated into the premium bottom border area.
-  • Typography: Elite lettering with precise alignment and premium spacing.
-PREMIUM DARK ELITE AESTHETIC:
-- Sophisticated, contemporary dark design focused on premium quality and distinctive identity.
-- Subtle premium textures (brushed metal, carbon fiber, holographic) and refined glows for elevated depth.
-- Balanced composition with clear hierarchy and premium dark theme readability.
-- Signature accent color system: each card gets one distinctive accent for identity while maintaining restraint.
-- Everything aligns with premium dark UI principles and elite presentation standards.
-- DO: Premium fonts, signature accent colors, refined textures, sophisticated glows, elite spacing, distinctive identity.
-- DO NOT: Plain sans-serif fonts, neutral appearance, overly flashy effects, gaudy colors, amateur styling.
-- CRITICAL: All text elements perfectly readable with premium contrast and distinctive, intentional styling.
-MATERIALS & FINISH:
-- Borders: Premium rounded rectangles with sophisticated textures and refined outer rim lights.
-- Text: Elite display fonts with metallic/neon glow effects and excellent readability.
-- Accents: Signature color system with premium backgrounds and sophisticated contrast.
-- Overall: Premium, elite dark card design with distinctive identity and sophisticated modern restraint.
-OUTPUT:
-- Single premium dark elite trading card, front face only, sophisticated design with signature accent color and distinctive identity.
-  `.trim();
+LAYOUT SPEC (Scientific Precision + Emotional Depth Trading Card):
+- BACKDROP: Clean gradient background transitioning from deep scientific blue-gray (#1e293b) to rich emotional tone. NEVER pure black or white.
+- FRAME: Modern rectangular border inspired by scientific instruments and tarot card elegance. NO cathedral shapes or medieval elements.
+  • Gradient border that reflects the card's emotional theme (warm oranges/reds for intensity, cool blues/purples for calm, etc.)
+  • Subtle geometric patterns suggesting "hidden forces beneath the surface" - think circuit board traces or molecular diagrams
+  • Clean lines with soft lighting and layered depth for premium feel
+  • Glossy highlights and modern materials like brushed aluminum or lab-grade glass
+- TITLE BAR (TOP SECTION):
+  • Text: "${title}" in clean, readable scientific font with subtle glow effect
+  • Background: Translucent panel with diagrammatic grid lines and interface-like UI accents
+  • Typography: Crisp and elegant, balancing precision with human warmth
+  • Color: Matches the emotional gradient theme of the card
+- DIAGRAMMATIC ELEMENTS:
+  • Subtle gridlines and measurement marks along borders (like scientific instruments)
+  • Small glyphs and symbolic markers that suggest analysis and depth
+  • Interface-style UI accents that feel modern and premium
+  • Geometric patterns hinting at underlying psychological/emotional forces
+- TOP-RIGHT CORNER INDICATOR:
+  • Clean badge displaying: "${topRight || ' '}"
+  • Style: Scientific precision meets tarot elegance
+  • Translucent background with subtle geometric patterning
+- CENTRAL ART WINDOW (DOMINANT FOCUS ~65% HEIGHT):
+  • Showcase: ${art}
+  • Frame: Modern rectangular border with soft lighting and depth
+  • Keep artwork completely unobstructed and central
+  • Enhance with emotional color gradients that complement the subject
+  • Soft, layered lighting that adds dreamscape quality while maintaining clarity
+  • Style: Fusion of lab instrument precision and emotional expressiveness
+- ROLE INDICATOR (BOTTOM-LEFT):
+  • Scientific-style label: "${bottomLeft || ' '}"
+  • Design: Clean diagrammatic styling with emotional color accents
+  • Typography: Precise yet warm, like a compassionate analysis tool
+- DESCRIPTION FIELD (LOWER SECTION):
+  • Text: "${desc}"
+  • Style: Clean, readable scientific documentation with emotional warmth
+  • Background: Subtle gradient with diagrammatic grid overlay
+  • Typography: Balances quantification with human feeling - crisp but approachable
+- TYPE CLASSIFICATION (BOTTOM CENTER):
+  • Label: "${bottomCenter || ' '}"
+  • Style: Scientific classification meets emotional categorization
+  • Clean, precise typography with gradient color coding
+AESTHETIC FUSION REQUIREMENTS:
+- Inspired by Pokémon, Yu-Gi-Oh!, and Magic: The Gathering but distinctly its own identity
+- Feels like a scientific tarot card - modeling hidden forces under life events
+- Balances quantification (precise, analytical) with human feeling (warm, expressive)
+- Cross between lab instrument interface and dreamscape visualization
+- Modern, premium, and symbolic without being cold or clinical
+- Emotional tone expressed through expressive color gradients and textural lighting
+- Subtle patterns suggest psychological/emotional depth beneath surface events
+MATERIALS & VISUAL EFFECTS:
+- Gradient borders matching emotional theme (blues for calm, reds for intensity, etc.)
+- Soft lighting with glossy highlights for premium feel
+- Layered depth with translucent elements
+- Geometric patterns suggesting hidden psychological forces
+- Interface-like UI accents with scientific precision
+- Modern rectangular frame with elegant proportions
+FINAL OUTPUT SPECIFICATIONS:
+- High-resolution trading card with clean, modern aesthetic
+- Scientific precision + emotional depth fusion style
+- Same proportions as trading card standard
+- Central artwork enhanced but unobstructed
+- Crisp, readable, elegant throughout
+- Looks like a card from a system that analyzes the hidden emotional/psychological forces in life events
+`.trim();
 
   // Optional stylistic hinting
   const extraFlavor = theme ? `ADDITIONAL ART DIRECTION: ${theme}` : '';
