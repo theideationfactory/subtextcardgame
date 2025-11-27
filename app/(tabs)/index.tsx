@@ -1783,21 +1783,23 @@ export default function CollectionScreen() {
                 }
               ]}
             >
-              {/* Top section - Card name */}
-              <View style={styles.cardNameContainer}>
-                <Text 
-                  style={[
-                    styles.cardName, 
-                    { 
-                      fontSize: nameFontSize,
-                      color: item.name_color || '#FFFFFF' 
-                    }
-                  ]}
-                  numberOfLines={1}
-                >
-                  {item.name}
-                </Text>
-              </View>
+              {/* Top section - Card name (hidden for premium generation) */}
+              {!item.is_premium_generation && (
+                <View style={styles.cardNameContainer}>
+                  <Text 
+                    style={[
+                      styles.cardName, 
+                      { 
+                        fontSize: nameFontSize,
+                        color: item.name_color || '#FFFFFF' 
+                      }
+                    ]}
+                    numberOfLines={1}
+                  >
+                    {item.name}
+                  </Text>
+                </View>
+              )}
 
               {/* Middle section - Card image (50% of card height) */}
               <View 
@@ -1813,84 +1815,86 @@ export default function CollectionScreen() {
                 />
               </View>
 
-              {/* Bottom section - Type line and description (50% of card height) */}
-              <View style={{ flex: 1 }}>
-                {/* Type line */}
-                <View style={[styles.typeLine, { marginTop: contentPadding }]}>
-                  <View style={styles.typeContainer}>
-                    <Text 
-                      style={[
-                        styles.typeText, 
-                        { 
-                          fontSize: typeFontSize,
-                          color: item.type_color || '#FFFFFF' 
-                        }
-                      ]}
-                    >
-                      {item.type}
-                    </Text>
-                  </View>
-                  
-                  {item.role && (
-                    <View style={styles.roleContainer}>
-                      {getCardRoleIcon(item.role)}
+              {/* Bottom section - Type line and description (hidden for premium generation) */}
+              {!item.is_premium_generation && (
+                <View style={{ flex: 1 }}>
+                  {/* Type line */}
+                  <View style={[styles.typeLine, { marginTop: contentPadding }]}>
+                    <View style={styles.typeContainer}>
                       <Text 
                         style={[
-                          styles.roleText, 
+                          styles.typeText, 
                           { 
-                            fontSize: Math.max(8, Math.round(14 * scaleFactor)),
-                            color: '#FFFFFF' 
+                            fontSize: typeFontSize,
+                            color: item.type_color || '#FFFFFF' 
                           }
                         ]}
                       >
-                        {item.role}
+                        {item.type}
+                      </Text>
+                    </View>
+                    
+                    {item.role && (
+                      <View style={styles.roleContainer}>
+                        {getCardRoleIcon(item.role)}
+                        <Text 
+                          style={[
+                            styles.roleText, 
+                            { 
+                              fontSize: Math.max(8, Math.round(14 * scaleFactor)),
+                              color: '#FFFFFF' 
+                            }
+                          ]}
+                        >
+                          {item.role}
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+
+                  {/* Description - directly below type line */}
+                  <View 
+                    style={[
+                      styles.textBox,
+                      { 
+                        marginTop: contentPadding / 2,
+                        flex: 1,
+                      }
+                    ]}
+                  >
+                    <Text 
+                      style={[
+                        styles.cardDescription, 
+                        { 
+                          fontSize: descriptionFontSize,
+                          lineHeight: Math.max(12, Math.round(descriptionFontSize * 1.4)),
+                          color: item.description_color || '#FFFFFF' 
+                        }
+                      ]}
+                      numberOfLines={numberOfLines}
+                    >
+                      {item.description}
+                    </Text>
+                  </View>
+
+                  {/* Context - at the bottom of the card */}
+                  {item.context && (
+                    <View style={[styles.contextContainer, { marginTop: contentPadding / 2 }]}>
+                      <Text 
+                        style={[
+                          styles.contextText, 
+                          { 
+                            fontSize: contextFontSize,
+                            color: item.context_color || '#CCCCCC' 
+                          }
+                        ]}
+                      >
+                        {item.context}
                       </Text>
                     </View>
                   )}
                 </View>
-
-                {/* Description - directly below type line */}
-                <View 
-                  style={[
-                    styles.textBox,
-                    { 
-                      marginTop: contentPadding / 2,
-                      flex: 1,
-                    }
-                  ]}
-                >
-                  <Text 
-                    style={[
-                      styles.cardDescription, 
-                      { 
-                        fontSize: descriptionFontSize,
-                        lineHeight: Math.max(12, Math.round(descriptionFontSize * 1.4)),
-                        color: item.description_color || '#FFFFFF' 
-                      }
-                    ]}
-                    numberOfLines={numberOfLines}
-                  >
-                    {item.description}
-                  </Text>
-                </View>
-
-                {/* Context - at the bottom of the card */}
-                {item.context && (
-                  <View style={[styles.contextContainer, { marginTop: contentPadding / 2 }]}>
-                    <Text 
-                      style={[
-                        styles.contextText, 
-                        { 
-                          fontSize: contextFontSize,
-                          color: item.context_color || '#CCCCCC' 
-                        }
-                      ]}
-                    >
-                      {item.context}
-                    </Text>
-                  </View>
-                )}
-              </View>
+              )}
             </View>
           )}
         </LinearGradient>
@@ -1983,6 +1987,13 @@ export default function CollectionScreen() {
                 const shadowDescriptionFontSize = getAdaptiveDescriptionFontSize(shadowItem.description || '', shadowItem.format);
                 
                 if (shadowItem.format === 'fullBleed') {
+                  // For premium generation shadow cards, show pure image without overlays
+                  if (shadowItem.is_premium_generation) {
+                    return (
+                      <Image source={{ uri: shadowItem.image_url }} style={styles.fullBleedImage} resizeMode="cover" />
+                    );
+                  }
+                  
                   // Render shadow card as full bleed with same layout as normal full bleed
                   return (
                     <>
@@ -2018,8 +2029,8 @@ export default function CollectionScreen() {
                         );
                       })()}
 
-                      {/* Type label in top right */}
-                      {shadowItem.type ? (
+                      {/* Type label in top right - hidden for premium generation */}
+                      {!shadowItem.is_premium_generation && shadowItem.type ? (
                         <Text
                           style={[
                             styles.fullBleedCorner,
@@ -2031,8 +2042,8 @@ export default function CollectionScreen() {
                         </Text>
                       ) : null}
 
-                      {/* Role label in top left */}
-                      {shadowItem.role ? (
+                      {/* Role label in top left - hidden for premium generation */}
+                      {!shadowItem.is_premium_generation && shadowItem.role ? (
                         <Text
                           style={[
                             styles.fullBleedCorner,
@@ -2044,8 +2055,8 @@ export default function CollectionScreen() {
                         </Text>
                       ) : null}
 
-                      {/* Title and description in corner layout */}
-                      {shadowItem.description ? (
+                      {/* Title and description in corner layout - hidden for premium generation */}
+                      {!shadowItem.is_premium_generation && shadowItem.description ? (
                         <View style={styles.cornerTextContainer}>
                           {shadowItem.name ? (
                             <Text
@@ -2124,7 +2135,7 @@ export default function CollectionScreen() {
                           })()}
                         </View>
                       ) : (
-                        shadowItem.name ? (
+                        !shadowItem.is_premium_generation && shadowItem.name ? (
                           <View style={styles.cornerTextContainer}>
                             <Text
                               style={[
@@ -2141,6 +2152,24 @@ export default function CollectionScreen() {
                     </>
                   );
                 } else {
+                  // For premium generation shadow cards, show pure image without overlays
+                  if (shadowItem.is_premium_generation) {
+                    return (
+                      <View 
+                        style={[
+                          styles.artContainer,
+                          { height: cardHeight, width: cardWidth, borderRadius: 16, overflow: 'hidden' }
+                        ]}
+                      >
+                        <Image
+                          source={{ uri: shadowItem.image_url }}
+                          style={{ width: '100%', height: '100%' }}
+                          resizeMode="cover"
+                        />
+                      </View>
+                    );
+                  }
+                  
                   // Render shadow card as framed (complete card rendering matching front card)
                   const shadowBorderWidth = Math.max(1, 3 * scaleFactor); // Match front card border calculation
                   const shadowContentPadding = Math.max(4, Math.round(8 * scaleFactor));
