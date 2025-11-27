@@ -75,6 +75,7 @@ export default function CardCreationNewScreen() {
   const [authChecking, setAuthChecking] = useState(false);
   const [isPremiumGeneration, setIsPremiumGeneration] = useState(false);
   const [generationJobId, setGenerationJobId] = useState<string | null>(null);
+  const [isUploadedImage, setIsUploadedImage] = useState(false); // Track if image was uploaded vs generated
 
   // Check for completed jobs on screen focus
   useFocusEffect(
@@ -424,7 +425,7 @@ export default function CardCreationNewScreen() {
           // Fetch the card from the database to get the actual visibility settings and background gradient
           const { data: cardData, error } = await supabase
             .from('cards')
-            .select('is_public, is_shared_with_friends, background_gradient')
+            .select('is_public, is_shared_with_friends, background_gradient, is_uploaded_image')
             .eq('id', params.id)
             .single();
           
@@ -459,6 +460,10 @@ export default function CardCreationNewScreen() {
                 // Keep default gradient if parsing fails
               }
             }
+            
+            // Load uploaded image flag
+            setIsUploadedImage(cardData.is_uploaded_image || false);
+            console.log('Loaded uploaded image flag:', cardData.is_uploaded_image);
           }
         } catch (err) {
           console.error('Failed to load visibility settings:', err);
@@ -669,6 +674,7 @@ export default function CardCreationNewScreen() {
 
       setCardImage(data.imageUrl);
       setIsPremiumGeneration(true); // Flag this as premium generation
+      setIsUploadedImage(false); // Clear uploaded flag since this is AI generated
     } catch (err) {
       console.error('Enhanced image generation error:', err);
       if (err instanceof Error) {
@@ -757,6 +763,7 @@ export default function CardCreationNewScreen() {
 
       setCardImage(data.imageUrl);
       setIsPremiumGeneration(false); // Flag this as legacy generation
+      setIsUploadedImage(false); // Clear uploaded flag since this is AI generated
     } catch (err) {
       console.error('Image generation error:', err);
       if (err instanceof Error) {
@@ -1028,6 +1035,7 @@ export default function CardCreationNewScreen() {
 
           // Set the uploaded image URL
           setCardImage(publicUrl);
+          setIsUploadedImage(true); // Flag this as user-uploaded image
           
           // Show success feedback
           if (Platform.OS !== 'web') {
@@ -1417,6 +1425,7 @@ export default function CardCreationNewScreen() {
         format,
         frame_color: DEFAULT_FRAME_COLOR,
         is_premium_generation: isPremiumGeneration, // Track if this uses premium generation
+        is_uploaded_image: isUploadedImage, // Track if this is a user-uploaded image
         // Only save background gradient if user selected something other than default black
         ...(JSON.stringify(backgroundGradient) !== JSON.stringify(['#1a1a1a', '#000000']) && {
           background_gradient: JSON.stringify(backgroundGradient)

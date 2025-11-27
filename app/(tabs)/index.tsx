@@ -88,6 +88,7 @@ export default function CollectionScreen() {
     format?: "framed" | "fullBleed";
     background_gradient?: string;
     is_premium_generation?: boolean;
+    is_uploaded_image?: boolean; // Track if image was uploaded by user
     user_id: string;
     collection_id?: string;
     collections?: any;
@@ -179,7 +180,7 @@ export default function CollectionScreen() {
             .select(`
               id, name, description, image_description, type, role, context, image_url, frame_width, frame_color, 
               name_color, type_color, description_color, context_color, format, background_gradient, 
-              is_premium_generation, user_id, collection_id, shadow_card_id,
+              is_premium_generation, is_uploaded_image, user_id, collection_id, shadow_card_id,
               shadow_card:shadow_card_id(
                 id, name, description, type, role, context, image_url, frame_width, frame_color,
                 name_color, type_color, description_color, context_color, format, background_gradient,
@@ -215,7 +216,7 @@ export default function CollectionScreen() {
 
           let friendCardsQuery = supabase
             .from('cards')
-            .select('id, name, description, type, role, context, image_url, frame_width, frame_color, name_color, type_color, description_color, context_color, format, background_gradient, is_premium_generation, user_id, collection_id')
+            .select('id, name, description, type, role, context, image_url, frame_width, frame_color, name_color, type_color, description_color, context_color, format, background_gradient, is_premium_generation, is_uploaded_image, user_id, collection_id')
             .in('user_id', friendIds)
             .order('created_at', { ascending: false })
             .limit(50);
@@ -250,7 +251,7 @@ export default function CollectionScreen() {
             // First try with is_public column (if migration has been run)
             const { data: publicCards, error: publicError } = await supabase
               .from('cards')
-              .select('id, name, description, type, role, context, image_url, frame_width, frame_color, name_color, type_color, description_color, context_color, format, background_gradient, is_premium_generation, user_id, collection_id')
+              .select('id, name, description, type, role, context, image_url, frame_width, frame_color, name_color, type_color, description_color, context_color, format, background_gradient, is_premium_generation, is_uploaded_image, user_id, collection_id')
               .eq('is_public', true)
               .order('created_at', { ascending: false })
               .limit(50);
@@ -261,7 +262,7 @@ export default function CollectionScreen() {
                 console.log('is_public column not found, falling back to showing other users\' cards');
                 const { data: fallbackCards, error: fallbackError } = await supabase
                   .from('cards')
-                  .select('id, name, description, type, role, context, image_url, frame_width, frame_color, name_color, type_color, description_color, context_color, format, background_gradient, is_premium_generation, user_id, collection_id')
+                  .select('id, name, description, type, role, context, image_url, frame_width, frame_color, name_color, type_color, description_color, context_color, format, background_gradient, is_premium_generation, is_uploaded_image, user_id, collection_id')
                   .neq('user_id', user.id)
                   .order('created_at', { ascending: false })
                   .limit(50);
@@ -281,7 +282,7 @@ export default function CollectionScreen() {
               console.log('Caught is_public column error in catch block, using fallback');
               const { data: fallbackCards, error: fallbackError } = await supabase
                 .from('cards')
-                .select('id, name, description, type, role, context, image_url, frame_width, frame_color, name_color, type_color, description_color, context_color, format, background_gradient, is_premium_generation, user_id, collection_id')
+                .select('id, name, description, type, role, context, image_url, frame_width, frame_color, name_color, type_color, description_color, context_color, format, background_gradient, is_premium_generation, is_uploaded_image, user_id, collection_id')
                 .neq('user_id', user.id)
                 .order('created_at', { ascending: false })
                 .limit(50);
@@ -1487,8 +1488,8 @@ export default function CollectionScreen() {
 
 
 
-          {/* Hide text overlays for premium generation */}
-          {!item.is_premium_generation && item.type ? (
+          {/* Hide text overlays for premium generation and uploaded images */}
+          {!item.is_premium_generation && !item.is_uploaded_image && item.type ? (
             <Text
               style={[
                 styles.fullBleedCorner,
@@ -1500,7 +1501,7 @@ export default function CollectionScreen() {
             </Text>
           ) : null}
 
-          {!item.is_premium_generation && item.role ? (
+          {!item.is_premium_generation && !item.is_uploaded_image && item.role ? (
             <Text
               style={[
                 styles.fullBleedCorner,
@@ -1512,8 +1513,8 @@ export default function CollectionScreen() {
             </Text>
           ) : null}
 
-          {/* Hide name and description overlays for premium generation */}
-          {!item.is_premium_generation && item.description ? (
+          {/* Hide name and description overlays for premium generation and uploaded images */}
+          {!item.is_premium_generation && !item.is_uploaded_image && item.description ? (
             <View style={styles.cornerTextContainer}>
               {item.name ? (
                 <Text
@@ -2029,8 +2030,8 @@ export default function CollectionScreen() {
                         );
                       })()}
 
-                      {/* Type label in top right - hidden for premium generation */}
-                      {!shadowItem.is_premium_generation && shadowItem.type ? (
+                      {/* Type label in top right - hidden for premium generation and uploaded images */}
+                      {!shadowItem.is_premium_generation && !shadowItem.is_uploaded_image && shadowItem.type ? (
                         <Text
                           style={[
                             styles.fullBleedCorner,
@@ -2042,8 +2043,8 @@ export default function CollectionScreen() {
                         </Text>
                       ) : null}
 
-                      {/* Role label in top left - hidden for premium generation */}
-                      {!shadowItem.is_premium_generation && shadowItem.role ? (
+                      {/* Role label in top left - hidden for premium generation and uploaded images */}
+                      {!shadowItem.is_premium_generation && !shadowItem.is_uploaded_image && shadowItem.role ? (
                         <Text
                           style={[
                             styles.fullBleedCorner,
@@ -2055,8 +2056,8 @@ export default function CollectionScreen() {
                         </Text>
                       ) : null}
 
-                      {/* Title and description in corner layout - hidden for premium generation */}
-                      {!shadowItem.is_premium_generation && shadowItem.description ? (
+                      {/* Title and description in corner layout - hidden for premium generation and uploaded images */}
+                      {!shadowItem.is_premium_generation && !shadowItem.is_uploaded_image && shadowItem.description ? (
                         <View style={styles.cornerTextContainer}>
                           {shadowItem.name ? (
                             <Text
