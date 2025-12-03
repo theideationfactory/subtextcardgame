@@ -129,9 +129,11 @@ export default function CardCreationNewScreen() {
   const [newTypeInput, setNewTypeInput] = useState('');
   const [newDetailInput, setNewDetailInput] = useState('');
   const [newContextInput, setNewContextInput] = useState('');
+  const [newBorderStyleInput, setNewBorderStyleInput] = useState('');
   const [showNewTypeInput, setShowNewTypeInput] = useState(false);
   const [showNewDetailInput, setShowNewDetailInput] = useState(false);
   const [showNewContextInput, setShowNewContextInput] = useState(false);
+  const [showNewBorderStyleInput, setShowNewBorderStyleInput] = useState(false);
   
   // Custom contexts state (make contexts dynamic like types)
   const [customContexts, setCustomContexts] = useState<string[]>([]);
@@ -140,15 +142,20 @@ export default function CardCreationNewScreen() {
   const [showTypeOptions, setShowTypeOptions] = useState(false);
   const [showDetailOptions, setShowDetailOptions] = useState(false);
   const [showContextOptions, setShowContextOptions] = useState(false);
+  const [showBorderStyleOptions, setShowBorderStyleOptions] = useState(false);
+  
+  // Border style state
+  const [borderStyle, setBorderStyle] = useState('Classic');
   
   // Generation type selection
-  const [selectedGenerationType, setSelectedGenerationType] = useState<'legacy' | 'premium' | 'classic'>('premium');
+  const [selectedGenerationType, setSelectedGenerationType] = useState<'legacy' | 'premium' | 'classic' | 'enhanced'>('premium');
   
   // Generation type options
   const generationTypeOptions = [
     { key: 'legacy', label: 'Legacy: Background Image', description: 'Traditional background generation' },
     { key: 'premium', label: 'Premium: Full Prompt', description: 'Enhanced prompt processing' },
-    { key: 'classic', label: 'Elite: Premium Card', description: 'Sophisticated premium card with signature accent colors' }
+    { key: 'classic', label: 'Elite: Premium Card', description: 'Sophisticated premium card with signature accent colors' },
+    { key: 'enhanced', label: 'Full bleed card, no description text', description: 'Complete trading card with integrated text elements' }
   ] as const;
   
   // Chat functionality states
@@ -221,6 +228,23 @@ export default function CardCreationNewScreen() {
     return allContexts;
   }, [customContexts]);
 
+  // Default border styles - will be merged with custom ones
+  const defaultBorderStyles = ['Classic', 'Modern', 'Vintage', 'Minimal', 'Ornate', 'Rounded', 'Sharp', 'Double'];
+  
+  // Custom border styles state
+  const [customBorderStyles, setCustomBorderStyles] = useState<string[]>([]);
+  
+  // Combined border style options (defaults + custom)
+  const borderStyleOptions = useMemo(() => {
+    const allBorderStyles = [...defaultBorderStyles];
+    customBorderStyles.forEach(customBorderStyle => {
+      if (!allBorderStyles.includes(customBorderStyle)) {
+        allBorderStyles.push(customBorderStyle);
+      }
+    });
+    return allBorderStyles;
+  }, [customBorderStyles]);
+
 
   const [fontsLoaded] = useFonts({
     'Inter-Regular': Inter_400Regular,
@@ -237,6 +261,7 @@ export default function CardCreationNewScreen() {
     setType('Intention');
     setRole('');
     setContext('TBD');
+    setBorderStyle('Classic');
     setCardImage('');
     setFormat('framed');
     setVisibility(['personal']);
@@ -388,6 +413,38 @@ export default function CardCreationNewScreen() {
     }
   };
 
+  // Load custom border styles from database
+  const loadCustomBorderStyles = async () => {
+    try {
+      if (!user) {
+        console.log('No user found, using default border styles');
+        return;
+      }
+
+      const { data: userData, error: dbError } = await supabase
+        .from('users')
+        .select('custom_border_styles')
+        .eq('id', user.id)
+        .single();
+
+      if (dbError) {
+        console.error('Error loading custom border styles from database:', dbError);
+        return;
+      }
+
+      if (userData?.custom_border_styles) {
+        console.log('Loaded custom border styles from database:', userData.custom_border_styles);
+        setCustomBorderStyles(userData.custom_border_styles);
+      } else {
+        console.log('No custom border styles found, using defaults only');
+        setCustomBorderStyles([]);
+      }
+    } catch (error) {
+      console.error('Error loading custom border styles:', error);
+      setCustomBorderStyles([]);
+    }
+  };
+
   // Reset form state when the screen is focused for creating a new card
   useFocusEffect(
     useCallback(() => {
@@ -416,6 +473,7 @@ export default function CardCreationNewScreen() {
       setType(params.type?.toString() || '');
       setRole(params.role?.toString() || '');
       setContext(params.context?.toString() || '');
+      setBorderStyle(params.border_style?.toString() || 'Classic');
       setCardImage(params.image_url?.toString() || '');
       console.log('📋 Card data loaded successfully for editing');
       
@@ -425,7 +483,7 @@ export default function CardCreationNewScreen() {
           // Fetch the card from the database to get the actual visibility settings and background gradient
           const { data: cardData, error } = await supabase
             .from('cards')
-            .select('is_public, is_shared_with_friends, background_gradient, is_uploaded_image')
+            .select('is_public, is_shared_with_friends, background_gradient, is_uploaded_image, border_style')
             .eq('id', params.id)
             .single();
           
@@ -464,6 +522,12 @@ export default function CardCreationNewScreen() {
             // Load uploaded image flag
             setIsUploadedImage(cardData.is_uploaded_image || false);
             console.log('Loaded uploaded image flag:', cardData.is_uploaded_image);
+            
+            // Load border style if it exists
+            if (cardData.border_style) {
+              setBorderStyle(cardData.border_style);
+              console.log('Loaded border style:', cardData.border_style);
+            }
           }
         } catch (err) {
           console.error('Failed to load visibility settings:', err);
@@ -507,11 +571,12 @@ export default function CardCreationNewScreen() {
     checkAuthStatus();
   }, []);
 
-  // Load phenomena types, custom detail options, and custom contexts on component mount
+  // Load phenomena types, custom detail options, custom contexts, and custom border styles on component mount
   useEffect(() => {
     loadPhenomenaTypes();
     loadCustomDetailOptions();
     loadCustomContexts();
+    loadCustomBorderStyles();
   }, []);
 
   // Also reload all custom data when screen is focused (in case they were updated elsewhere)
@@ -520,6 +585,7 @@ export default function CardCreationNewScreen() {
       loadPhenomenaTypes();
       loadCustomDetailOptions();
       loadCustomContexts();
+      loadCustomBorderStyles();
     }, [])
   );
 
@@ -531,7 +597,7 @@ export default function CardCreationNewScreen() {
 
   const queueImageGeneration = async (generationType: boolean | 'classic') => {
     console.log('🚀 queueImageGeneration called with generationType:', generationType);
-    console.log('📝 Current form state:', { name, imageDescription, type, role, context });
+    console.log('📝 Current form state:', { name, imageDescription, type, role, context, borderStyle });
     
     if (!name || !imageDescription) {
       console.log('❌ Missing required fields:', { name: !!name, imageDescription: !!imageDescription });
@@ -560,6 +626,7 @@ export default function CardCreationNewScreen() {
         type,
         role,
         context,
+        borderStyle,
         format,
         isPremium,
         generationType: isClassic ? 'classic' : (isPremium ? 'premium' : 'legacy'),
@@ -601,6 +668,133 @@ export default function CardCreationNewScreen() {
       console.log('🏁 Generation attempt finished, setting isGenerating to false');
       setIsGenerating(false);
     }
+  };
+
+  const generateEnhancedCard = async () => {
+    console.log('🚀 generateEnhancedCard called');
+    console.log('📝 Current form state:', { name, imageDescription, type, role, context, borderStyle });
+    
+    if (!name || !imageDescription) {
+      console.log('❌ Missing required fields:', { name: !!name, imageDescription: !!imageDescription });
+      setError('Please provide a card name and image description.');
+      return;
+    }
+
+    console.log('✅ Form validation passed, starting enhanced card generation...');
+    setIsGenerating(true);
+    setError('');
+
+    try {
+      const currentSession = await refreshSession();
+      if (!currentSession?.user?.id) {
+        throw new Error('Authentication required. Please log in again.');
+      }
+
+      console.log('🎨 Starting enhanced card generation...');
+      console.log('👤 User ID:', currentSession.user.id);
+      console.log('📤 Calling generate-enhanced-card function...');
+
+      // Call the generate-enhanced-card edge function
+      const { data, error } = await supabase.functions.invoke('generate-enhanced-card', {
+        body: { 
+          name, 
+          description: imageDescription, 
+          type, 
+          role: role || 'TBD', 
+          context: context || 'TBD', 
+          borderStyle: borderStyle || 'Classic',
+          format: 'fullBleed', 
+          size: '1024x1536', 
+          quality: 'auto' 
+        },
+      });
+
+      console.log('📥 Function response:', { data, error });
+
+      if (error) {
+        console.error('❌ Edge function error:', error);
+        throw error;
+      }
+
+      if (data?.jobId) {
+        console.log('✅ Card queued for background generation, jobId:', data.jobId);
+        setGenerationJobId(data.jobId);
+        setIsPremiumGeneration(true);
+        
+        Alert.alert(
+          'Enhanced Card Generation Started!',
+          'Your complete trading card is being generated in the background. You can safely leave this screen. We\'ll notify you when it\'s ready.',
+          [{ text: 'OK' }]
+        );
+        
+        // Start polling for completion
+        pollForJobCompletion(data.jobId);
+      } else if (data?.imageUrl) {
+        // Direct response (old format)
+        console.log('✅ Enhanced card generated successfully:', data.imageUrl);
+        setCardImage(data.imageUrl);
+        setIsPremiumGeneration(true);
+        setIsUploadedImage(false);
+      } else {
+        throw new Error('No image URL or job ID returned from generation');
+      }
+
+    } catch (err) {
+      console.error('❌ Error generating enhanced card:', err);
+      setError(`Failed to generate enhanced card: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    } finally {
+      console.log('🏁 Enhanced card generation attempt finished');
+      setIsGenerating(false);
+    }
+  };
+
+  const pollForJobCompletion = async (jobId: string) => {
+    console.log('🔄 Starting to poll for job completion:', jobId);
+    
+    for (let i = 0; i < 60; i++) { // Poll for up to 2 minutes
+      await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds
+      
+      try {
+        const { data: job, error } = await supabase
+          .from('image_generation_queue')
+          .select('status, image_url, error_message')
+          .eq('id', jobId)
+          .single();
+        
+        if (error) {
+          console.error('❌ Error checking job status:', error);
+          continue;
+        }
+        
+        console.log(`🔍 Job ${jobId} status:`, job?.status);
+        
+        if (job?.status === 'completed' && job.image_url) {
+          console.log('✅ Enhanced card generation completed:', job.image_url);
+          setCardImage(job.image_url);
+          setGenerationJobId(null);
+          setIsUploadedImage(false);
+          
+          Alert.alert(
+            'Enhanced Card Ready!',
+            'Your complete trading card has been generated successfully.',
+            [{ text: 'OK' }]
+          );
+          return;
+        } else if (job?.status === 'failed') {
+          console.error('❌ Enhanced card generation failed:', job.error_message);
+          setError(`Enhanced card generation failed: ${job.error_message || 'Unknown error'}`);
+          setGenerationJobId(null);
+          return;
+        }
+      } catch (pollError) {
+        console.error('❌ Error polling job status:', pollError);
+      }
+    }
+    
+    // Timeout
+    console.error('❌ Enhanced card generation timed out');
+    setError('Enhanced card generation timed out. Please try again.');
+    setGenerationJobId(null);
   };
 
   // Old synchronous generation functions are now deprecated by the queue system.
@@ -1287,6 +1481,39 @@ export default function CardCreationNewScreen() {
     }
   };
 
+  const addNewBorderStyle = async () => {
+    const trimmedInput = newBorderStyleInput.trim();
+    if (!trimmedInput) {
+      setError('Please enter a border style name');
+      return;
+    }
+
+    if (borderStyleOptions.includes(trimmedInput)) {
+      setError('This border style already exists');
+      return;
+    }
+
+    try {
+      const updatedBorderStyles = [...customBorderStyles, trimmedInput];
+      setCustomBorderStyles(updatedBorderStyles);
+      
+      // Save to database
+      await saveCustomBorderStyles(updatedBorderStyles);
+      
+      // Select the new border style and clear input
+      setBorderStyle(trimmedInput);
+      setNewBorderStyleInput('');
+      setShowNewBorderStyleInput(false);
+      
+      if (Platform.OS !== 'web') {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      }
+    } catch (error) {
+      console.error('Error adding new border style:', error);
+      setError('Failed to add new border style. Please try again.');
+    }
+  };
+
   // Save functions for database persistence
   const savePhenomenaTypes = async (types: string[]) => {
     try {
@@ -1350,6 +1577,28 @@ export default function CardCreationNewScreen() {
       }
     } catch (error) {
       console.error('Error saving contexts:', error);
+      throw error;
+    }
+  };
+
+  const saveCustomBorderStyles = async (borderStyles: string[]) => {
+    try {
+      if (!user) {
+        console.error('No user found for saving border styles');
+        return;
+      }
+
+      const { error } = await supabase
+        .from('users')
+        .update({ custom_border_styles: borderStyles })
+        .eq('id', user.id);
+
+      if (error) {
+        console.error('Error saving border styles to database:', error);
+        throw error;
+      }
+    } catch (error) {
+      console.error('Error saving border styles:', error);
       throw error;
     }
   };
@@ -1421,6 +1670,7 @@ export default function CardCreationNewScreen() {
         phenomena: type || null,
         role: role || 'General',
         context: context || 'Fantasy',
+        border_style: borderStyle || 'Classic',
         image_url: cardImage,
         format,
         frame_color: DEFAULT_FRAME_COLOR,
@@ -1903,6 +2153,84 @@ export default function CardCreationNewScreen() {
             )}
           </View>
 
+          {/* Border Style Selection */}
+          <View style={styles.inlineSelectionGroup}>
+            <TouchableOpacity 
+              style={styles.collapsibleHeader}
+              onPress={() => {
+                setShowBorderStyleOptions(!showBorderStyleOptions);
+                if (Platform.OS !== 'web') {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                }
+              }}
+            >
+              <Text style={styles.inlineSelectionLabel}>Border Style</Text>
+              <View style={styles.collapsibleHeaderRight}>
+                <Text style={styles.selectedValueText}>{borderStyle || 'Select border style'}</Text>
+                <ChevronDown 
+                  size={16} 
+                  color="#666" 
+                  style={[styles.chevronIcon, showBorderStyleOptions && styles.chevronIconRotated]} 
+                />
+              </View>
+            </TouchableOpacity>
+            
+            {showBorderStyleOptions && (
+              <View style={styles.chipContainer}>
+                {borderStyleOptions.map((option) => (
+                  <TouchableOpacity
+                    key={option}
+                    style={[
+                      styles.chip,
+                      borderStyle === option && styles.chipSelected
+                    ]}
+                    onPress={() => {
+                      setBorderStyle(option);
+                      setShowBorderStyleOptions(false); // Collapse after selection
+                      if (Platform.OS !== 'web') {
+                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                      }
+                    }}
+                  >
+                    <Text style={[
+                      styles.chipText,
+                      borderStyle === option && styles.chipTextSelected
+                    ]}>
+                      {option}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+                <TouchableOpacity
+                  style={[styles.chip, styles.addChip]}
+                  onPress={() => setShowNewBorderStyleInput(!showNewBorderStyleInput)}
+                >
+                  <Plus size={14} color="#6366f1" />
+                  <Text style={styles.addChipText}>Add Border Style</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+            
+            {showNewBorderStyleInput && (
+              <View style={styles.newItemInput}>
+                <TextInput
+                  style={styles.newItemTextInput}
+                  value={newBorderStyleInput}
+                  onChangeText={setNewBorderStyleInput}
+                  placeholder="Enter new border style name"
+                  placeholderTextColor="#666"
+                  onSubmitEditing={() => addNewBorderStyle()}
+                  returnKeyType="done"
+                />
+                <TouchableOpacity
+                  style={styles.addItemButton}
+                  onPress={addNewBorderStyle}
+                >
+                  <Check size={16} color="#fff" />
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
+
 
           {/* Image Section */}
           <View style={[styles.cardPreview, format === 'fullBleed' && styles.cardPreviewFullBleed]}>
@@ -1955,6 +2283,10 @@ export default function CardCreationNewScreen() {
                   console.log('💎 Elite generation selected (using enhanced prompt)');
                   setFormat('fullBleed');
                   queueImageGeneration(true); // Swap: Elite label now uses premium function
+                } else if (selectedGenerationType === 'enhanced') {
+                  console.log('🃏 Enhanced generation selected (using generate-enhanced-card)');
+                  setFormat('fullBleed');
+                  generateEnhancedCard();
                 }
               }}
               disabled={!name || !imageDescription || isGenerating}

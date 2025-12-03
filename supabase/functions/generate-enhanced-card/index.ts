@@ -44,7 +44,7 @@ Deno.serve(async (req: Request) => {
     const requestBody = await req.json();
     console.log('Request body:', requestBody);
     
-    const { name, description, type, role, context, format, size, quality } = requestBody;
+    const { name, description, type, role, context, borderStyle, format, size, quality } = requestBody;
 
     if (!name || !description) {
       console.error('Missing required fields:', { name: !!name, description: !!description });
@@ -73,6 +73,7 @@ Deno.serve(async (req: Request) => {
       type,
       role,
       context,
+      borderStyle,
       format,
       size,
       quality,
@@ -97,8 +98,7 @@ Deno.serve(async (req: Request) => {
       .insert({
         user_id: user.id,
         card_data: cardData,
-        status: 'queued',
-        generation_type: 'enhanced'
+        status: 'queued'
       })
       .select()
       .single();
@@ -114,13 +114,13 @@ Deno.serve(async (req: Request) => {
     // Trigger processing function (don't await, but log any errors)
     supabaseAdmin.functions.invoke('process-enhanced-card-generation', { 
       body: { jobId: job.id } 
-    }).then(({ data, error }) => {
+    }).then(({ data, error }: { data: any, error: any }) => {
       if (error) {
         console.error('❌ Failed to trigger processing function:', error);
       } else {
         console.log('✅ Processing function triggered successfully');
       }
-    }).catch(err => {
+    }).catch((err: any) => {
       console.error('❌ Error triggering processing function:', err);
     });
 

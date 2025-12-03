@@ -21,6 +21,7 @@ type CardData = {
   type?: string;               // e.g., "Intimacy"  -> top-right diamond
   role?: string;               // e.g., "Protector" -> bottom-left badge
   context?: string;            // optional extra tag (unused in layout, but can flavor)
+  borderStyle?: string;        // e.g., "Classic", "Modern", "Vintage", etc.
   size?: '1024x1536' | '1024x1024' | '2048x1536' | string;
   quality?: 'auto' | 'high';
   themeHint?: string;          // optional: extra art direction
@@ -34,12 +35,14 @@ function buildPremiumPrompt(card: CardData) {
   const desc = card.description?.trim() || '';
   const art = (card.imageDescription || card.description || 'fantasy creature').trim();
   const theme = card.themeHint?.trim();
+  const borderStyle = card.borderStyle?.trim() || 'Classic';
 
   // Premium dark elite trading card layout
   const layoutSpec = `
 LAYOUT SPEC (Scientific Precision + Emotional Depth Trading Card):
 - BACKDROP: Clean gradient background transitioning from deep scientific blue-gray (#1e293b) to rich emotional tone. NEVER pure black or white.
 - FRAME: Modern rectangular border inspired by scientific instruments and tarot card elegance. NO cathedral shapes or medieval elements.
+  • Style: Implement a ${borderStyle.toLowerCase()} border design that complements the premium trading card aesthetic
   • Gradient border that reflects the card's emotional theme (warm oranges/reds for intensity, cool blues/purples for calm, etc.)
   • Subtle geometric patterns suggesting "hidden forces beneath the surface" - think circuit board traces or molecular diagrams
   • Clean lines with soft lighting and layered depth for premium feel
@@ -189,7 +192,7 @@ Deno.serve(async (req) => {
 
     // Ensure bucket exists
     const { data: buckets } = await supabase.storage.listBuckets();
-    const bucketExists = buckets?.some((b) => b.name === BUCKET_NAME);
+    const bucketExists = buckets?.some((b: any) => b.name === BUCKET_NAME);
     if (!bucketExists) {
       await supabase.storage.createBucket(BUCKET_NAME, {
         public: true,
