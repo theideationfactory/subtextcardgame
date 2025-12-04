@@ -1444,14 +1444,25 @@ export default function CollectionScreen() {
       // Regular fullBleed rendering for legacy cards
       return (
         <Pressable
-          style={[styles.fullBleedCard, { width: cardWidth, height: cardHeight }]}
+          style={[
+            styles.fullBleedCard, 
+            { width: cardWidth, height: cardHeight },
+            // Remove shadows for uploaded images
+            item.is_uploaded_image && {
+              elevation: 0,
+              shadowColor: 'transparent',
+              shadowOffset: { width: 0, height: 0 },
+              shadowOpacity: 0,
+              shadowRadius: 0,
+            }
+          ]}
           onPress={() => handleDoubleTapCard()}
           onLongPress={handleLongPress}
         >
           <Image source={{ uri: item.image_url }} style={styles.fullBleedImage} resizeMode="cover" />
 
-          {/* Adaptive gradient overlay */}
-          {(() => {
+          {/* Adaptive gradient overlay - hide for uploaded images */}
+          {!item.is_uploaded_image && (() => {
             // Calculate adaptive gradient height based on content
             const titleLines = item.name ? Math.ceil(item.name.length / 20) : 0; // Rough estimate of title lines
             const titleHeight = titleLines * nameFontSize * 1.2; // Line height factor
@@ -1612,6 +1623,14 @@ export default function CollectionScreen() {
           { 
             width: cardWidth,
             height: cardHeight,
+          },
+          // Remove shadows for uploaded images
+          item.is_uploaded_image && {
+            elevation: 0,
+            shadowColor: 'transparent',
+            shadowOffset: { width: 0, height: 0 },
+            shadowOpacity: 0,
+            shadowRadius: 0,
           }
         ]}
         onPress={() => handleDoubleTapCard()}
