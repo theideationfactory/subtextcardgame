@@ -44,7 +44,7 @@ Deno.serve(async (req: Request) => {
     const requestBody = await req.json();
     console.log('Request body:', requestBody);
     
-    const { name, description, type, role, context, borderStyle, format, size, quality } = requestBody;
+    const { name, description, type, role, context, borderStyle, borderColor, format, size, quality } = requestBody;
 
     if (!name || !description) {
       console.error('Missing required fields:', { name: !!name, description: !!description });
@@ -74,6 +74,7 @@ Deno.serve(async (req: Request) => {
       role,
       context,
       borderStyle,
+      borderColor,
       format,
       size,
       quality,

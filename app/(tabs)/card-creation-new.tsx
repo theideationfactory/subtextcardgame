@@ -143,9 +143,29 @@ export default function CardCreationNewScreen() {
   const [showDetailOptions, setShowDetailOptions] = useState(false);
   const [showContextOptions, setShowContextOptions] = useState(false);
   const [showBorderStyleOptions, setShowBorderStyleOptions] = useState(false);
+  const [showBorderColorOptions, setShowBorderColorOptions] = useState(false);
   
   // Border style state
   const [borderStyle, setBorderStyle] = useState('Classic');
+  
+  // Border color state
+  const [borderColor, setBorderColor] = useState('#808080'); // Default medium gray
+  
+  // Border color options
+  const borderColorOptions = [
+    { name: 'Silver', color: '#C0C0C0' },
+    { name: 'Gold', color: '#FFD700' },
+    { name: 'Bronze', color: '#CD7F32' },
+    { name: 'Platinum', color: '#E5E4E2' },
+    { name: 'Copper', color: '#B87333' },
+    { name: 'Steel', color: '#808080' },
+    { name: 'Obsidian', color: '#3C3C3C' },
+    { name: 'Pearl', color: '#F0EAD6' },
+    { name: 'Emerald', color: '#50C878' },
+    { name: 'Ruby', color: '#E0115F' },
+    { name: 'Sapphire', color: '#0F52BA' },
+    { name: 'Amethyst', color: '#9966CC' }
+  ];
   
   // Generation type selection
   const [selectedGenerationType, setSelectedGenerationType] = useState<'legacy' | 'premium' | 'classic' | 'enhanced'>('premium');
@@ -262,6 +282,7 @@ export default function CardCreationNewScreen() {
     setRole('');
     setContext('TBD');
     setBorderStyle('Classic');
+    setBorderColor('#808080');
     setCardImage('');
     setFormat('framed');
     setVisibility(['personal']);
@@ -474,6 +495,7 @@ export default function CardCreationNewScreen() {
       setRole(params.role?.toString() || '');
       setContext(params.context?.toString() || '');
       setBorderStyle(params.border_style?.toString() || 'Classic');
+      setBorderColor(params.border_color?.toString() || '#808080');
       setCardImage(params.image_url?.toString() || '');
       console.log('📋 Card data loaded successfully for editing');
       
@@ -483,7 +505,7 @@ export default function CardCreationNewScreen() {
           // Fetch the card from the database to get the actual visibility settings and background gradient
           const { data: cardData, error } = await supabase
             .from('cards')
-            .select('is_public, is_shared_with_friends, background_gradient, is_uploaded_image, border_style')
+            .select('is_public, is_shared_with_friends, background_gradient, is_uploaded_image, border_style, border_color')
             .eq('id', params.id)
             .single();
           
@@ -527,6 +549,12 @@ export default function CardCreationNewScreen() {
             if (cardData.border_style) {
               setBorderStyle(cardData.border_style);
               console.log('Loaded border style:', cardData.border_style);
+            }
+            
+            // Load border color if it exists
+            if (cardData.border_color) {
+              setBorderColor(cardData.border_color);
+              console.log('Loaded border color:', cardData.border_color);
             }
           }
         } catch (err) {
@@ -627,6 +655,7 @@ export default function CardCreationNewScreen() {
         role,
         context,
         borderStyle,
+        borderColor,
         format,
         isPremium,
         generationType: isClassic ? 'classic' : (isPremium ? 'premium' : 'legacy'),
@@ -703,6 +732,7 @@ export default function CardCreationNewScreen() {
           role: role || 'TBD', 
           context: context || 'TBD', 
           borderStyle: borderStyle || 'Classic',
+          borderColor: borderColor || '#808080',
           format: 'fullBleed', 
           size: '1024x1536', 
           quality: 'auto' 
@@ -1671,6 +1701,7 @@ export default function CardCreationNewScreen() {
         role: role || 'General',
         context: context || 'Fantasy',
         border_style: borderStyle || 'Classic',
+        border_color: borderColor || '#808080',
         image_url: cardImage,
         format,
         frame_color: DEFAULT_FRAME_COLOR,
@@ -2231,6 +2262,77 @@ export default function CardCreationNewScreen() {
             )}
           </View>
 
+          {/* Border Color Selection */}
+          <View style={styles.inlineSelectionGroup}>
+            <TouchableOpacity 
+              style={styles.collapsibleHeader}
+              onPress={() => {
+                setShowBorderColorOptions(!showBorderColorOptions);
+                if (Platform.OS !== 'web') {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                }
+              }}
+            >
+              <Text style={styles.inlineSelectionLabel}>Border Color</Text>
+              <View style={styles.collapsibleHeaderRight}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <View style={{
+                    width: 20,
+                    height: 20,
+                    borderRadius: 4,
+                    backgroundColor: borderColor,
+                    borderWidth: 1,
+                    borderColor: '#444'
+                  }} />
+                  <Text style={styles.selectedValueText}>
+                    {borderColorOptions.find(opt => opt.color === borderColor)?.name || 'Custom'}
+                  </Text>
+                </View>
+                <ChevronDown 
+                  size={16} 
+                  color="#666" 
+                  style={[styles.chevronIcon, showBorderColorOptions && styles.chevronIconRotated]} 
+                />
+              </View>
+            </TouchableOpacity>
+            
+            {showBorderColorOptions && (
+              <View style={styles.colorOptionsGrid}>
+                {borderColorOptions.map((option) => (
+                  <TouchableOpacity
+                    key={option.name}
+                    style={[
+                      styles.colorOption,
+                      borderColor === option.color && styles.colorOptionSelected
+                    ]}
+                    onPress={() => {
+                      setBorderColor(option.color);
+                      setShowBorderColorOptions(false);
+                      if (Platform.OS !== 'web') {
+                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                      }
+                    }}
+                  >
+                    <View style={[
+                      styles.colorSwatch,
+                      { backgroundColor: option.color }
+                    ]} />
+                    <Text style={[
+                      styles.colorOptionText,
+                      borderColor === option.color && styles.colorOptionTextSelected
+                    ]}>
+                      {option.name}
+                    </Text>
+                    {borderColor === option.color && (
+                      <View style={styles.colorCheckmark}>
+                        <Check size={12} color="#6366f1" />
+                      </View>
+                    )}
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+          </View>
 
           {/* Image Section */}
           <View style={[styles.cardPreview, format === 'fullBleed' && styles.cardPreviewFullBleed]}>
@@ -3392,5 +3494,53 @@ const styles = StyleSheet.create({
     color: '#999',
     fontSize: 14,
     fontFamily: 'Inter-Regular',
+  },
+  
+  // Color option styles
+  colorOptionsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+    marginTop: 8,
+  },
+  colorOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#1a1a1a',
+    borderWidth: 1,
+    borderColor: '#333',
+    borderRadius: 8,
+    padding: 10,
+    gap: 8,
+    minWidth: '45%',
+  },
+  colorOptionSelected: {
+    borderColor: '#6366f1',
+    backgroundColor: '#1e1e2e',
+  },
+  colorSwatch: {
+    width: 24,
+    height: 24,
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: '#444',
+  },
+  colorOptionText: {
+    flex: 1,
+    fontSize: 14,
+    fontFamily: 'Inter-Regular',
+    color: '#ccc',
+  },
+  colorOptionTextSelected: {
+    color: '#fff',
+    fontFamily: 'Inter-Bold',
+  },
+  colorCheckmark: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: '#e8e8ff',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

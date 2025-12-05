@@ -22,6 +22,7 @@ type CardData = {
   role?: string;               // e.g., "Protector" -> bottom-left badge
   context?: string;            // optional extra tag (unused in layout, but can flavor)
   borderStyle?: string;        // e.g., "Classic", "Modern", "Vintage", etc.
+  borderColor?: string;        // e.g., "#FFD700" for gold border
   size?: '1024x1536' | '1024x1024' | '2048x1536' | string;
   quality?: 'auto' | 'high';
   themeHint?: string;          // optional: extra art direction
@@ -36,6 +37,7 @@ function buildPremiumPrompt(card: CardData) {
   const art = (card.imageDescription || card.description || 'fantasy creature').trim();
   const theme = card.themeHint?.trim();
   const borderStyle = card.borderStyle?.trim() || 'Classic';
+  const borderColor = card.borderColor?.trim();
 
   // Premium dark elite trading card layout
   const layoutSpec = `
@@ -44,6 +46,7 @@ LAYOUT SPEC (Scientific Precision + Emotional Depth Trading Card):
 - FRAME: Modern rectangular border inspired by scientific instruments and tarot card elegance. NO cathedral shapes or medieval elements.
   • Style: Implement a ${borderStyle.toLowerCase()} border design that complements the premium trading card aesthetic
   • Gradient border that reflects the card's emotional theme (warm oranges/reds for intensity, cool blues/purples for calm, etc.)
+  ${borderColor ? `• Border Color: Use ${borderColor} as the primary border color, incorporating it elegantly into the card's frame design` : ''}
   • Subtle geometric patterns suggesting "hidden forces beneath the surface" - think circuit board traces or molecular diagrams
   • Clean lines with soft lighting and layered depth for premium feel
   • Glossy highlights and modern materials like brushed aluminum or lab-grade glass

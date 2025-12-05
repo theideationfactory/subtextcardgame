@@ -49,7 +49,7 @@ Deno.serve(async (req: Request) => {
     if (fetchError) throw fetchError;
 
     const cardData = job.card_data;
-    const { name, description, type, role, context, borderStyle, size = '1024x1536', quality = 'auto' } = cardData;
+    const { name, description, type, role, context, borderStyle, borderColor, size = '1024x1536', quality = 'auto' } = cardData;
 
     // Build enhanced prompt (same logic as original generate-enhanced-card)
     const topLabels = [];
@@ -64,6 +64,7 @@ Deno.serve(async (req: Request) => {
       `Design as a complete professional trading card with sophisticated integrated badge system and premium typography.`,
       `Include the title "${name}" prominently displayed in premium display font with subtle metallic or refined glow effect.`,
       borderStyle ? `Border Style: Implement a ${borderStyle.toLowerCase()} border design that complements the premium trading card aesthetic.` : '',
+      borderColor ? `Border Color: Use ${borderColor} as the primary border color, incorporating it elegantly into the card's border and frame design.` : '',
       
       // Professional badge specifications
       topLabels.length > 0 ? 
