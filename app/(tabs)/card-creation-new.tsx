@@ -168,14 +168,14 @@ export default function CardCreationNewScreen() {
   ];
   
   // Generation type selection
-  const [selectedGenerationType, setSelectedGenerationType] = useState<'legacy' | 'premium' | 'classic' | 'enhanced'>('premium');
+  const [selectedGenerationType, setSelectedGenerationType] = useState<'legacy' | 'premium' | 'classic' | 'modern_parchment'>('premium');
   
   // Generation type options
   const generationTypeOptions = [
     { key: 'legacy', label: 'Legacy: Background Image', description: 'Traditional background generation' },
-    { key: 'premium', label: 'Premium: Full Prompt', description: 'Enhanced prompt processing' },
-    { key: 'classic', label: 'Elite: Premium Card', description: 'Sophisticated premium card with signature accent colors' },
-    { key: 'enhanced', label: 'Full bleed card, no description text', description: 'Complete trading card with integrated text elements' }
+    { key: 'premium', label: 'Premium: Classic Card Generation', description: 'Enhanced prompt processing with premium styling' },
+    { key: 'classic', label: 'Full Bleed Card, No Description Text', description: 'Complete trading card with integrated text elements' },
+    { key: 'modern_parchment', label: 'Premium: Classic TCG - Modern Parchment', description: 'Premium parchment frame with title bar, diamond badge, and detail ribbon' }
   ] as const;
   
   // Chat functionality states
@@ -623,7 +623,7 @@ export default function CardCreationNewScreen() {
 
   // Debug logging removed to reduce console spam
 
-  const queueImageGeneration = async (generationType: boolean | 'classic') => {
+  const queueImageGeneration = async (generationType: boolean | 'classic' | 'modern_parchment') => {
     console.log('🚀 queueImageGeneration called with generationType:', generationType);
     console.log('📝 Current form state:', { name, imageDescription, type, role, context, borderStyle });
     
@@ -638,14 +638,26 @@ export default function CardCreationNewScreen() {
     setError('');
 
     try {
-      const currentSession = await refreshSession();
+      console.log('🔄 Refreshing session...');
+      
+      // Add timeout to prevent hanging on session refresh
+      const sessionPromise = refreshSession();
+      const timeoutPromise = new Promise<never>((_, reject) => 
+        setTimeout(() => reject(new Error('Session refresh timed out')), 10000)
+      );
+      
+      const currentSession = await Promise.race([sessionPromise, timeoutPromise]) as Awaited<ReturnType<typeof refreshSession>>;
+      
       if (!currentSession?.user?.id) {
         throw new Error('Authentication required. Please log in again.');
       }
+      
+      console.log('✅ Session refreshed successfully');
 
       // Determine generation parameters based on type
       const isPremium = generationType === true;
       const isClassic = generationType === 'classic';
+      const isModernParchment = generationType === 'modern_parchment';
       
       const cardDetails = {
         name,
@@ -658,7 +670,7 @@ export default function CardCreationNewScreen() {
         borderColor,
         format,
         isPremium,
-        generationType: isClassic ? 'classic' : (isPremium ? 'premium' : 'legacy'),
+        generationType: isModernParchment ? 'modern_parchment' : (isClassic ? 'classic' : (isPremium ? 'premium' : 'legacy')),
       };
 
       console.log('🎨 Starting image generation for:', cardDetails);
@@ -680,7 +692,7 @@ export default function CardCreationNewScreen() {
       }
 
       setGenerationJobId(data.jobId);
-      setIsPremiumGeneration(isPremium || isClassic);
+      setIsPremiumGeneration(isPremium || isClassic || isModernParchment);
 
       Alert.alert(
         'Generation Started!',
@@ -697,134 +709,6 @@ export default function CardCreationNewScreen() {
       console.log('🏁 Generation attempt finished, setting isGenerating to false');
       setIsGenerating(false);
     }
-  };
-
-  const generateEnhancedCard = async () => {
-    console.log('🚀 generateEnhancedCard called');
-    console.log('📝 Current form state:', { name, imageDescription, type, role, context, borderStyle });
-    
-    if (!name || !imageDescription) {
-      console.log('❌ Missing required fields:', { name: !!name, imageDescription: !!imageDescription });
-      setError('Please provide a card name and image description.');
-      return;
-    }
-
-    console.log('✅ Form validation passed, starting enhanced card generation...');
-    setIsGenerating(true);
-    setError('');
-
-    try {
-      const currentSession = await refreshSession();
-      if (!currentSession?.user?.id) {
-        throw new Error('Authentication required. Please log in again.');
-      }
-
-      console.log('🎨 Starting enhanced card generation...');
-      console.log('👤 User ID:', currentSession.user.id);
-      console.log('📤 Calling generate-enhanced-card function...');
-
-      // Call the generate-enhanced-card edge function
-      const { data, error } = await supabase.functions.invoke('generate-enhanced-card', {
-        body: { 
-          name, 
-          description: imageDescription, 
-          type, 
-          role: role || 'TBD', 
-          context: context || 'TBD', 
-          borderStyle: borderStyle || 'Classic',
-          borderColor: borderColor || '#808080',
-          format: 'fullBleed', 
-          size: '1024x1536', 
-          quality: 'auto' 
-        },
-      });
-
-      console.log('📥 Function response:', { data, error });
-
-      if (error) {
-        console.error('❌ Edge function error:', error);
-        throw error;
-      }
-
-      if (data?.jobId) {
-        console.log('✅ Card queued for background generation, jobId:', data.jobId);
-        setGenerationJobId(data.jobId);
-        setIsPremiumGeneration(true);
-        
-        Alert.alert(
-          'Enhanced Card Generation Started!',
-          'Your complete trading card is being generated in the background. You can safely leave this screen. We\'ll notify you when it\'s ready.',
-          [{ text: 'OK' }]
-        );
-        
-        // Start polling for completion
-        pollForJobCompletion(data.jobId);
-      } else if (data?.imageUrl) {
-        // Direct response (old format)
-        console.log('✅ Enhanced card generated successfully:', data.imageUrl);
-        setCardImage(data.imageUrl);
-        setIsPremiumGeneration(true);
-        setIsUploadedImage(false);
-      } else {
-        throw new Error('No image URL or job ID returned from generation');
-      }
-
-    } catch (err) {
-      console.error('❌ Error generating enhanced card:', err);
-      setError(`Failed to generate enhanced card: ${err instanceof Error ? err.message : 'Unknown error'}`);
-    } finally {
-      console.log('🏁 Enhanced card generation attempt finished');
-      setIsGenerating(false);
-    }
-  };
-
-  const pollForJobCompletion = async (jobId: string) => {
-    console.log('🔄 Starting to poll for job completion:', jobId);
-    
-    for (let i = 0; i < 60; i++) { // Poll for up to 2 minutes
-      await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds
-      
-      try {
-        const { data: job, error } = await supabase
-          .from('image_generation_queue')
-          .select('status, image_url, error_message')
-          .eq('id', jobId)
-          .single();
-        
-        if (error) {
-          console.error('❌ Error checking job status:', error);
-          continue;
-        }
-        
-        console.log(`🔍 Job ${jobId} status:`, job?.status);
-        
-        if (job?.status === 'completed' && job.image_url) {
-          console.log('✅ Enhanced card generation completed:', job.image_url);
-          setCardImage(job.image_url);
-          setGenerationJobId(null);
-          setIsUploadedImage(false);
-          
-          Alert.alert(
-            'Enhanced Card Ready!',
-            'Your complete trading card has been generated successfully.',
-            [{ text: 'OK' }]
-          );
-          return;
-        } else if (job?.status === 'failed') {
-          console.error('❌ Enhanced card generation failed:', job.error_message);
-          setError(`Enhanced card generation failed: ${job.error_message || 'Unknown error'}`);
-          setGenerationJobId(null);
-          return;
-        }
-      } catch (pollError) {
-        console.error('❌ Error polling job status:', pollError);
-      }
-    }
-    
-    // Timeout
-    console.error('❌ Enhanced card generation timed out');
-    setError('Enhanced card generation timed out. Please try again.');
-    setGenerationJobId(null);
   };
 
   // Old synchronous generation functions are now deprecated by the queue system.
@@ -2378,17 +2262,17 @@ export default function CardCreationNewScreen() {
                   setFormat('framed');
                   queueImageGeneration(false);
                 } else if (selectedGenerationType === 'premium') {
-                  console.log('🃏 Premium generation selected (using basic full prompt)');
+                  console.log('🃏 Premium Classic generation selected (using enhanced prompt)');
                   setFormat('fullBleed');
-                  queueImageGeneration('classic'); // Swap: Premium label now uses classic function
+                  queueImageGeneration(true); // Use enhanced function for premium classic
                 } else if (selectedGenerationType === 'classic') {
-                  console.log('💎 Elite generation selected (using enhanced prompt)');
+                  console.log('💎 Full Bleed generation selected (using classic function)');
                   setFormat('fullBleed');
-                  queueImageGeneration(true); // Swap: Elite label now uses premium function
-                } else if (selectedGenerationType === 'enhanced') {
-                  console.log('🃏 Enhanced generation selected (using generate-enhanced-card)');
+                  queueImageGeneration('classic'); // Use classic function for full bleed
+                } else if (selectedGenerationType === 'modern_parchment') {
+                  console.log('📜 Modern Parchment generation selected (using queue system)');
                   setFormat('fullBleed');
-                  generateEnhancedCard();
+                  queueImageGeneration('modern_parchment');
                 }
               }}
               disabled={!name || !imageDescription || isGenerating}

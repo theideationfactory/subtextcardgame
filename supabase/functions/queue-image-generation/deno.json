@@ -1,3 +1,6 @@
 {
-  "imports": "./import_map.json"
+  "imports": {
+    "supabase": "https://esm.sh/@supabase/supabase-js@2.39.3",
+    "openai": "npm:openai@4.24.1"
+  }
 }

@@ -58,9 +58,11 @@ Deno.serve(async (req: Request) => {
     // We don't await this call.
     let processorFunction;
     if (cardData.generationType === 'classic') {
-      processorFunction = 'process-classic-card-generation';
+      processorFunction = 'process-full-bleed-card-generation';
+    } else if (cardData.generationType === 'modern_parchment') {
+      processorFunction = 'process-modern-parchment-card-generation';
     } else if (cardData.isPremium) {
-      processorFunction = 'process-enhanced-card-generation';
+      processorFunction = 'process-premium-classic-generation';
     } else {
       processorFunction = 'process-image-generation';
     }
