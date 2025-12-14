@@ -75,6 +75,8 @@ export default function CardCreationNewScreen() {
   const [authChecking, setAuthChecking] = useState(false);
   const [isPremiumGeneration, setIsPremiumGeneration] = useState(false);
   const [generationJobId, setGenerationJobId] = useState<string | null>(null);
+  const [customGenerationTypes, setCustomGenerationTypes] = useState<any[]>([]);
+  const [selectedCustomGenerationType, setSelectedCustomGenerationType] = useState<string | null>(null);
   const [isUploadedImage, setIsUploadedImage] = useState(false); // Track if image was uploaded vs generated
 
   // Check for completed jobs on screen focus
@@ -167,16 +169,23 @@ export default function CardCreationNewScreen() {
     { name: 'Amethyst', color: '#9966CC' }
   ];
   
-  // Generation type selection
-  const [selectedGenerationType, setSelectedGenerationType] = useState<'legacy' | 'premium' | 'classic' | 'modern_parchment'>('premium');
+  // Generation type selection - now includes custom types
+  const [selectedGenerationType, setSelectedGenerationType] = useState<'legacy' | 'premium' | 'classic' | 'modern_parchment' | string>('premium');
   
   // Generation type options
+  // Dynamic generation type options that include custom types
   const generationTypeOptions = [
     { key: 'legacy', label: 'Legacy: Background Image', description: 'Traditional background generation' },
     { key: 'premium', label: 'Premium: Classic Card Generation', description: 'Enhanced prompt processing with premium styling' },
     { key: 'classic', label: 'Full Bleed Card, No Description Text', description: 'Complete trading card with integrated text elements' },
-    { key: 'modern_parchment', label: 'Premium: Classic TCG - Modern Parchment', description: 'Premium parchment frame with title bar, diamond badge, and detail ribbon' }
-  ] as const;
+    { key: 'modern_parchment', label: 'Premium: Classic TCG - Modern Parchment', description: 'Premium parchment frame with title bar, diamond badge, and detail ribbon' },
+    ...customGenerationTypes.map(type => ({
+      key: `custom_${type.id}`,
+      label: `Custom: ${type.name}`,
+      description: type.description || 'User-defined custom generation type',
+      customTypeId: type.id
+    }))
+  ];
   
   // Chat functionality states
   const [showChat, setShowChat] = useState(false);
@@ -449,20 +458,43 @@ export default function CardCreationNewScreen() {
         .single();
 
       if (dbError) {
-        console.error('Error loading custom border styles from database:', dbError);
+        console.log('Database error for border styles, using defaults:', dbError);
         return;
       }
 
       if (userData?.custom_border_styles) {
-        console.log('Loaded custom border styles from database:', userData.custom_border_styles);
-        setCustomBorderStyles(userData.custom_border_styles);
-      } else {
-        console.log('No custom border styles found, using defaults only');
-        setCustomBorderStyles([]);
+        const customStyles = JSON.parse(userData.custom_border_styles);
+        setCustomBorderStyles(customStyles);
+        console.log('Loaded custom border styles from database:', customStyles.length);
       }
-    } catch (error) {
-      console.error('Error loading custom border styles:', error);
-      setCustomBorderStyles([]);
+    } catch (err) {
+      console.error('Error loading custom border styles:', err);
+    }
+  };
+
+  const loadCustomGenerationTypes = async () => {
+    try {
+      if (!user) {
+        console.log('No user found, no custom generation types');
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from('custom_generation_types')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('is_active', true)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.log('Error loading custom generation types:', error);
+        return;
+      }
+
+      setCustomGenerationTypes(data || []);
+      console.log('Loaded custom generation types:', data?.length || 0);
+    } catch (err) {
+      console.error('Error loading custom generation types:', err);
     }
   };
 
@@ -605,6 +637,7 @@ export default function CardCreationNewScreen() {
     loadCustomDetailOptions();
     loadCustomContexts();
     loadCustomBorderStyles();
+    loadCustomGenerationTypes();
   }, []);
 
   // Also reload all custom data when screen is focused (in case they were updated elsewhere)
@@ -614,6 +647,7 @@ export default function CardCreationNewScreen() {
       loadCustomDetailOptions();
       loadCustomContexts();
       loadCustomBorderStyles();
+      loadCustomGenerationTypes();
     }, [])
   );
 
@@ -623,7 +657,7 @@ export default function CardCreationNewScreen() {
 
   // Debug logging removed to reduce console spam
 
-  const queueImageGeneration = async (generationType: boolean | 'classic' | 'modern_parchment') => {
+  const queueImageGeneration = async (generationType: boolean | 'classic' | 'modern_parchment' | 'custom') => {
     console.log('🚀 queueImageGeneration called with generationType:', generationType);
     console.log('📝 Current form state:', { name, imageDescription, type, role, context, borderStyle });
     
@@ -658,6 +692,7 @@ export default function CardCreationNewScreen() {
       const isPremium = generationType === true;
       const isClassic = generationType === 'classic';
       const isModernParchment = generationType === 'modern_parchment';
+      const isCustom = generationType === 'custom';
       
       const cardDetails = {
         name,
@@ -669,8 +704,9 @@ export default function CardCreationNewScreen() {
         borderStyle,
         borderColor,
         format,
-        isPremium,
-        generationType: isModernParchment ? 'modern_parchment' : (isClassic ? 'classic' : (isPremium ? 'premium' : 'legacy')),
+        isPremium: isPremium || isCustom,  // Custom types should use premium quality
+        generationType: isCustom ? 'custom' : (isModernParchment ? 'modern_parchment' : (isClassic ? 'classic' : (isPremium ? 'premium' : 'legacy'))),
+        customGenerationTypeId: isCustom ? selectedCustomGenerationType : null,
       };
 
       console.log('🎨 Starting image generation for:', cardDetails);
@@ -1590,6 +1626,7 @@ export default function CardCreationNewScreen() {
         format,
         frame_color: DEFAULT_FRAME_COLOR,
         is_premium_generation: isPremiumGeneration, // Track if this uses premium generation
+        custom_generation_type_id: selectedCustomGenerationType, // Track custom generation type if used
         is_uploaded_image: isUploadedImage, // Track if this is a user-uploaded image
         // Only save background gradient if user selected something other than default black
         ...(JSON.stringify(backgroundGradient) !== JSON.stringify(['#1a1a1a', '#000000']) && {
@@ -1757,6 +1794,13 @@ export default function CardCreationNewScreen() {
                     style={styles.dropdownItem}
                     onPress={() => {
                       setSelectedGenerationType(option.key);
+                      // If it's a custom generation type, extract and set the ID
+                      if (option.key.startsWith('custom_')) {
+                        const customTypeId = option.key.replace('custom_', '');
+                        setSelectedCustomGenerationType(customTypeId);
+                      } else {
+                        setSelectedCustomGenerationType(null);
+                      }
                       setShowGenerationTypeDropdown(false);
                       if (Platform.OS !== 'web') {
                         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -2273,6 +2317,12 @@ export default function CardCreationNewScreen() {
                   console.log('📜 Modern Parchment generation selected (using queue system)');
                   setFormat('fullBleed');
                   queueImageGeneration('modern_parchment');
+                } else if (selectedGenerationType?.startsWith('custom_')) {
+                  const customTypeId = selectedGenerationType.replace('custom_', '');
+                  console.log('🎨 Custom generation type selected:', customTypeId);
+                  setSelectedCustomGenerationType(customTypeId);
+                  setFormat('fullBleed');
+                  queueImageGeneration('custom');
                 }
               }}
               disabled={!name || !imageDescription || isGenerating}

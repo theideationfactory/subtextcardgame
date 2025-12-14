@@ -88,6 +88,7 @@ export default function CollectionScreen() {
     format?: "framed" | "fullBleed";
     background_gradient?: string;
     is_premium_generation?: boolean;
+    custom_generation_type_id?: string; // Track if this card was generated with a custom type
     is_uploaded_image?: boolean; // Track if image was uploaded by user
     user_id: string;
     collection_id?: string;
@@ -180,11 +181,11 @@ export default function CollectionScreen() {
             .select(`
               id, name, description, image_description, type, role, context, image_url, frame_width, frame_color, 
               name_color, type_color, description_color, context_color, format, background_gradient, 
-              is_premium_generation, is_uploaded_image, user_id, collection_id, shadow_card_id,
+              is_premium_generation, custom_generation_type_id, is_uploaded_image, user_id, collection_id, shadow_card_id,
               shadow_card:shadow_card_id(
                 id, name, description, type, role, context, image_url, frame_width, frame_color,
                 name_color, type_color, description_color, context_color, format, background_gradient,
-                is_premium_generation
+                is_premium_generation, custom_generation_type_id
               )
             `)
             .eq('user_id', user.id)
@@ -216,7 +217,7 @@ export default function CollectionScreen() {
 
           let friendCardsQuery = supabase
             .from('cards')
-            .select('id, name, description, type, role, context, image_url, frame_width, frame_color, name_color, type_color, description_color, context_color, format, background_gradient, is_premium_generation, is_uploaded_image, user_id, collection_id')
+            .select('id, name, description, type, role, context, image_url, frame_width, frame_color, name_color, type_color, description_color, context_color, format, background_gradient, is_premium_generation, custom_generation_type_id, is_uploaded_image, user_id, collection_id')
             .in('user_id', friendIds)
             .order('created_at', { ascending: false })
             .limit(50);
@@ -251,7 +252,7 @@ export default function CollectionScreen() {
             // First try with is_public column (if migration has been run)
             const { data: publicCards, error: publicError } = await supabase
               .from('cards')
-              .select('id, name, description, type, role, context, image_url, frame_width, frame_color, name_color, type_color, description_color, context_color, format, background_gradient, is_premium_generation, is_uploaded_image, user_id, collection_id')
+              .select('id, name, description, type, role, context, image_url, frame_width, frame_color, name_color, type_color, description_color, context_color, format, background_gradient, is_premium_generation, custom_generation_type_id, is_uploaded_image, user_id, collection_id')
               .eq('is_public', true)
               .order('created_at', { ascending: false })
               .limit(50);
@@ -262,7 +263,7 @@ export default function CollectionScreen() {
                 console.log('is_public column not found, falling back to showing other users\' cards');
                 const { data: fallbackCards, error: fallbackError } = await supabase
                   .from('cards')
-                  .select('id, name, description, type, role, context, image_url, frame_width, frame_color, name_color, type_color, description_color, context_color, format, background_gradient, is_premium_generation, is_uploaded_image, user_id, collection_id')
+                  .select('id, name, description, type, role, context, image_url, frame_width, frame_color, name_color, type_color, description_color, context_color, format, background_gradient, is_premium_generation, custom_generation_type_id, is_uploaded_image, user_id, collection_id')
                   .neq('user_id', user.id)
                   .order('created_at', { ascending: false })
                   .limit(50);
@@ -1375,8 +1376,8 @@ export default function CollectionScreen() {
     
     // If the card uses the full-bleed format, render it with edge-to-edge art and text overlays
     if (item.format === 'fullBleed') {
-      // For premium generation, use completely custom container for clean display
-      if (item.is_premium_generation) {
+      // For premium generation or custom generation types, use completely custom container for clean display
+      if (item.is_premium_generation || item.custom_generation_type_id) {
         return (
           <Pressable
             style={{

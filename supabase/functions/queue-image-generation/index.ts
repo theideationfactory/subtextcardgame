@@ -1,4 +1,4 @@
-import { createClient } from 'npm:@supabase/supabase-js@2'
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3?deno-std=0.177.0'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -61,6 +61,8 @@ Deno.serve(async (req: Request) => {
       processorFunction = 'process-full-bleed-card-generation';
     } else if (cardData.generationType === 'modern_parchment') {
       processorFunction = 'process-modern-parchment-card-generation';
+    } else if (cardData.customGenerationTypeId) {
+      processorFunction = 'process-custom-generation';
     } else if (cardData.isPremium) {
       processorFunction = 'process-premium-classic-generation';
     } else {

@@ -35,26 +35,24 @@ export default function CreateScreen() {
       <View style={styles.optionsContainer}>
         <Pressable 
           style={styles.optionCard}
-          onPress={() => {
-            // Forward any parameters from spread screen to card creation
-            if (params.returnTo && params.zone) {
-              router.push({
-                pathname: '/(tabs)/card-creation-new',
-                params: {
-                  returnTo: params.returnTo,
-                  zone: params.zone
-                }
-              });
-            } else {
-              router.push('/(tabs)/card-creation-new');
-            }
-          }}
+          onPress={() => router.push('/(tabs)/card-creation-new')}
         >
           <View style={styles.optionIconContainer}>
             <PlusCircle size={32} color="#6366f1" />
           </View>
           <Text style={styles.optionTitle}>Create New Card</Text>
           <Text style={styles.optionDescription}>Design a custom card with your own text and AI-generated image</Text>
+        </Pressable>
+
+        <Pressable 
+          style={styles.optionCard}
+          onPress={() => router.push('/(tabs)/custom-generation-builder')}
+        >
+          <View style={styles.optionIconContainer}>
+            <Layers size={32} color="#6366f1" />
+          </View>
+          <Text style={styles.optionTitle}>Custom Generation Type</Text>
+          <Text style={styles.optionDescription}>Create your own card generation style with custom prompts and layouts</Text>
         </Pressable>
 
         <Pressable 
