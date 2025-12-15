@@ -16,9 +16,7 @@ import ViewShot from 'react-native-view-shot';
 import * as Sharing from 'expo-sharing';
 import * as ImagePicker from 'expo-image-picker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { WalletService } from '@/app/services/walletService';
-import { SubtextNftMinter } from '@/app/utils/nftMinter';
-import { Network } from 'alchemy-sdk';
+// NFT minting now handled server-side via Edge Function
 
 const COLLECTION_TYPES = [
   {
@@ -110,8 +108,6 @@ export default function CollectionScreen() {
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [deleteError, setDeleteError] = useState('');
   const [mintingNFT, setMintingNFT] = useState(false);
-  const [walletConnected, setWalletConnected] = useState(false);
-  const [walletAddress, setWalletAddress] = useState('');
   const [selectedType, setSelectedType] = useState<CollectionType>('personal');
   const [showTypeMenu, setShowTypeMenu] = useState(false);
   const [phenomenaTypes, setPhenomenaTypes] = useState<string[]>(['All']);
@@ -144,8 +140,6 @@ export default function CollectionScreen() {
   // Double tap timing ref
   const lastTapRef = useRef<number>(0);
   
-  // Wallet service for NFT minting
-  const walletService = useRef(new WalletService()).current;
   
   // Calculate scaling factor for horizontal scrolling based on device
   const getScaleFactor = () => {
@@ -829,90 +823,23 @@ export default function CollectionScreen() {
     // Provide haptic feedback
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     
-    // Check if wallet is connected
-    if (!walletConnected) {
-      // Prompt to connect wallet
-      Alert.alert(
-        'Connect Wallet',
-        'To mint this card as an NFT, you need to connect your wallet with MATIC for gas fees.',
-        [
-          { text: 'Cancel', style: 'cancel' },
-          { 
-            text: 'Learn More', 
-            onPress: () => {
-              Alert.alert(
-                'NFT Minting Setup',
-                'To mint NFTs:\n\n1. Add Polygon Mainnet to MetaMask\n2. Get MATIC tokens for gas fees\n3. Connect your wallet\n\nYour NFTs will appear on OpenSea after minting.',
-                [{ text: 'OK' }]
-              );
-            }
-          },
-          {
-            text: 'Connect Wallet',
-            onPress: () => connectTestWallet(card)
-          }
-        ]
-      );
+    // Check if user is logged in
+    if (!user) {
+      Alert.alert('Sign In Required', 'Please sign in to mint NFTs.');
       return;
     }
     
-    // If wallet is already connected, proceed with minting
-    await mintCardAsNFT(card);
-  };
-
-  const connectTestWallet = async (card: Card) => {
-    Alert.prompt(
-      'Connect Wallet',
-      'Enter your wallet private key to connect:\n\n⚠️ Keep your private key secure!',
+    // Confirm minting with user
+    Alert.alert(
+      'Mint to Official Collection',
+      `Mint "${card.name}" to the official Subtext NFT collection?\n\nThis will create a permanent record of your card on the blockchain.`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
-          text: 'Connect',
-          onPress: async (privateKey) => {
-            if (!privateKey || privateKey.trim() === '') {
-              Alert.alert('Error', 'Private key is required');
-              return;
-            }
-            
-            setMintingNFT(true);
-            try {
-              // Remove any 0x prefix if present
-              const cleanKey = privateKey.trim().replace(/^0x/, '');
-              
-              // Connect wallet using private key
-              console.log('🔐 Connecting wallet...');
-              const network = process.env.EXPO_PUBLIC_BLOCKCHAIN_NETWORK === 'MATIC_MAINNET' ? 'mainnet' : 'amoy';
-              const result = await walletService.connectWithPrivateKey(cleanKey, network);
-              
-              setWalletAddress(result.address);
-              setWalletConnected(true);
-              setMintingNFT(false);
-              
-              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-              
-              Alert.alert(
-                'Wallet Connected! ✅',
-                `Address: ${result.address.substring(0, 6)}...${result.address.substring(38)}\n\nReady to mint NFT!`,
-                [
-                  { text: 'Cancel', style: 'cancel' },
-                  { 
-                    text: 'Mint NFT', 
-                    onPress: () => mintCardAsNFT(card) 
-                  }
-                ]
-              );
-            } catch (error: any) {
-              setMintingNFT(false);
-              console.error('❌ Connection error:', error);
-              Alert.alert(
-                'Connection Failed',
-                error.message || 'Failed to connect wallet. Check your private key and try again.'
-              );
-            }
-          }
+          text: 'Mint NFT',
+          onPress: () => mintCardAsNFT(card)
         }
-      ],
-      'plain-text'
+      ]
     );
   };
 
@@ -920,109 +847,58 @@ export default function CollectionScreen() {
     setMintingNFT(true);
     
     try {
-      // Check environment configuration
-      if (!process.env.EXPO_PUBLIC_ALCHEMY_API_KEY ||
-          !process.env.EXPO_PUBLIC_PINATA_API_KEY ||
-          !process.env.EXPO_PUBLIC_NFT_CONTRACT_ADDRESS) {
-        throw new Error('Missing environment variables. Please configure .env file.');
-      }
+      console.log('🎴 Minting card to official collection:', card.name);
       
-      // Get contract address from environment
-      const contractAddress = process.env.EXPO_PUBLIC_NFT_CONTRACT_ADDRESS;
-      console.log('🔍 Using contract address:', contractAddress);
-      
-      // Initialize NFT minter
-      const nftMinter = new SubtextNftMinter({
-        alchemyApiKey: process.env.EXPO_PUBLIC_ALCHEMY_API_KEY,
-        pinataApiKey: process.env.EXPO_PUBLIC_PINATA_API_KEY,
-        pinataSecretKey: process.env.EXPO_PUBLIC_PINATA_SECRET_KEY || '',
-        contractAddress: contractAddress,
-        network: process.env.EXPO_PUBLIC_BLOCKCHAIN_NETWORK === 'MATIC_MAINNET' 
-          ? Network.MATIC_MAINNET 
-          : Network.MATIC_MUMBAI
+      // Call server-side Edge Function to mint NFT
+      const { data, error } = await supabase.functions.invoke('mint-nft', {
+        body: {
+          cardId: card.id,
+          userId: user?.id
+        }
       });
       
-      // Get signer and address from wallet service
-      const signer = walletService.getSigner();
-      const recipientAddress = walletService.getAddress();
-      
-      if (!signer || !recipientAddress) {
-        throw new Error('Wallet not connected. Please connect your wallet first.');
+      if (error) {
+        throw new Error(error.message || 'Failed to mint NFT');
       }
       
-      console.log('💰 Wallet address:', recipientAddress);
+      if (!data.success) {
+        if (data.alreadyMinted) {
+          Alert.alert(
+            'Already Minted',
+            'This card has already been minted to the official Subtext NFT collection.',
+            [{ text: 'OK' }]
+          );
+          return;
+        }
+        throw new Error(data.error || 'Minting failed');
+      }
       
-      // Convert card to format expected by minter
-      const subtextCard = {
-        id: card.id,
-        name: card.name,
-        description: card.description || '',
-        type: card.type,
-        role: card.role,
-        context: card.context,
-        artStyle: 'Fantasy (MTG-inspired)', // Default art style
-        imageUri: card.image_url
-      };
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       
-      console.log('🎴 Starting NFT minting for card:', card.name);
+      // Get user email for display
+      const userEmail = data.userEmail || user?.email || 'your account';
       
-      // Mint NFT on blockchain
-      const result = await nftMinter.mintSubtextCardNFTs(
-        subtextCard,
-        signer,
-        recipientAddress
+      Alert.alert(
+        'NFT Minted Successfully! 🎉',
+        `Your card "${card.name}" has been minted to the official Subtext NFT collection.\n\n` +
+        `Minted for: ${userEmail}\n` +
+        `Token ID: ${data.tokenId}\n\n` +
+        `This card is now part of the permanent Subtext collection on the blockchain.`,
+        [
+          { text: 'OK' },
+          { 
+            text: 'View on Polygonscan', 
+            onPress: () => Linking.openURL(data.explorerUrl)
+          },
+          { 
+            text: 'View on OpenSea', 
+            onPress: () => Linking.openURL(data.openSeaUrl)
+          }
+        ]
       );
       
-      if (result.success) {
-        // Save mint record to database
-        await supabase
-          .from('nft_mints')
-          .insert({
-            user_id: user?.id,
-            card_id: card.id,
-            transaction_hash: result.imageNftTxHash,
-            image_nft_hash: result.imageNftTxHash,
-            card_nft_hash: result.cardNftTxHash,
-            image_token_id: result.imageTokenId,
-            card_token_id: result.cardTokenId,
-            contract_address: contractAddress,
-            wallet_address: recipientAddress,
-            network: process.env.EXPO_PUBLIC_BLOCKCHAIN_NETWORK || 'MATIC_MAINNET',
-            status: 'confirmed'
-          });
-        
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        
-        const explorerUrl = process.env.EXPO_PUBLIC_BLOCKCHAIN_NETWORK === 'MATIC_MAINNET'
-          ? `https://polygonscan.com/tx/${result.imageNftTxHash}`
-          : `https://amoy.polygonscan.com/tx/${result.imageNftTxHash}`;
-        
-        // Construct OpenSea URL - uses mainnet or testnet (Amoy) based on network
-        const openSeaUrl = process.env.EXPO_PUBLIC_BLOCKCHAIN_NETWORK === 'MATIC_MAINNET'
-          ? `https://opensea.io/assets/matic/${contractAddress}/${result.cardTokenId}`
-          : `https://testnets.opensea.io/assets/amoy/${contractAddress}/${result.cardTokenId}`;
-        
-        Alert.alert(
-          'NFT Minted Successfully! 🎉',
-          `Your card "${card.name}" has been minted as an NFT.\n\n` +
-          `Token ID: ${result.cardTokenId}\n` +
-          `Transaction: ${result.imageNftTxHash?.substring(0, 10)}...\n\n` +
-          `View it on OpenSea!`,
-          [
-            { text: 'OK' },
-            { 
-              text: 'View on Polygonscan', 
-              onPress: () => Linking.openURL(explorerUrl)
-            },
-            { 
-              text: 'View on OpenSea', 
-              onPress: () => Linking.openURL(openSeaUrl)
-            }
-          ]
-        );
-      } else {
-        throw new Error(result.error || 'Minting failed');
-      }
+      console.log('✅ NFT minted successfully:', data.tokenId);
+      
     } catch (error: any) {
       console.error('❌ Minting error:', error);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);

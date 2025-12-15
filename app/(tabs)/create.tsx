@@ -8,7 +8,7 @@ import {
 import { useFonts, Inter_400Regular, Inter_700Bold } from '@expo-google-fonts/inter';
 import * as SplashScreen from 'expo-splash-screen';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import { Wand2, PlusCircle, Layers } from 'lucide-react-native';
+import { Wand2, PlusCircle, Layers, Inbox } from 'lucide-react-native';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -42,6 +42,17 @@ export default function CreateScreen() {
           </View>
           <Text style={styles.optionTitle}>Create New Card</Text>
           <Text style={styles.optionDescription}>Design a custom card with your own text and AI-generated image</Text>
+        </Pressable>
+
+        <Pressable 
+          style={styles.optionCard}
+          onPress={() => router.push('/(tabs)/card-inbox')}
+        >
+          <View style={styles.optionIconContainer}>
+            <Inbox size={32} color="#6366f1" />
+          </View>
+          <Text style={styles.optionTitle}>Card Inbox</Text>
+          <Text style={styles.optionDescription}>View and complete card drafts with generated images</Text>
         </Pressable>
 
         <Pressable 

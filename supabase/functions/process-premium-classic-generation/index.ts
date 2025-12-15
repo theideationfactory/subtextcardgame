@@ -26,6 +26,14 @@ type CardData = {
   size?: '1024x1536' | '1024x1024' | '2048x1536' | string;
   quality?: 'auto' | 'high';
   themeHint?: string;          // optional: extra art direction
+  // Fields for automatic card creation
+  visibility?: string[];
+  backgroundGradient?: string;
+  format?: string;
+  customGenerationTypeId?: string | null;
+  isPublic?: boolean;
+  isSharedWithFriends?: boolean;
+  shadowForCardId?: string | null;
 };
 
 function buildPremiumPrompt(card: CardData) {
@@ -217,14 +225,95 @@ Deno.serve(async (req) => {
     const { data: { publicUrl } } = supabase.storage.from(BUCKET_NAME).getPublicUrl(fileName);
     if (!publicUrl) throw new Error('Failed to get public URL for uploaded image');
 
+    // Create the card in the database
+    console.log('📝 Creating card in database...');
+    
+    let collectionId;
+    const { data: existingCollections, error: collectionError } = await supabase
+      .from('collections')
+      .select('id')
+      .eq('user_id', job.user_id)
+      .limit(1);
+    
+    if (collectionError) throw collectionError;
+    
+    if (existingCollections && existingCollections.length > 0) {
+      collectionId = existingCollections[0].id;
+    } else {
+      const { data: newCollection, error: createCollectionError } = await supabase
+        .from('collections')
+        .insert({
+          name: 'My Collection',
+          user_id: job.user_id,
+          visibility: cardData.visibility || ['personal']
+        })
+        .select('id')
+        .single();
+      
+      if (createCollectionError) throw createCollectionError;
+      collectionId = newCollection.id;
+    }
+    
+    let backgroundGradient = null;
+    if (cardData.backgroundGradient) {
+      try {
+        const parsed = JSON.parse(cardData.backgroundGradient);
+        if (JSON.stringify(parsed) !== JSON.stringify(['#1a1a1a', '#000000'])) {
+          backgroundGradient = cardData.backgroundGradient;
+        }
+      } catch (e) {}
+    }
+    
+    const newCardData = {
+      name: cardData.name || 'Untitled Card',
+      description: cardData.description || '',
+      image_description: cardData.imageDescription || '',
+      type: cardData.type || 'Card',
+      phenomena: cardData.type || null,
+      role: cardData.role || 'General',
+      context: cardData.context || 'Fantasy',
+      border_style: cardData.borderStyle || 'Classic',
+      border_color: cardData.borderColor || '#808080',
+      image_url: publicUrl,
+      format: cardData.format || 'framed',
+      frame_color: '#808080',
+      is_premium_generation: true,
+      custom_generation_type_id: cardData.customGenerationTypeId || null,
+      is_uploaded_image: false,
+      background_gradient: backgroundGradient,
+      user_id: job.user_id,
+      collection_id: collectionId,
+      is_public: cardData.isPublic || false,
+      is_shared_with_friends: cardData.isSharedWithFriends || false
+    };
+    
+    const { data: newCard, error: insertError } = await supabase
+      .from('cards')
+      .insert(newCardData)
+      .select()
+      .single();
+    
+    if (insertError) throw insertError;
+    
+    console.log('✅ Card created successfully:', newCard.id);
+    
+    if (cardData.shadowForCardId) {
+      await supabase
+        .from('cards')
+        .update({ shadow_card_id: newCard.id })
+        .eq('id', cardData.shadowForCardId)
+        .eq('user_id', job.user_id);
+    }
+
     await supabase.from('image_generation_queue').update({
       status: 'completed',
       image_url: publicUrl,
+      card_id: newCard.id,
     }).eq('id', jobId);
 
-    console.log(`✅ Premium card job ${jobId} completed:`, publicUrl);
+    console.log(`✅ Premium card job ${jobId} completed with card:`, newCard.id);
 
-    return new Response(JSON.stringify({ success: true, imageUrl: publicUrl }), {
+    return new Response(JSON.stringify({ success: true, imageUrl: publicUrl, cardId: newCard.id }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 

@@ -147,17 +147,118 @@ Deno.serve(async (req: Request) => {
 
     const imageUrl = publicUrl;
 
-    // 4. Update job status to 'completed'
+    // 4. Create the card in the database
+    console.log('📝 Creating card in database...');
+    
+    // First, get or create a collection for the user
+    let collectionId;
+    const { data: existingCollections, error: collectionError } = await supabaseClient
+      .from('collections')
+      .select('id')
+      .eq('user_id', job.user_id)
+      .limit(1);
+    
+    if (collectionError) {
+      console.error('Error fetching collections:', collectionError);
+      throw collectionError;
+    }
+    
+    if (existingCollections && existingCollections.length > 0) {
+      collectionId = existingCollections[0].id;
+    } else {
+      const { data: newCollection, error: createCollectionError } = await supabaseClient
+        .from('collections')
+        .insert({
+          name: 'My Collection',
+          user_id: job.user_id,
+          visibility: cardData.visibility || ['personal']
+        })
+        .select('id')
+        .single();
+      
+      if (createCollectionError) {
+        console.error('Error creating collection:', createCollectionError);
+        throw createCollectionError;
+      }
+      collectionId = newCollection.id;
+    }
+    
+    // Parse background gradient if it exists
+    let backgroundGradient = null;
+    if (cardData.backgroundGradient) {
+      try {
+        const parsed = JSON.parse(cardData.backgroundGradient);
+        // Only save if not default black gradient
+        if (JSON.stringify(parsed) !== JSON.stringify(['#1a1a1a', '#000000'])) {
+          backgroundGradient = cardData.backgroundGradient;
+        }
+      } catch (e) {
+        console.error('Error parsing background gradient:', e);
+      }
+    }
+    
+    const newCardData = {
+      name: cardData.name || 'Untitled Card',
+      description: cardData.description || '',
+      image_description: cardData.imageDescription || '',
+      type: cardData.type || 'Card',
+      phenomena: cardData.type || null,
+      role: cardData.role || 'General',
+      context: cardData.context || 'Fantasy',
+      border_style: cardData.borderStyle || 'Classic',
+      border_color: cardData.borderColor || '#808080',
+      image_url: imageUrl,
+      format: cardData.format || 'framed',
+      frame_color: '#808080',
+      is_premium_generation: cardData.isPremium || false,
+      custom_generation_type_id: cardData.customGenerationTypeId || null,
+      is_uploaded_image: false,
+      background_gradient: backgroundGradient,
+      user_id: job.user_id,
+      collection_id: collectionId,
+      is_public: cardData.isPublic || false,
+      is_shared_with_friends: cardData.isSharedWithFriends || false
+    };
+    
+    const { data: newCard, error: insertError } = await supabaseClient
+      .from('cards')
+      .insert(newCardData)
+      .select()
+      .single();
+    
+    if (insertError) {
+      console.error('Error creating card:', insertError);
+      throw insertError;
+    }
+    
+    console.log('✅ Card created successfully:', newCard.id);
+    
+    // If this card is a shadow for another card, link them
+    if (cardData.shadowForCardId) {
+      console.log('Linking shadow card:', newCard.id, 'to original card:', cardData.shadowForCardId);
+      const { error: linkError } = await supabaseClient
+        .from('cards')
+        .update({ shadow_card_id: newCard.id })
+        .eq('id', cardData.shadowForCardId)
+        .eq('user_id', job.user_id);
+      
+      if (linkError) {
+        console.error('Error linking shadow card:', linkError);
+        // Don't throw - card was created successfully
+      }
+    }
+    
+    // 5. Update job status to 'completed' with the created card ID
     await supabaseClient
       .from('image_generation_queue')
-      .update({ status: 'completed', image_url: imageUrl })
+      .update({ status: 'completed', image_url: imageUrl, card_id: newCard.id })
       .eq('id', jobId);
 
-    // 5. (Future Step) Trigger push notification
+    // 6. (Future Step) Trigger push notification
     // await supabaseClient.functions.invoke('send-push-notification', { body: { userId: job.user_id, imageUrl } });
     
-    console.log(`✅ Job ${jobId} completed successfully with image: ${imageUrl}`);
-    console.log('Successfully generated and uploaded image:', imageUrl);
+    console.log(`✅ Job ${jobId} completed successfully with card: ${newCard.id}`);
+    console.log('Successfully generated image and created card:', newCard.id);
 
     return new Response(
       JSON.stringify({ success: true, imageUrl }),

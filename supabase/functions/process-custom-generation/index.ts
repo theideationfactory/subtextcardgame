@@ -255,21 +255,122 @@ Deno.serve(async (req: Request) => {
       throw new Error('Failed to get public URL for uploaded image');
     }
 
-    // Update job status to 'completed'
+    // Create the card in the database
+    console.log('📝 Creating card in database...');
+    
+    // Get or create a collection for the user
+    let collectionId;
+    const { data: existingCollections, error: collectionError } = await supabase
+      .from('collections')
+      .select('id')
+      .eq('user_id', job.user_id)
+      .limit(1);
+    
+    if (collectionError) {
+      console.error('Error fetching collections:', collectionError);
+      throw collectionError;
+    }
+    
+    if (existingCollections && existingCollections.length > 0) {
+      collectionId = existingCollections[0].id;
+    } else {
+      const { data: newCollection, error: createCollectionError } = await supabase
+        .from('collections')
+        .insert({
+          name: 'My Collection',
+          user_id: job.user_id,
+          visibility: (job.card_data as any).visibility || ['personal']
+        })
+        .select('id')
+        .single();
+      
+      if (createCollectionError) {
+        console.error('Error creating collection:', createCollectionError);
+        throw createCollectionError;
+      }
+      collectionId = newCollection.id;
+    }
+    
+    // Parse background gradient if it exists
+    let backgroundGradient = null;
+    const fullCardData = job.card_data as any;
+    if (fullCardData.backgroundGradient) {
+      try {
+        const parsed = JSON.parse(fullCardData.backgroundGradient);
+        if (JSON.stringify(parsed) !== JSON.stringify(['#1a1a1a', '#000000'])) {
+          backgroundGradient = fullCardData.backgroundGradient;
+        }
+      } catch (e) {
+        console.error('Error parsing background gradient:', e);
+      }
+    }
+    
+    const newCardData = {
+      name: cardData.name || 'Untitled Card',
+      description: cardData.description || '',
+      image_description: cardData.imageDescription || '',
+      type: cardData.type || 'Card',
+      phenomena: cardData.type || null,
+      role: cardData.role || 'General',
+      context: cardData.context || 'Fantasy',
+      border_style: fullCardData.borderStyle || 'Classic',
+      border_color: fullCardData.borderColor || '#808080',
+      image_url: publicUrl,
+      format: fullCardData.format || 'framed',
+      frame_color: '#808080',
+      is_premium_generation: true,
+      custom_generation_type_id: cardData.customGenerationTypeId || null,
+      is_uploaded_image: false,
+      background_gradient: backgroundGradient,
+      user_id: job.user_id,
+      collection_id: collectionId,
+      is_public: fullCardData.isPublic || false,
+      is_shared_with_friends: fullCardData.isSharedWithFriends || false
+    };
+    
+    const { data: newCard, error: insertError } = await supabase
+      .from('cards')
+      .insert(newCardData)
+      .select()
+      .single();
+    
+    if (insertError) {
+      console.error('Error creating card:', insertError);
+      throw insertError;
+    }
+    
+    console.log('✅ Card created successfully:', newCard.id);
+    
+    // If this card is a shadow for another card, link them
+    if (fullCardData.shadowForCardId) {
+      const { error: linkError } = await supabase
+        .from('cards')
+        .update({ shadow_card_id: newCard.id })
+        .eq('id', fullCardData.shadowForCardId)
+        .eq('user_id', job.user_id);
+      
+      if (linkError) {
+        console.error('Error linking shadow card:', linkError);
+      }
+    }
+
+    // Update job status to 'completed' with card ID
     await supabase
       .from('image_generation_queue')
       .update({ 
         status: 'completed', 
         image_url: publicUrl,
+        card_id: newCard.id,
       })
       .eq('id', jobId);
 
-    console.log(`✅ Custom generation job ${jobId} completed:`, publicUrl);
+    console.log(`✅ Custom generation job ${jobId} completed with card:`, newCard.id);
 
     return new Response(
       JSON.stringify({ 
         success: true, 
         imageUrl: publicUrl,
+        cardId: newCard.id,
         customTypeName: customType.name,
         theme: customType.theme,
       }),

@@ -57,13 +57,14 @@ export default function CardCreationNewScreen() {
   const [role, setRole] = useState('');
   const [context, setContext] = useState('TBD');
   const [cardImage, setCardImage] = useState('');
-  const [format, setFormat] = useState<'framed' | 'fullBleed'>('framed');
+  const [format, setFormat] = useState<'framed' | 'fullBleed'>('fullBleed'); // Default to fullBleed since default generation type is premium
   const [backgroundGradient, setBackgroundGradient] = useState<string[]>(['#1a1a1a', '#000000']); // Default black gradient
   
   // Get return parameters for navigation
   const returnTo = params.returnTo as string | undefined;
   const returnZone = params.zone as string | undefined;
   const shadowForCardId = params.shadowForCardId as string | undefined;
+  const inboxJobId = params.generation_job_id as string | undefined;
   
   const [isGeneratingDescription, setIsGeneratingDescription] = useState(false);
   const [isGeneratingImageDescription, setIsGeneratingImageDescription] = useState(false);
@@ -293,7 +294,7 @@ export default function CardCreationNewScreen() {
     setBorderStyle('Classic');
     setBorderColor('#808080');
     setCardImage('');
-    setFormat('framed');
+    setFormat('fullBleed'); // Default to fullBleed since default generation type is premium
     setVisibility(['personal']);
 
     
@@ -501,10 +502,11 @@ export default function CardCreationNewScreen() {
   // Reset form state when the screen is focused for creating a new card
   useFocusEffect(
     useCallback(() => {
-      // We only reset if we are not in edit mode.
+      // We only reset if we are not in edit mode AND not coming from inbox.
       // This ensures that when a user navigates away and back,
       // they get a fresh form instead of the old state.
-      if (!isEditing) {
+      // But if they're coming from the inbox, we keep the pre-filled data.
+      if (!isEditing && !inboxJobId) {
         resetForm();
         
         // After resetting, check if we have a preselected type to restore
@@ -512,7 +514,7 @@ export default function CardCreationNewScreen() {
           setType(params.preselected_type.toString());
         }
       }
-    }, [isEditing, params.preselected_type])
+    }, [isEditing, inboxJobId, params.preselected_type])
   );
 
   // Use useEffect to properly set the state values from params
@@ -610,6 +612,32 @@ export default function CardCreationNewScreen() {
     }
   }, [params.preselected_type, params.id]);
 
+  // Handle loading data from Card Inbox (when user clicks on a generation job)
+  useEffect(() => {
+    if (inboxJobId && !params.id) {
+      console.log('📥 Loading card data from inbox, job ID:', inboxJobId);
+      
+      // Load all the card data from params
+      if (params.name) setName(params.name.toString());
+      if (params.description) setDescription(params.description.toString());
+      if (params.image_description) setImageDescription(params.image_description.toString());
+      if (params.type) setType(params.type.toString());
+      if (params.role) setRole(params.role.toString());
+      if (params.context) setContext(params.context.toString());
+      if (params.border_style) setBorderStyle(params.border_style.toString());
+      if (params.border_color) setBorderColor(params.border_color.toString());
+      if (params.image_url) {
+        setCardImage(params.image_url.toString());
+        console.log('📥 Loaded completed image from inbox:', params.image_url.toString());
+      }
+      
+      // Store the job ID so we can delete it after saving
+      setGenerationJobId(inboxJobId);
+      
+      console.log('📥 Card data loaded from inbox successfully');
+    }
+  }, [inboxJobId, params.id]);
+
   // Check auth status on component mount
   useEffect(() => {
     const checkAuthStatus = async () => {
@@ -694,6 +722,10 @@ export default function CardCreationNewScreen() {
       const isModernParchment = generationType === 'modern_parchment';
       const isCustom = generationType === 'custom';
       
+      // Include all data needed to create the card automatically after image generation
+      const isPublic = visibility.includes('public');
+      const isSharedWithFriends = visibility.includes('friends');
+      
       const cardDetails = {
         name,
         description,
@@ -707,6 +739,16 @@ export default function CardCreationNewScreen() {
         isPremium: isPremium || isCustom,  // Custom types should use premium quality
         generationType: isCustom ? 'custom' : (isModernParchment ? 'modern_parchment' : (isClassic ? 'classic' : (isPremium ? 'premium' : 'legacy'))),
         customGenerationTypeId: isCustom ? selectedCustomGenerationType : null,
+        // Additional fields for automatic card creation
+        visibility,
+        backgroundGradient: JSON.stringify(backgroundGradient),
+        isPublic,
+        isSharedWithFriends,
+        // For shadow card linking
+        shadowForCardId: shadowForCardId || null,
+        // For return navigation after card creation
+        returnTo: returnTo || null,
+        returnZone: returnZone || null,
       };
 
       console.log('🎨 Starting image generation for:', cardDetails);
@@ -731,9 +773,12 @@ export default function CardCreationNewScreen() {
       setIsPremiumGeneration(isPremium || isClassic || isModernParchment);
 
       Alert.alert(
-        'Generation Started!',
-        'Your image is being generated in the background. You can safely leave this screen. We\'ll notify you when it\'s ready.',
-        [{ text: 'OK' }]
+        'Card Generation Started!',
+        'Your card is being created in the background. Once the image is generated, your card will automatically appear in your Cards collection. Check the Card Inbox for progress.',
+        [
+          { text: 'View Inbox', onPress: () => router.push('/(tabs)/card-inbox') },
+          { text: 'OK' }
+        ]
       );
 
     } catch (err) {
@@ -1671,6 +1716,23 @@ export default function CardCreationNewScreen() {
         
         console.log('Card created successfully:', newCard);
         
+        // If this card came from the inbox, delete the generation job from the queue
+        if (generationJobId) {
+          console.log('📥 Deleting generation job from queue:', generationJobId);
+          const { error: deleteJobError } = await supabase
+            .from('image_generation_queue')
+            .delete()
+            .eq('id', parseInt(generationJobId));
+          
+          if (deleteJobError) {
+            console.error('Error deleting generation job:', deleteJobError);
+            // Don't throw - the card was created successfully
+          } else {
+            console.log('📥 Generation job deleted from queue');
+          }
+          setGenerationJobId(null);
+        }
+        
         // If this card is being created as a shadow for another card, link them
         if (shadowForCardId && newCard) {
           console.log('Linking shadow card:', newCard.id, 'to original card:', shadowForCardId);
@@ -1794,6 +1856,12 @@ export default function CardCreationNewScreen() {
                     style={styles.dropdownItem}
                     onPress={() => {
                       setSelectedGenerationType(option.key);
+                      // Automatically enable full bleed for all premium generation types
+                      if (option.key !== 'legacy') {
+                        setFormat('fullBleed');
+                      } else {
+                        setFormat('framed');
+                      }
                       // If it's a custom generation type, extract and set the ID
                       if (option.key.startsWith('custom_')) {
                         const customTypeId = option.key.replace('custom_', '');
@@ -2499,17 +2567,20 @@ export default function CardCreationNewScreen() {
           {errorDetails && <Text style={styles.errorDetailsText}>{errorDetails}</Text>}
           {successMessage && <Text style={styles.successText}>{successMessage}</Text>}
 
-          <TouchableOpacity 
-            style={[styles.saveButton, isCreating && styles.saveButtonDisabled]} 
-            onPress={handleSave}
-            disabled={isCreating}
-          >
-            {isCreating ? (
-              <ActivityIndicator color="#fff" size="small" />
-            ) : (
-              <Text style={styles.saveButtonText}>{isEditing ? 'Save Changes' : 'Create Card'}</Text>
-            )}
-          </TouchableOpacity>
+          {/* Only show Create Card button when editing OR when user uploaded an image */}
+          {(isEditing || isUploadedImage) && (
+            <TouchableOpacity 
+              style={[styles.saveButton, isCreating && styles.saveButtonDisabled]} 
+              onPress={handleSave}
+              disabled={isCreating}
+            >
+              {isCreating ? (
+                <ActivityIndicator color="#fff" size="small" />
+              ) : (
+                <Text style={styles.saveButtonText}>{isEditing ? 'Save Changes' : 'Create Card'}</Text>
+              )}
+            </TouchableOpacity>
+          )}
         </View>
       </ScrollView>
 
