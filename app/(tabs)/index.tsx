@@ -2,7 +2,7 @@ import { View, Text, TextInput, StyleSheet, FlatList, Pressable, Image, Modal, T
 import { useCallback, useEffect, useState, useRef } from 'react';
 import { useFonts, Inter_400Regular, Inter_700Bold } from '@expo-google-fonts/inter';
 import * as SplashScreen from 'expo-splash-screen';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { Settings2, CreditCard as Edit3, Trash2, Swords, Shield, Sparkles, Users, Globe as Globe2, Lock, Wallet, Plus, Share2, Coins, Heart, Globe, Star, Wand2, Zap, Target, User, Briefcase, Palette, Upload, X, Check } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -305,6 +305,15 @@ export default function CollectionScreen() {
       fetchCards(false);
     }
   }, [user, fetchCards]);
+
+  // Refresh cards when tab is focused (e.g., after creating a card from inbox)
+  useFocusEffect(
+    useCallback(() => {
+      if (user) {
+        fetchCards(false);
+      }
+    }, [user, fetchCards])
+  );
 
   // Load phenomena types and deck images on component mount
   useEffect(() => {

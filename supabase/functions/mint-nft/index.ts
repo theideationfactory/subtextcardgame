@@ -173,17 +173,11 @@ Deno.serve(async (req: Request) => {
       throw new Error('Card not found or access denied');
     }
 
-    // Fetch user email
-    const { data: userData, error: userError } = await supabaseClient
-      .from('users')
-      .select('email')
-      .eq('id', userId)
-      .single();
-
-    const userEmail = userData?.email || 'unknown';
+    // Create truncated user hash for privacy (first 8 chars of UUID)
+    const creatorHash = userId.substring(0, 8);
 
     console.log(`🎴 Minting NFT for card: ${card.name} (${cardId})`);
-    console.log(`👤 User: ${userEmail}`);
+    console.log(`👤 Creator Hash: ${creatorHash}`);
 
     // Check if card is already minted
     const { data: existingMint } = await supabaseClient
@@ -257,7 +251,7 @@ Deno.serve(async (req: Request) => {
         { trait_type: "Context", value: card.context || "TBD" },
         { trait_type: "Format", value: card.format || "framed" },
         { trait_type: "Aspect Ratio", value: "2.5:3.5" },
-        { trait_type: "Minted By", value: userEmail },
+        { trait_type: "Creator Hash", value: creatorHash },
         { trait_type: "Original Card ID", value: cardId }
       ]
     };
@@ -399,7 +393,7 @@ Deno.serve(async (req: Request) => {
         contractAddress,
         explorerUrl,
         openSeaUrl,
-        userEmail,
+        creatorHash,
         cardName: card.name
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
