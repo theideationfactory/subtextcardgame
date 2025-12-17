@@ -148,6 +148,21 @@ export default function CardCreationNewScreen() {
   const [showBorderStyleOptions, setShowBorderStyleOptions] = useState(false);
   const [showBorderColorOptions, setShowBorderColorOptions] = useState(false);
   
+  // Auto-complete states for type input
+  const [typeInputValue, setTypeInputValue] = useState('');
+  const [filteredTypeOptions, setFilteredTypeOptions] = useState<string[]>([]);
+  const [showTypeSuggestions, setShowTypeSuggestions] = useState(false);
+  
+  // Auto-complete states for detail (role) input
+  const [detailInputValue, setDetailInputValue] = useState('');
+  const [filteredDetailOptions, setFilteredDetailOptions] = useState<string[]>([]);
+  const [showDetailSuggestions, setShowDetailSuggestions] = useState(false);
+  
+  // Auto-complete states for context input
+  const [contextInputValue, setContextInputValue] = useState('');
+  const [filteredContextOptions, setFilteredContextOptions] = useState<string[]>([]);
+  const [showContextSuggestions, setShowContextSuggestions] = useState(false);
+  
   // Border style state
   const [borderStyle, setBorderStyle] = useState('Classic');
   
@@ -244,6 +259,89 @@ export default function CardCreationNewScreen() {
   }, [customDetailOptions]);
 
   const roleOptions = useMemo(() => subOptionsMap[type] || [], [type]);
+  
+  // Auto-complete logic for type input
+  const handleTypeInputChange = useCallback((input: string) => {
+    setTypeInputValue(input);
+    
+    if (input.trim() === '') {
+      setFilteredTypeOptions([]);
+      setShowTypeSuggestions(false);
+      return;
+    }
+    
+    // Filter options that contain the input text (case-insensitive)
+    const filtered = typeOptions.filter(option => 
+      option.toLowerCase().includes(input.toLowerCase())
+    );
+    
+    setFilteredTypeOptions(filtered);
+    setShowTypeSuggestions(filtered.length > 0);
+  }, [typeOptions]);
+  
+  // Handle type selection from suggestions
+  const handleTypeSelection = useCallback((selectedType: string) => {
+    setType(selectedType);
+    setTypeInputValue(selectedType);
+    setRole(''); // Reset detail when type changes
+    setShowTypeSuggestions(false);
+    if (Platform.OS !== 'web') {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    }
+  }, []);
+  
+  // Handle type input submission (Enter key)
+  const handleTypeSubmit = useCallback(() => {
+    const inputValue = typeInputValue.trim();
+    if (inputValue && !typeOptions.includes(inputValue)) {
+      // Create new type if it doesn't exist
+      addNewType(inputValue);
+    } else if (inputValue && typeOptions.includes(inputValue)) {
+      // Select existing type
+      handleTypeSelection(inputValue);
+    }
+  }, [typeInputValue, typeOptions, handleTypeSelection]);
+  
+  // Auto-complete logic for detail input
+  const handleDetailInputChange = useCallback((input: string) => {
+    setDetailInputValue(input);
+    
+    if (input.trim() === '') {
+      setFilteredDetailOptions([]);
+      setShowDetailSuggestions(false);
+      return;
+    }
+    
+    // Filter role options that contain the input text (case-insensitive)
+    const filtered = roleOptions.filter(option => 
+      option.toLowerCase().includes(input.toLowerCase())
+    );
+    
+    setFilteredDetailOptions(filtered);
+    setShowDetailSuggestions(filtered.length > 0);
+  }, [roleOptions]);
+  
+  // Handle detail selection from suggestions
+  const handleDetailSelection = useCallback((selectedDetail: string) => {
+    setRole(selectedDetail);
+    setDetailInputValue(selectedDetail);
+    setShowDetailSuggestions(false);
+    if (Platform.OS !== 'web') {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    }
+  }, []);
+  
+  // Handle detail input submission (Enter key)
+  const handleDetailSubmit = useCallback(() => {
+    const inputValue = detailInputValue.trim();
+    if (inputValue && roleOptions.includes(inputValue)) {
+      // Select existing detail
+      handleDetailSelection(inputValue);
+    } else if (inputValue && !roleOptions.includes(inputValue)) {
+      // Create new detail if it doesn't exist
+      addNewDetail(inputValue);
+    }
+  }, [detailInputValue, roleOptions, handleDetailSelection]);
   // Default contexts - will be merged with custom ones
   const defaultContexts = ['TBD', 'Self', 'Family', 'Friendship', 'Therapy', 'Peer', 'Work', 'Art', 'Politics'];
   
@@ -257,6 +355,47 @@ export default function CardCreationNewScreen() {
     });
     return allContexts;
   }, [customContexts]);
+
+  // Auto-complete logic for context input
+  const handleContextInputChange = useCallback((input: string) => {
+    setContextInputValue(input);
+    
+    if (input.trim() === '') {
+      setFilteredContextOptions([]);
+      setShowContextSuggestions(false);
+      return;
+    }
+    
+    // Filter context options that contain the input text (case-insensitive)
+    const filtered = contextOptions.filter(option => 
+      option.toLowerCase().includes(input.toLowerCase())
+    );
+    
+    setFilteredContextOptions(filtered);
+    setShowContextSuggestions(filtered.length > 0);
+  }, [contextOptions]);
+  
+  // Handle context selection from suggestions
+  const handleContextSelection = useCallback((selectedContext: string) => {
+    setContext(selectedContext);
+    setContextInputValue(selectedContext);
+    setShowContextSuggestions(false);
+    if (Platform.OS !== 'web') {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    }
+  }, []);
+  
+  // Handle context input submission (Enter key)
+  const handleContextSubmit = useCallback(() => {
+    const inputValue = contextInputValue.trim();
+    if (inputValue && contextOptions.includes(inputValue)) {
+      // Select existing context
+      handleContextSelection(inputValue);
+    } else if (inputValue && !contextOptions.includes(inputValue)) {
+      // Create new context if it doesn't exist
+      addNewContext(inputValue);
+    }
+  }, [contextInputValue, contextOptions, handleContextSelection]);
 
   // Default border styles - will be merged with custom ones
   const defaultBorderStyles = ['Classic', 'Modern', 'Vintage', 'Minimal', 'Ornate', 'Rounded', 'Sharp', 'Double'];
@@ -289,8 +428,11 @@ export default function CardCreationNewScreen() {
     setDescription('');
     setImageDescription('');
     setType('Intention');
+    setTypeInputValue(''); // Reset type input
     setRole('');
+    setDetailInputValue(''); // Reset detail input
     setContext('TBD');
+    setContextInputValue(''); // Reset context input
     setBorderStyle('Classic');
     setBorderColor('#808080');
     setCardImage('');
@@ -311,6 +453,9 @@ export default function CardCreationNewScreen() {
     setShowVisibility(false);
     setShowBackgroundDropdown(false);
     setShowGenerationTypeDropdown(false);
+    setShowTypeSuggestions(false); // Reset suggestions
+    setShowDetailSuggestions(false); // Reset detail suggestions
+    setShowContextSuggestions(false); // Reset context suggestions
     
     // Reset inline creation states
     setNewTypeInput('');
@@ -525,9 +670,15 @@ export default function CardCreationNewScreen() {
       setName(params.name?.toString() || '');
       setDescription(params.description?.toString() || '');
       setImageDescription(params.image_description?.toString() || ''); // Load image description for editing
-      setType(params.type?.toString() || '');
-      setRole(params.role?.toString() || '');
-      setContext(params.context?.toString() || '');
+      const loadedType = params.type?.toString() || '';
+      setType(loadedType);
+      setTypeInputValue(loadedType); // Set input value to match loaded type
+      const loadedRole = params.role?.toString() || '';
+      setRole(loadedRole);
+      setDetailInputValue(loadedRole); // Set detail input value to match loaded role
+      const loadedContext = params.context?.toString() || '';
+      setContext(loadedContext);
+      setContextInputValue(loadedContext); // Set context input value to match loaded context
       setBorderStyle(params.border_style?.toString() || 'Classic');
       setBorderColor(params.border_color?.toString() || '#808080');
       setCardImage(params.image_url?.toString() || '');
@@ -609,6 +760,7 @@ export default function CardCreationNewScreen() {
       // Only set preselected type for new cards (not editing)
       const preselectedType = params.preselected_type.toString();
       setType(preselectedType);
+      setTypeInputValue(preselectedType); // Set input value to match preselected type
     }
   }, [params.preselected_type, params.id]);
 
@@ -621,9 +773,21 @@ export default function CardCreationNewScreen() {
       if (params.name) setName(params.name.toString());
       if (params.description) setDescription(params.description.toString());
       if (params.image_description) setImageDescription(params.image_description.toString());
-      if (params.type) setType(params.type.toString());
-      if (params.role) setRole(params.role.toString());
-      if (params.context) setContext(params.context.toString());
+      const inboxType = params.type?.toString();
+      if (inboxType) {
+        setType(inboxType);
+        setTypeInputValue(inboxType); // Set input value to match inbox type
+      }
+      const inboxRole = params.role?.toString();
+      if (inboxRole) {
+        setRole(inboxRole);
+        setDetailInputValue(inboxRole); // Set detail input value to match inbox role
+      }
+      const inboxContext = params.context?.toString();
+      if (inboxContext) {
+        setContext(inboxContext);
+        setContextInputValue(inboxContext); // Set context input value to match inbox context
+      }
       if (params.border_style) setBorderStyle(params.border_style.toString());
       if (params.border_color) setBorderColor(params.border_color.toString());
       if (params.image_url) {
@@ -1372,8 +1536,8 @@ export default function CardCreationNewScreen() {
   };
 
   // Functions for adding new items inline
-  const addNewType = async () => {
-    const trimmedInput = newTypeInput.trim();
+  const addNewType = async (typeName?: string) => {
+    const trimmedInput = (typeName || newTypeInput).trim();
     if (!trimmedInput) {
       setError('Please enter a type name');
       return;
@@ -1391,11 +1555,13 @@ export default function CardCreationNewScreen() {
       // Save to database
       await savePhenomenaTypes(updatedTypes);
       
-      // Select the new type and clear input
+      // Select the new type and update input
       setType(trimmedInput);
+      setTypeInputValue(trimmedInput); // Set input value for auto-complete field
       setRole(''); // Reset detail when type changes
       setNewTypeInput('');
       setShowNewTypeInput(false);
+      setShowTypeSuggestions(false); // Hide suggestions when new type is added
       
       if (Platform.OS !== 'web') {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -1406,8 +1572,8 @@ export default function CardCreationNewScreen() {
     }
   };
 
-  const addNewDetail = async () => {
-    const trimmedInput = newDetailInput.trim();
+  const addNewDetail = async (detailName?: string) => {
+    const trimmedInput = (detailName || newDetailInput).trim();
     if (!trimmedInput || !type) {
       setError('Please enter a detail name and select a type first');
       return;
@@ -1429,10 +1595,12 @@ export default function CardCreationNewScreen() {
       // Save to database
       await saveCustomDetailOptions(updatedCustomOptions);
       
-      // Select the new detail and clear input
+      // Select the new detail and update input
       setRole(trimmedInput);
+      setDetailInputValue(trimmedInput); // Set input value for auto-complete field
       setNewDetailInput('');
       setShowNewDetailInput(false);
+      setShowDetailSuggestions(false); // Hide suggestions when new detail is added
       
       if (Platform.OS !== 'web') {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -1443,8 +1611,8 @@ export default function CardCreationNewScreen() {
     }
   };
 
-  const addNewContext = async () => {
-    const trimmedInput = newContextInput.trim();
+  const addNewContext = async (contextName?: string) => {
+    const trimmedInput = (contextName || newContextInput).trim();
     if (!trimmedInput) {
       setError('Please enter a context name');
       return;
@@ -1462,10 +1630,12 @@ export default function CardCreationNewScreen() {
       // Save to database
       await saveCustomContexts(updatedContexts);
       
-      // Select the new context and clear input
+      // Select the new context and update input
       setContext(trimmedInput);
+      setContextInputValue(trimmedInput); // Set input value for auto-complete field
       setNewContextInput('');
       setShowNewContextInput(false);
+      setShowContextSuggestions(false); // Hide suggestions when new context is added
       
       if (Platform.OS !== 'web') {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -1943,239 +2113,226 @@ export default function CardCreationNewScreen() {
             </View>
           )}
 
-          {/* Type Selection */}
+          {/* Type Selection - Auto-completing Input */}
           <View style={styles.inlineSelectionGroup}>
-            <TouchableOpacity 
-              style={styles.collapsibleHeader}
-              onPress={() => {
-                setShowTypeOptions(!showTypeOptions);
-                if (Platform.OS !== 'web') {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                }
-              }}
-            >
-              <Text style={styles.inlineSelectionLabel}>Type</Text>
-              <View style={styles.collapsibleHeaderRight}>
-                <Text style={styles.selectedValueText}>{type || 'Select type'}</Text>
-                <ChevronDown 
-                  size={16} 
-                  color="#666" 
-                  style={[styles.chevronIcon, showTypeOptions && styles.chevronIconRotated]} 
-                />
-              </View>
-            </TouchableOpacity>
-            
-            {showTypeOptions && (
-              <View style={styles.chipContainer}>
-                {typeOptions.map((option) => (
-                  <TouchableOpacity
-                    key={option}
-                    style={[
-                      styles.chip,
-                      type === option && styles.chipSelected
-                    ]}
-                    onPress={() => {
-                      setType(option);
-                      setRole(''); // Reset detail when type changes
-                      setShowTypeOptions(false); // Collapse after selection
-                      if (Platform.OS !== 'web') {
-                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                      }
-                    }}
-                  >
-                    <Text style={[
-                      styles.chipText,
-                      type === option && styles.chipTextSelected
-                    ]}>
-                      {option}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
+            <Text style={styles.inlineSelectionLabel}>Type</Text>
+            <View style={styles.inputContainer}>
+              <TextInput
+                style={styles.typeInput}
+                value={typeInputValue}
+                onChangeText={handleTypeInputChange}
+                onSubmitEditing={handleTypeSubmit}
+                placeholder="Start typing to search or create type..."
+                placeholderTextColor="#666"
+                returnKeyType="done"
+                onFocus={() => {
+                  if (typeInputValue.trim()) {
+                    handleTypeInputChange(typeInputValue);
+                  }
+                }}
+              />
+              {typeInputValue.trim() && (
                 <TouchableOpacity
-                  style={[styles.chip, styles.addChip]}
-                  onPress={() => setShowNewTypeInput(!showNewTypeInput)}
+                  style={styles.clearInputButton}
+                  onPress={() => {
+                    setTypeInputValue('');
+                    setType('');
+                    setRole('');
+                    setShowTypeSuggestions(false);
+                  }}
                 >
-                  <Plus size={14} color="#6366f1" />
-                  <Text style={styles.addChipText}>Add Type</Text>
+                  <Text style={styles.clearInputText}>✕</Text>
                 </TouchableOpacity>
-              </View>
-            )}
+              )}
+            </View>
             
-            {showNewTypeInput && (
-              <View style={styles.newItemInput}>
-                <TextInput
-                  style={styles.newItemTextInput}
-                  value={newTypeInput}
-                  onChangeText={setNewTypeInput}
-                  placeholder="Enter new type name"
-                  placeholderTextColor="#666"
-                  onSubmitEditing={() => addNewType()}
-                  returnKeyType="done"
-                />
-                <TouchableOpacity
-                  style={styles.addItemButton}
-                  onPress={addNewType}
-                >
-                  <Check size={16} color="#fff" />
-                </TouchableOpacity>
+            {/* Auto-complete suggestions */}
+            {showTypeSuggestions && (
+              <View style={styles.suggestionsContainer}>
+                <ScrollView style={styles.suggestionsScroll} nestedScrollEnabled={true}>
+                  {filteredTypeOptions.map((option) => (
+                    <TouchableOpacity
+                      key={option}
+                      style={[
+                        styles.suggestionItem,
+                        type === option && styles.suggestionItemSelected
+                      ]}
+                      onPress={() => handleTypeSelection(option)}
+                    >
+                      <Text style={[
+                        styles.suggestionText,
+                        type === option && styles.suggestionTextSelected
+                      ]}>
+                        {option}
+                      </Text>
+                      {type === option && (
+                        <Check size={16} color="#6366f1" />
+                      )}
+                    </TouchableOpacity>
+                  ))}
+                  
+                  {/* Option to create new type if input doesn't match existing */}
+                  {typeInputValue.trim() && !filteredTypeOptions.includes(typeInputValue.trim()) && (
+                    <TouchableOpacity
+                      style={styles.suggestionItem}
+                      onPress={() => addNewType(typeInputValue.trim())}
+                    >
+                      <Plus size={14} color="#6366f1" />
+                      <Text style={styles.createNewText}>
+                        Create "{typeInputValue.trim()}"
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+                </ScrollView>
               </View>
             )}
           </View>
 
-          {/* Detail Selection */}
+          {/* Detail Selection - Auto-completing Input */}
           <View style={styles.inlineSelectionGroup}>
-            <TouchableOpacity 
-              style={styles.collapsibleHeader}
-              onPress={() => {
-                setShowDetailOptions(!showDetailOptions);
-                if (Platform.OS !== 'web') {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                }
-              }}
-            >
-              <Text style={styles.inlineSelectionLabel}>Detail {type ? `(${type})` : ''}</Text>
-              <View style={styles.collapsibleHeaderRight}>
-                <Text style={styles.selectedValueText}>{role || 'Select detail'}</Text>
-                <ChevronDown 
-                  size={16} 
-                  color="#666" 
-                  style={[styles.chevronIcon, showDetailOptions && styles.chevronIconRotated]} 
-                />
-              </View>
-            </TouchableOpacity>
-            
-            {showDetailOptions && (
-              <View style={styles.chipContainer}>
-                {roleOptions.map((option) => (
-                  <TouchableOpacity
-                    key={option}
-                    style={[
-                      styles.chip,
-                      role === option && styles.chipSelected
-                    ]}
-                    onPress={() => {
-                      setRole(option);
-                      setShowDetailOptions(false); // Collapse after selection
-                      if (Platform.OS !== 'web') {
-                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                      }
-                    }}
-                  >
-                    <Text style={[
-                      styles.chipText,
-                      role === option && styles.chipTextSelected
-                    ]}>
-                      {option}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-                {type && (
-                  <TouchableOpacity
-                    style={[styles.chip, styles.addChip]}
-                    onPress={() => setShowNewDetailInput(!showNewDetailInput)}
-                  >
-                    <Plus size={14} color="#6366f1" />
-                    <Text style={styles.addChipText}>Add Detail</Text>
-                  </TouchableOpacity>
-                )}
-              </View>
-            )}
-            
-            {showNewDetailInput && type && (
-              <View style={styles.newItemInput}>
-                <TextInput
-                  style={styles.newItemTextInput}
-                  value={newDetailInput}
-                  onChangeText={setNewDetailInput}
-                  placeholder={`Enter new ${type} detail`}
-                  placeholderTextColor="#666"
-                  onSubmitEditing={() => addNewDetail()}
-                  returnKeyType="done"
-                />
+            <Text style={styles.inlineSelectionLabel}>Detail {type ? `(${type})` : ''}</Text>
+            <View style={styles.inputContainer}>
+              <TextInput
+                style={styles.typeInput}
+                value={detailInputValue}
+                onChangeText={handleDetailInputChange}
+                onSubmitEditing={handleDetailSubmit}
+                placeholder="Start typing to search or create detail..."
+                placeholderTextColor="#666"
+                returnKeyType="done"
+                editable={type !== ''} // Only enable if type is selected
+                onFocus={() => {
+                  if (detailInputValue.trim() && type !== '') {
+                    handleDetailInputChange(detailInputValue);
+                  }
+                }}
+              />
+              {detailInputValue.trim() && (
                 <TouchableOpacity
-                  style={styles.addItemButton}
-                  onPress={addNewDetail}
+                  style={styles.clearInputButton}
+                  onPress={() => {
+                    setDetailInputValue('');
+                    setRole('');
+                    setShowDetailSuggestions(false);
+                  }}
                 >
-                  <Check size={16} color="#fff" />
+                  <Text style={styles.clearInputText}>✕</Text>
                 </TouchableOpacity>
+              )}
+            </View>
+            
+            {/* Auto-complete suggestions */}
+            {showDetailSuggestions && type !== '' && (
+              <View style={styles.suggestionsContainer}>
+                <ScrollView style={styles.suggestionsScroll} nestedScrollEnabled={true}>
+                  {filteredDetailOptions.map((option) => (
+                    <TouchableOpacity
+                      key={option}
+                      style={[
+                        styles.suggestionItem,
+                        role === option && styles.suggestionItemSelected
+                      ]}
+                      onPress={() => handleDetailSelection(option)}
+                    >
+                      <Text style={[
+                        styles.suggestionText,
+                        role === option && styles.suggestionTextSelected
+                      ]}>
+                        {option}
+                      </Text>
+                      {role === option && (
+                        <Check size={16} color="#6366f1" />
+                      )}
+                    </TouchableOpacity>
+                  ))}
+                  
+                  {/* Option to create new detail if input doesn't match existing */}
+                  {detailInputValue.trim() && !filteredDetailOptions.includes(detailInputValue.trim()) && (
+                    <TouchableOpacity
+                      style={styles.suggestionItem}
+                      onPress={() => addNewDetail(detailInputValue.trim())}
+                    >
+                      <Plus size={14} color="#6366f1" />
+                      <Text style={styles.createNewText}>
+                        Create "{detailInputValue.trim()}"
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+                </ScrollView>
               </View>
             )}
           </View>
 
-          {/* Context Selection */}
+          {/* Context Selection - Auto-completing Input */}
           <View style={styles.inlineSelectionGroup}>
-            <TouchableOpacity 
-              style={styles.collapsibleHeader}
-              onPress={() => {
-                setShowContextOptions(!showContextOptions);
-                if (Platform.OS !== 'web') {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                }
-              }}
-            >
-              <Text style={styles.inlineSelectionLabel}>Context</Text>
-              <View style={styles.collapsibleHeaderRight}>
-                <Text style={styles.selectedValueText}>{context || 'Select context'}</Text>
-                <ChevronDown 
-                  size={16} 
-                  color="#666" 
-                  style={[styles.chevronIcon, showContextOptions && styles.chevronIconRotated]} 
-                />
-              </View>
-            </TouchableOpacity>
-            
-            {showContextOptions && (
-              <View style={styles.chipContainer}>
-                {contextOptions.map((option) => (
-                  <TouchableOpacity
-                    key={option}
-                    style={[
-                      styles.chip,
-                      context === option && styles.chipSelected
-                    ]}
-                    onPress={() => {
-                      setContext(option);
-                      setShowContextOptions(false); // Collapse after selection
-                      if (Platform.OS !== 'web') {
-                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                      }
-                    }}
-                  >
-                    <Text style={[
-                      styles.chipText,
-                      context === option && styles.chipTextSelected
-                    ]}>
-                      {option}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
+            <Text style={styles.inlineSelectionLabel}>Context</Text>
+            <View style={styles.inputContainer}>
+              <TextInput
+                style={styles.typeInput}
+                value={contextInputValue}
+                onChangeText={handleContextInputChange}
+                onSubmitEditing={handleContextSubmit}
+                placeholder="Start typing to search or create context..."
+                placeholderTextColor="#666"
+                returnKeyType="done"
+                onFocus={() => {
+                  if (contextInputValue.trim()) {
+                    handleContextInputChange(contextInputValue);
+                  }
+                }}
+              />
+              {contextInputValue.trim() && (
                 <TouchableOpacity
-                  style={[styles.chip, styles.addChip]}
-                  onPress={() => setShowNewContextInput(!showNewContextInput)}
+                  style={styles.clearInputButton}
+                  onPress={() => {
+                    setContextInputValue('');
+                    setContext('');
+                    setShowContextSuggestions(false);
+                  }}
                 >
-                  <Plus size={14} color="#6366f1" />
-                  <Text style={styles.addChipText}>Add Context</Text>
+                  <Text style={styles.clearInputText}>✕</Text>
                 </TouchableOpacity>
-              </View>
-            )}
+              )}
+            </View>
             
-            {showNewContextInput && (
-              <View style={styles.newItemInput}>
-                <TextInput
-                  style={styles.newItemTextInput}
-                  value={newContextInput}
-                  onChangeText={setNewContextInput}
-                  placeholder="Enter new context name"
-                  placeholderTextColor="#666"
-                  onSubmitEditing={() => addNewContext()}
-                  returnKeyType="done"
-                />
-                <TouchableOpacity
-                  style={styles.addItemButton}
-                  onPress={addNewContext}
-                >
-                  <Check size={16} color="#fff" />
-                </TouchableOpacity>
+            {/* Auto-complete suggestions */}
+            {showContextSuggestions && (
+              <View style={styles.suggestionsContainer}>
+                <ScrollView style={styles.suggestionsScroll} nestedScrollEnabled={true}>
+                  {filteredContextOptions.map((option) => (
+                    <TouchableOpacity
+                      key={option}
+                      style={[
+                        styles.suggestionItem,
+                        context === option && styles.suggestionItemSelected
+                      ]}
+                      onPress={() => handleContextSelection(option)}
+                    >
+                      <Text style={[
+                        styles.suggestionText,
+                        context === option && styles.suggestionTextSelected
+                      ]}>
+                        {option}
+                      </Text>
+                      {context === option && (
+                        <Check size={16} color="#6366f1" />
+                      )}
+                    </TouchableOpacity>
+                  ))}
+                  
+                  {/* Option to create new context if input doesn't match existing */}
+                  {contextInputValue.trim() && !filteredContextOptions.includes(contextInputValue.trim()) && (
+                    <TouchableOpacity
+                      style={styles.suggestionItem}
+                      onPress={() => addNewContext(contextInputValue.trim())}
+                    >
+                      <Plus size={14} color="#6366f1" />
+                      <Text style={styles.createNewText}>
+                        Create "{contextInputValue.trim()}"
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+                </ScrollView>
               </View>
             )}
           </View>
@@ -3435,6 +3592,74 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: 'Inter-Regular',
     color: '#fff',
+  },
+  // Auto-complete input styles
+  inputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#1a1a1a',
+    borderWidth: 1,
+    borderColor: '#333',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  typeInput: {
+    flex: 1,
+    fontSize: 14,
+    fontFamily: 'Inter-Regular',
+    color: '#fff',
+    padding: 0, // Remove default padding since container has it
+  },
+  clearInputButton: {
+    padding: 4,
+    marginLeft: 8,
+  },
+  clearInputText: {
+    fontSize: 16,
+    color: '#666',
+    fontWeight: 'bold',
+  },
+  suggestionsContainer: {
+    backgroundColor: '#1a1a1a',
+    borderWidth: 1,
+    borderColor: '#333',
+    borderTopWidth: 0,
+    borderBottomLeftRadius: 8,
+    borderBottomRightRadius: 8,
+    maxHeight: 200,
+    marginTop: -1, // Connect with input border
+  },
+  suggestionsScroll: {
+    maxHeight: 200,
+  },
+  suggestionItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#2a2a2a',
+    gap: 8,
+  },
+  suggestionItemSelected: {
+    backgroundColor: '#2a2a2a',
+  },
+  suggestionText: {
+    flex: 1,
+    fontSize: 14,
+    fontFamily: 'Inter-Regular',
+    color: '#fff',
+  },
+  suggestionTextSelected: {
+    color: '#6366f1',
+    fontFamily: 'Inter-Bold',
+  },
+  createNewText: {
+    flex: 1,
+    fontSize: 14,
+    fontFamily: 'Inter-Regular',
+    color: '#6366f1',
   },
   addItemButton: {
     backgroundColor: '#6366f1',
