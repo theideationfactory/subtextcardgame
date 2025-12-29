@@ -423,6 +423,30 @@ export default function CardCreationNewScreen() {
   // Get auth context at component level
   const { refreshSession, user } = useAuth();
 
+  // Sync all input values to actual state - called before save/generate to ensure values are committed
+  const syncInputValues = () => {
+    const trimmedType = typeInputValue.trim();
+    const trimmedDetail = detailInputValue.trim();
+    const trimmedContext = contextInputValue.trim();
+    
+    if (trimmedType && trimmedType !== type) {
+      setType(trimmedType);
+    }
+    if (trimmedDetail && trimmedDetail !== role) {
+      setRole(trimmedDetail);
+    }
+    if (trimmedContext && trimmedContext !== context) {
+      setContext(trimmedContext);
+    }
+    
+    // Return the synced values for immediate use (since setState is async)
+    return {
+      type: trimmedType || type,
+      role: trimmedDetail || role,
+      context: trimmedContext || context
+    };
+  };
+
   const resetForm = () => {
     setName('');
     setDescription('');
@@ -850,8 +874,11 @@ export default function CardCreationNewScreen() {
   // Debug logging removed to reduce console spam
 
   const queueImageGeneration = async (generationType: boolean | 'classic' | 'modern_parchment' | 'custom') => {
+    // Sync input values before generating - ensures typed values are captured
+    const syncedValues = syncInputValues();
+    
     console.log('🚀 queueImageGeneration called with generationType:', generationType);
-    console.log('📝 Current form state:', { name, imageDescription, type, role, context, borderStyle });
+    console.log('📝 Current form state:', { name, imageDescription, type: syncedValues.type, role: syncedValues.role, context: syncedValues.context, borderStyle });
     
     if (!name || !imageDescription) {
       console.log('❌ Missing required fields:', { name: !!name, imageDescription: !!imageDescription });
@@ -894,9 +921,9 @@ export default function CardCreationNewScreen() {
         name,
         description,
         imageDescription,
-        type,
-        role,
-        context,
+        type: syncedValues.type,
+        role: syncedValues.role,
+        context: syncedValues.context,
         borderStyle,
         borderColor,
         format,
@@ -1771,6 +1798,9 @@ export default function CardCreationNewScreen() {
 
 
   const handleSave = async () => {
+    // Sync input values before saving - ensures typed values are captured
+    const syncedValues = syncInputValues();
+    
     if (!name) {
       setError('Please provide a card name');
       return;
@@ -1831,10 +1861,10 @@ export default function CardCreationNewScreen() {
         name,
         description: description || '',
         image_description: imageDescription || '', // Save image description for editing
-        type: type || 'Card',
-        phenomena: type || null,
-        role: role || 'General',
-        context: context || 'Fantasy',
+        type: syncedValues.type || 'Card',
+        phenomena: syncedValues.type || null,
+        role: syncedValues.role || 'General',
+        context: syncedValues.context || 'Fantasy',
         border_style: borderStyle || 'Classic',
         border_color: borderColor || '#808080',
         image_url: cardImage,
@@ -2130,6 +2160,14 @@ export default function CardCreationNewScreen() {
                     handleTypeInputChange(typeInputValue);
                   }
                 }}
+                onBlur={() => {
+                  // Sync input value to actual type state when user taps away
+                  const inputValue = typeInputValue.trim();
+                  if (inputValue && inputValue !== type) {
+                    setType(inputValue);
+                    setShowTypeSuggestions(false);
+                  }
+                }}
               />
               {typeInputValue.trim() && (
                 <TouchableOpacity
@@ -2206,6 +2244,14 @@ export default function CardCreationNewScreen() {
                     handleDetailInputChange(detailInputValue);
                   }
                 }}
+                onBlur={() => {
+                  // Sync input value to actual role state when user taps away
+                  const inputValue = detailInputValue.trim();
+                  if (inputValue && inputValue !== role) {
+                    setRole(inputValue);
+                    setShowDetailSuggestions(false);
+                  }
+                }}
               />
               {detailInputValue.trim() && (
                 <TouchableOpacity
@@ -2280,6 +2326,14 @@ export default function CardCreationNewScreen() {
                     handleContextInputChange(contextInputValue);
                   }
                 }}
+                onBlur={() => {
+                  // Sync input value to actual context state when user taps away
+                  const inputValue = contextInputValue.trim();
+                  if (inputValue && inputValue !== context) {
+                    setContext(inputValue);
+                    setShowContextSuggestions(false);
+                  }
+                }}
               />
               {contextInputValue.trim() && (
                 <TouchableOpacity
@@ -2337,7 +2391,8 @@ export default function CardCreationNewScreen() {
             )}
           </View>
 
-          {/* Border Style Selection */}
+          {/* Border Style Selection - Hidden for custom generation types */}
+          {!selectedGenerationType.startsWith('custom_') && (
           <View style={styles.inlineSelectionGroup}>
             <TouchableOpacity 
               style={styles.collapsibleHeader}
@@ -2414,8 +2469,10 @@ export default function CardCreationNewScreen() {
               </View>
             )}
           </View>
+          )}
 
-          {/* Border Color Selection */}
+          {/* Border Color Selection - Hidden for custom generation types */}
+          {!selectedGenerationType.startsWith('custom_') && (
           <View style={styles.inlineSelectionGroup}>
             <TouchableOpacity 
               style={styles.collapsibleHeader}
@@ -2486,6 +2543,7 @@ export default function CardCreationNewScreen() {
               </View>
             )}
           </View>
+          )}
 
           {/* Image Section */}
           <View style={[styles.cardPreview, format === 'fullBleed' && styles.cardPreviewFullBleed]}>

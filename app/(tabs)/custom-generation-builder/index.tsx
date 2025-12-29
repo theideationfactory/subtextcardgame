@@ -270,8 +270,7 @@ export default function CustomGenerationBuilderScreen() {
                   </View>
                   <Text style={styles.typeDescription}>{type.description}</Text>
                   <View style={styles.typeDetails}>
-                    <Text style={styles.typeDetail}>Size: {type.image_size}</Text>
-                    <Text style={styles.typeDetail}>Style: {type.frame_style}</Text>
+                    <Text style={styles.typeDetail}>Theme: {type.theme}</Text>
                     <Text style={styles.typeDetail}>Active: {type.is_active ? 'Yes' : 'No'}</Text>
                   </View>
                 </View>
@@ -329,6 +328,36 @@ export default function CustomGenerationBuilderScreen() {
           {/* Special Instructions */}
           <View style={styles.inputGroup}>
             <Text style={styles.label}>Special Instructions</Text>
+            
+            {/* Quick Add Bubbles */}
+            <View style={styles.quickAddContainer}>
+              <TouchableOpacity
+                style={styles.quickAddBubble}
+                onPress={() => {
+                  const newText = specialInstructions 
+                    ? `${specialInstructions}\nCard should be on black background`
+                    : 'Card should be on black background';
+                  setSpecialInstructions(newText);
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                }}
+              >
+                <Text style={styles.quickAddText}>+ Black Background</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                style={styles.quickAddBubble}
+                onPress={() => {
+                  const newText = specialInstructions 
+                    ? `${specialInstructions}\nPlace symbols in the card's empty space`
+                    : "Place symbols in the card's empty space";
+                  setSpecialInstructions(newText);
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                }}
+              >
+                <Text style={styles.quickAddText}>+ Symbols in Empty Space</Text>
+              </TouchableOpacity>
+            </View>
+            
             <TextInput
               style={[styles.input, styles.textArea]}
               value={specialInstructions}
@@ -597,6 +626,25 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#999',
     marginTop: 4,
+  },
+  quickAddContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 12,
+  },
+  quickAddBubble: {
+    backgroundColor: '#374151',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#4b5563',
+  },
+  quickAddText: {
+    fontFamily: 'Inter-Regular',
+    fontSize: 13,
+    color: '#e5e7eb',
   },
   toggleGroup: {
     flexDirection: 'row',
