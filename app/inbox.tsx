@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, FlatList, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, FlatList, ActivityIndicator, Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { ArrowLeft, FileText } from 'lucide-react-native';
@@ -23,6 +23,8 @@ const supabase = createClient(
 
 export default function InboxScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const topPadding = Platform.OS === 'web' ? 0 : Math.max(insets.top, 4);
   const { user, loading: authLoading } = useAuth();
   const [sharedDrafts, setSharedDrafts] = useState<SharedDraft[]>([]);
   const [loading, setLoading] = useState(true);
@@ -140,7 +142,7 @@ export default function InboxScreen() {
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: topPadding + 16 }]}>
         <TouchableOpacity 
           style={styles.backButton}
           onPress={() => router.back()}

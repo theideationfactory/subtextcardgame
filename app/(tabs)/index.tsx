@@ -2513,7 +2513,7 @@ export default function CollectionScreen() {
           )}
         </View>
 
-        {/* View Mode Toggle: Cards vs Decks */}
+        {/* HIDDEN: View Mode Toggle: Cards vs Decks
         <TouchableOpacity 
           style={[
             styles.topBarButton,
@@ -2537,8 +2537,9 @@ export default function CollectionScreen() {
             {viewMode === 'cards' ? 'View Decks' : 'View Cards'}
           </Text>
         </TouchableOpacity>
+        */}
 
-        {/* Phenomena filter - only show in cards mode */}
+        {/* HIDDEN: Phenomena filter - only show in cards mode
         {viewMode === 'cards' && (
           <View style={styles.dropdownButtonContainer}>
             <TouchableOpacity 
@@ -2581,12 +2582,13 @@ export default function CollectionScreen() {
             )}
           </View>
         )}
+        */}
 
         {/* Search box */}
         <View style={styles.searchContainer}>
           <TextInput
             style={styles.searchInput}
-            placeholder={viewMode === 'cards' ? "Search cards..." : "Search decks..."}
+            placeholder="Search cards..."
             placeholderTextColor="#6b7280"
             value={searchQuery}
             onChangeText={setSearchQuery}

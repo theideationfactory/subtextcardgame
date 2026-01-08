@@ -47,7 +47,9 @@ const GRADIENT_OPTIONS = [
 export default function CardCreationNewScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
-  const isEditing = !!params.id;
+  // Treat the screen as "editing" only when explicitly opened in edit mode
+  // (e.g., from the Cards tab with edit_mode='true' and an existing card id).
+  const isEditing = params.edit_mode === 'true' && !!params.id;
 
   // Initialize state with params or defaults
   const [name, setName] = useState('');
@@ -79,6 +81,47 @@ export default function CardCreationNewScreen() {
   const [customGenerationTypes, setCustomGenerationTypes] = useState<any[]>([]);
   const [selectedCustomGenerationType, setSelectedCustomGenerationType] = useState<string | null>(null);
   const [isUploadedImage, setIsUploadedImage] = useState(false); // Track if image was uploaded vs generated
+
+  const [assistedMode, setAssistedMode] = useState(!isEditing);
+  const [assistedStep, setAssistedStep] = useState(0);
+
+  const assistedStepMeta = [
+    {
+      key: 'name',
+      title: 'Card title',
+      subtitle: 'Give your card a clear, memorable name that captures its essence.',
+    },
+    {
+      key: 'description',
+      title: 'Card description',
+      subtitle: 'Describe what this card reveals or how it should be used in a spread.',
+    },
+    {
+      key: 'type',
+      title: 'Phenomena type',
+      subtitle: 'Choose the main dimension this card speaks to (Intention, Context, Impact, etc.).',
+    },
+    {
+      key: 'detail',
+      title: 'Detail',
+      subtitle: 'Add a specific angle or nuance within that type (for example, a particular Role or Impact).',
+    },
+    {
+      key: 'context',
+      title: 'Context',
+      subtitle: 'Optional: capture the situation, relationship, or power dynamics this card focuses on.',
+    },
+    {
+      key: 'imageDescription',
+      title: 'Image description',
+      subtitle: 'Describe the visual you want on the card so the image generator knows what to create.',
+    },
+    {
+      key: 'generate',
+      title: 'Generate your card image',
+      subtitle: 'Use your image description and generation type to create the card art.',
+    },
+  ];
 
   // Check for completed jobs on screen focus
   useFocusEffect(
@@ -2024,16 +2067,476 @@ export default function CardCreationNewScreen() {
         contentContainerStyle={styles.scrollContent}
       >
         <View style={styles.formContainer}>
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Card Name <Text style={styles.required}>*</Text></Text>
-            <TextInput
-              style={styles.input}
-              value={name}
-              onChangeText={setName}
-              placeholder="Enter card name"
-              placeholderTextColor="#666"
-            />
+          <View style={styles.assistedToggleRow}>
+            <Text style={styles.assistedToggleLabel}>Assisted mode</Text>
+            <View style={styles.assistedToggleRight}>
+              {assistedMode && (
+                <View style={styles.assistedTag}>
+                  <Text style={styles.assistedTagText}>Typeform-style flow</Text>
+                </View>
+              )}
+              <Switch
+                value={assistedMode}
+                onValueChange={(value) => {
+                  setAssistedMode(value);
+                  if (value) {
+                    setAssistedStep(0);
+                  }
+                }}
+              />
+            </View>
           </View>
+
+          {assistedMode && (
+            <View style={styles.assistedStepContainer}>
+              <Text style={styles.assistedStepIndicator}>
+                Step {assistedStep + 1} of {assistedStepMeta.length}
+              </Text>
+              <Text style={styles.assistedStepTitle}>
+                {assistedStepMeta[assistedStep]?.title}
+              </Text>
+              <Text style={styles.assistedStepSubtitle}>
+                {assistedStepMeta[assistedStep]?.subtitle}
+              </Text>
+
+              {assistedStep === 0 && (
+                <TextInput
+                  style={styles.assistedStepInput}
+                  value={name}
+                  onChangeText={setName}
+                  placeholder="Enter card name"
+                  placeholderTextColor="#666"
+                />
+              )}
+
+              {assistedStep === 1 && (
+                <View style={styles.inputWithIcon}>
+                  <TextInput
+                    style={[styles.assistedStepInput, styles.assistedStepTextArea, styles.textAreaWithIcon]}
+                    value={description}
+                    onChangeText={setDescription}
+                    placeholder="Describe what this card reveals or how it should be used"
+                    placeholderTextColor="#666"
+                    multiline
+                    numberOfLines={4}
+                    textAlignVertical="top"
+                  />
+                  <TouchableOpacity
+                    style={[
+                      styles.inputIcon,
+                      (!name || isGeneratingDescription) && styles.inputIconDisabled,
+                    ]}
+                    onPress={handleGenerateDescription}
+                    disabled={!name || isGeneratingDescription}
+                  >
+                    {isGeneratingDescription ? (
+                      <ActivityIndicator color="#6366f1" size="small" />
+                    ) : (
+                      <Wand2
+                        size={16}
+                        color={(!name || isGeneratingDescription) ? '#666' : '#6366f1'}
+                      />
+                    )}
+                  </TouchableOpacity>
+                </View>
+              )}
+
+              {assistedStep === 2 && (
+                <>
+                  <TextInput
+                    style={styles.assistedStepInput}
+                    value={typeInputValue}
+                    onChangeText={(text) => {
+                      setTypeInputValue(text);
+                      setType(text);
+                      handleTypeInputChange(text);
+                    }}
+                    placeholder="Start typing to search or create type..."
+                    placeholderTextColor="#666"
+                  />
+
+                  {typeInputValue.trim().length > 0 && filteredTypeOptions.length > 0 && (
+                    <View style={styles.suggestionsContainer}>
+                      <ScrollView style={styles.suggestionsScroll} nestedScrollEnabled={true}>
+                        {filteredTypeOptions.map((option) => (
+                          <TouchableOpacity
+                            key={option}
+                            style={[
+                              styles.suggestionItem,
+                              type === option && styles.suggestionItemSelected,
+                            ]}
+                            onPress={() => {
+                              handleTypeSelection(option);
+                              setTypeInputValue(option);
+                            }}
+                          >
+                            <Text
+                              style={[
+                                styles.suggestionText,
+                                type === option && styles.suggestionTextSelected,
+                              ]}
+                            >
+                              {option}
+                            </Text>
+                            {type === option && <Check size={16} color="#6366f1" />}
+                          </TouchableOpacity>
+                        ))}
+
+                        {typeInputValue.trim() &&
+                          !filteredTypeOptions.includes(typeInputValue.trim()) && (
+                            <TouchableOpacity
+                              style={styles.suggestionItem}
+                              onPress={() => addNewType(typeInputValue.trim())}
+                            >
+                              <Plus size={14} color="#6366f1" />
+                              <Text style={styles.createNewText}>
+                                Create "{typeInputValue.trim()}"
+                              </Text>
+                            </TouchableOpacity>
+                          )}
+                      </ScrollView>
+                    </View>
+                  )}
+                </>
+              )}
+
+              {assistedStep === 3 && (
+                <>
+                  <TextInput
+                    style={styles.assistedStepInput}
+                    value={detailInputValue}
+                    onChangeText={(text) => {
+                      setDetailInputValue(text);
+                      setRole(text);
+                      handleDetailInputChange(text);
+                    }}
+                    placeholder="Start typing to search or create detail..."
+                    placeholderTextColor="#666"
+                  />
+
+                  {detailInputValue.trim().length > 0 && filteredDetailOptions.length > 0 && (
+                    <View style={styles.suggestionsContainer}>
+                      <ScrollView style={styles.suggestionsScroll} nestedScrollEnabled={true}>
+                        {filteredDetailOptions.map((option) => (
+                          <TouchableOpacity
+                            key={option}
+                            style={[
+                              styles.suggestionItem,
+                              role === option && styles.suggestionItemSelected,
+                            ]}
+                            onPress={() => {
+                              handleDetailSelection(option);
+                              setDetailInputValue(option);
+                            }}
+                          >
+                            <Text
+                              style={[
+                                styles.suggestionText,
+                                role === option && styles.suggestionTextSelected,
+                              ]}
+                            >
+                              {option}
+                            </Text>
+                            {role === option && <Check size={16} color="#6366f1" />}
+                          </TouchableOpacity>
+                        ))}
+
+                        {detailInputValue.trim() &&
+                          !filteredDetailOptions.includes(detailInputValue.trim()) && (
+                            <TouchableOpacity
+                              style={styles.suggestionItem}
+                              onPress={() => addNewDetail(detailInputValue.trim())}
+                            >
+                              <Plus size={14} color="#6366f1" />
+                              <Text style={styles.createNewText}>
+                                Create "{detailInputValue.trim()}"
+                              </Text>
+                            </TouchableOpacity>
+                          )}
+                      </ScrollView>
+                    </View>
+                  )}
+                </>
+              )}
+
+              {assistedStep === 4 && (
+                <>
+                  <TextInput
+                    style={styles.assistedStepInput}
+                    value={contextInputValue}
+                    onChangeText={(text) => {
+                      setContextInputValue(text);
+                      setContext(text);
+                      handleContextInputChange(text);
+                    }}
+                    placeholder="Start typing to search or create context..."
+                    placeholderTextColor="#666"
+                  />
+
+                  {contextInputValue.trim().length > 0 &&
+                    filteredContextOptions.length > 0 && (
+                      <View style={styles.suggestionsContainer}>
+                        <ScrollView
+                          style={styles.suggestionsScroll}
+                          nestedScrollEnabled={true}
+                        >
+                          {filteredContextOptions.map((option) => (
+                            <TouchableOpacity
+                              key={option}
+                              style={[
+                                styles.suggestionItem,
+                                context === option && styles.suggestionItemSelected,
+                              ]}
+                              onPress={() => {
+                                handleContextSelection(option);
+                                setContextInputValue(option);
+                              }}
+                            >
+                              <Text
+                                style={[
+                                  styles.suggestionText,
+                                  context === option && styles.suggestionTextSelected,
+                                ]}
+                              >
+                                {option}
+                              </Text>
+                              {context === option && <Check size={16} color="#6366f1" />}
+                            </TouchableOpacity>
+                          ))}
+
+                          {contextInputValue.trim() &&
+                            !filteredContextOptions.includes(
+                              contextInputValue.trim(),
+                            ) && (
+                              <TouchableOpacity
+                                style={styles.suggestionItem}
+                                onPress={() =>
+                                  addNewContext(contextInputValue.trim())
+                                }
+                              >
+                                <Plus size={14} color="#6366f1" />
+                                <Text style={styles.createNewText}>
+                                  Create "{contextInputValue.trim()}"
+                                </Text>
+                              </TouchableOpacity>
+                            )}
+                        </ScrollView>
+                      </View>
+                    )}
+                </>
+              )}
+
+              {assistedStep === 5 && (
+                <View style={styles.inputWithIcon}>
+                  <TextInput
+                    style={[styles.assistedStepInput, styles.assistedStepTextArea, styles.textAreaWithIcon]}
+                    value={imageDescription}
+                    onChangeText={setImageDescription}
+                    placeholder="Describe the image you want on the card"
+                    placeholderTextColor="#666"
+                    multiline
+                    numberOfLines={4}
+                    textAlignVertical="top"
+                  />
+                  <TouchableOpacity
+                    style={[
+                      styles.inputIcon,
+                      (!name || isGeneratingImageDescription) && styles.inputIconDisabled,
+                    ]}
+                    onPress={handleGenerateImageDescription}
+                    disabled={!name || isGeneratingImageDescription}
+                  >
+                    {isGeneratingImageDescription ? (
+                      <ActivityIndicator color="#6366f1" size="small" />
+                    ) : (
+                      <Wand2
+                        size={16}
+                        color={(!name || isGeneratingImageDescription) ? '#666' : '#6366f1'}
+                      />
+                    )}
+                  </TouchableOpacity>
+                </View>
+              )}
+
+              {assistedStep === 6 && (
+                <View style={styles.assistedGenerateContainer}>
+                  <Text style={styles.assistedGenerateSummaryLabel}>Ready to generate</Text>
+                  <Text style={styles.assistedGenerateSummaryText}>
+                    We'll use your card name, description, type, detail, context, and image
+                    description with the currently selected generation type.
+                  </Text>
+
+                  <TouchableOpacity
+                    style={[
+                      styles.generateButton,
+                      (!name || !imageDescription || isGenerating) &&
+                        styles.generateButtonDisabled,
+                    ]}
+                    onPress={() => {
+                      console.log(
+                        `🎯 Assisted Generate Image button pressed - ${selectedGenerationType.toUpperCase()}`,
+                      );
+                      console.log('📋 Button state:', {
+                        name: !!name,
+                        imageDescription: !!imageDescription,
+                        isGenerating,
+                      });
+                      console.log('📝 Form values:', { name, imageDescription });
+
+                      if (!name || !imageDescription || isGenerating) {
+                        return;
+                      }
+
+                      if (selectedGenerationType === 'legacy') {
+                        console.log('🎨 Legacy generation selected (assisted)');
+                        setFormat('framed');
+                        queueImageGeneration(false);
+                      } else if (selectedGenerationType === 'premium') {
+                        console.log(
+                          '🃏 Premium Classic generation selected (assisted, enhanced prompt)',
+                        );
+                        setFormat('fullBleed');
+                        queueImageGeneration(true);
+                      } else if (selectedGenerationType === 'classic') {
+                        console.log(
+                          '💎 Full Bleed generation selected (assisted, classic function)',
+                        );
+                        setFormat('fullBleed');
+                        queueImageGeneration('classic');
+                      } else if (selectedGenerationType === 'modern_parchment') {
+                        console.log(
+                          '📜 Modern Parchment generation selected (assisted, queue system)',
+                        );
+                        setFormat('fullBleed');
+                        queueImageGeneration('modern_parchment');
+                      } else if (selectedGenerationType?.startsWith('custom_')) {
+                        const customTypeId = selectedGenerationType.replace('custom_', '');
+                        console.log('🎨 Custom generation type selected (assisted):', customTypeId);
+                        setSelectedCustomGenerationType(customTypeId);
+                        setFormat('fullBleed');
+                        queueImageGeneration('custom');
+                      }
+                    }}
+                    disabled={!name || !imageDescription || isGenerating}
+                  >
+                    {isGenerating ? (
+                      <ActivityIndicator color="#fff" size="small" />
+                    ) : (
+                      <>
+                        <Wand2
+                          size={18}
+                          color="#fff"
+                          style={styles.buttonIcon}
+                        />
+                        <Text style={styles.generateButtonText}>Generate Image</Text>
+                      </>
+                    )}
+                  </TouchableOpacity>
+
+                  <Text style={styles.assistedGenerateHint}>
+                    After generating, you can fine-tune details in the advanced view or with
+                    AI chat.
+                  </Text>
+                </View>
+              )}
+
+              {assistedStep > 0 && (
+                <View style={styles.assistedPreviewContainer}>
+                  <Text style={styles.assistedPreviewHeading}>Card so far</Text>
+
+                  {name ? (
+                    <View style={styles.assistedPreviewRow}>
+                      <Text style={styles.assistedPreviewLabel}>Title</Text>
+                      <Text style={styles.assistedPreviewValue}>{name}</Text>
+                    </View>
+                  ) : null}
+
+                  {assistedStep > 1 && description ? (
+                    <View style={styles.assistedPreviewRow}>
+                      <Text style={styles.assistedPreviewLabel}>Description</Text>
+                      <Text style={styles.assistedPreviewValue}>{description}</Text>
+                    </View>
+                  ) : null}
+
+                  {assistedStep > 2 && type ? (
+                    <View style={styles.assistedPreviewRow}>
+                      <Text style={styles.assistedPreviewLabel}>Type</Text>
+                      <Text style={styles.assistedPreviewValue}>{type}</Text>
+                    </View>
+                  ) : null}
+
+                  {assistedStep > 3 && role ? (
+                    <View style={styles.assistedPreviewRow}>
+                      <Text style={styles.assistedPreviewLabel}>Detail</Text>
+                      <Text style={styles.assistedPreviewValue}>{role}</Text>
+                    </View>
+                  ) : null}
+
+                  {assistedStep > 4 && context ? (
+                    <View style={styles.assistedPreviewRow}>
+                      <Text style={styles.assistedPreviewLabel}>Context</Text>
+                      <Text style={styles.assistedPreviewValue}>{context}</Text>
+                    </View>
+                  ) : null}
+
+                  {assistedStep > 5 && imageDescription ? (
+                    <View style={styles.assistedPreviewRow}>
+                      <Text style={styles.assistedPreviewLabel}>Image Description</Text>
+                      <Text style={styles.assistedPreviewValue}>{imageDescription}</Text>
+                    </View>
+                  ) : null}
+                </View>
+              )}
+
+              <View style={styles.assistedNavRow}>
+                <TouchableOpacity
+                  style={[styles.assistedNavButton, styles.assistedNavButtonSecondary, assistedStep === 0 && styles.assistedNavButtonDisabled]}
+                  disabled={assistedStep === 0}
+                  onPress={() => {
+                    const prevStep = Math.max(0, assistedStep - 1);
+                    setAssistedStep(prevStep);
+                    if (Platform.OS !== 'web') {
+                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    }
+                  }}
+                >
+                  <Text style={styles.assistedNavButtonSecondaryText}>Back</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.assistedNavButton}
+                  onPress={() => {
+                    if (assistedStep < assistedStepMeta.length - 1) {
+                      const nextStep = Math.min(assistedStepMeta.length - 1, assistedStep + 1);
+                      setAssistedStep(nextStep);
+                    } else {
+                      setAssistedMode(false);
+                    }
+                    if (Platform.OS !== 'web') {
+                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                    }
+                  }}
+                >
+                  <Text style={styles.assistedNavButtonText}>
+                    {assistedStep < assistedStepMeta.length - 1 ? 'Next' : 'Done'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
+
+          {!assistedMode && (
+            <>
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>Card Name <Text style={styles.required}>*</Text></Text>
+                <TextInput
+                  style={styles.input}
+                  value={name}
+                  onChangeText={setName}
+                  placeholder="Enter card name"
+                  placeholderTextColor="#666"
+                />
+              </View>
 
           {/* Generation Type Selector */}
           <View style={styles.inputGroup}>
@@ -2796,6 +3299,8 @@ export default function CardCreationNewScreen() {
               )}
             </TouchableOpacity>
           )}
+        </>
+      )}
         </View>
       </ScrollView>
 
@@ -2956,6 +3461,163 @@ const styles = StyleSheet.create({
   },
   formContainer: {
     padding: 16,
+  },
+  assistedToggleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+  },
+  assistedToggleLabel: {
+    color: '#ccc',
+    fontSize: 14,
+    fontFamily: 'Inter-Bold',
+  },
+  assistedToggleRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  assistedTag: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 999,
+    backgroundColor: '#111827',
+    borderWidth: 1,
+    borderColor: '#374151',
+    marginRight: 4,
+  },
+  assistedTagText: {
+    color: '#9CA3AF',
+    fontSize: 11,
+    fontFamily: 'Inter-Regular',
+  },
+  assistedStepContainer: {
+    marginBottom: 20,
+    padding: 16,
+    borderRadius: 12,
+    backgroundColor: '#020617',
+    borderWidth: 1,
+    borderColor: '#1F2937',
+  },
+  assistedStepIndicator: {
+    color: '#9CA3AF',
+    fontSize: 12,
+    marginBottom: 4,
+    fontFamily: 'Inter-Regular',
+  },
+  assistedStepTitle: {
+    color: '#E5E7EB',
+    fontSize: 18,
+    marginBottom: 4,
+    fontFamily: 'Inter-Bold',
+  },
+  assistedStepSubtitle: {
+    color: '#9CA3AF',
+    fontSize: 13,
+    marginBottom: 12,
+    fontFamily: 'Inter-Regular',
+  },
+  assistedStepInput: {
+    backgroundColor: '#020617',
+    borderWidth: 1,
+    borderColor: '#374151',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    color: '#F9FAFB',
+    fontSize: 16,
+    fontFamily: 'Inter-Regular',
+  },
+  assistedStepTextArea: {
+    minHeight: 100,
+    textAlignVertical: 'top',
+  },
+  assistedNavRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 16,
+    gap: 8,
+  },
+  assistedNavButton: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: 999,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#6366f1',
+  },
+  assistedNavButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontFamily: 'Inter-Bold',
+  },
+  assistedNavButtonSecondary: {
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: '#4B5563',
+  },
+  assistedNavButtonSecondaryText: {
+    color: '#E5E7EB',
+    fontSize: 14,
+    fontFamily: 'Inter-Bold',
+  },
+  assistedNavButtonDisabled: {
+    opacity: 0.4,
+  },
+  assistedGenerateContainer: {
+    marginTop: 8,
+    padding: 16,
+    borderRadius: 12,
+    backgroundColor: '#020617',
+    borderWidth: 1,
+    borderColor: '#1F2937',
+    gap: 12,
+  },
+  assistedGenerateSummaryLabel: {
+    color: '#E5E7EB',
+    fontSize: 14,
+    fontFamily: 'Inter-Bold',
+  },
+  assistedGenerateSummaryText: {
+    color: '#9CA3AF',
+    fontSize: 13,
+    fontFamily: 'Inter-Regular',
+    lineHeight: 18,
+  },
+  assistedGenerateHint: {
+    color: '#6B7280',
+    fontSize: 12,
+    fontFamily: 'Inter-Regular',
+    marginTop: 4,
+  },
+  assistedPreviewContainer: {
+    marginTop: 16,
+    padding: 12,
+    borderRadius: 10,
+    backgroundColor: '#020617',
+    borderWidth: 1,
+    borderColor: '#111827',
+    gap: 6,
+  },
+  assistedPreviewHeading: {
+    color: '#9CA3AF',
+    fontSize: 12,
+    fontFamily: 'Inter-Bold',
+    textTransform: 'uppercase',
+  },
+  assistedPreviewRow: {
+    gap: 2,
+  },
+  assistedPreviewLabel: {
+    color: '#6B7280',
+    fontSize: 12,
+    fontFamily: 'Inter-Bold',
+  },
+  assistedPreviewValue: {
+    color: '#E5E7EB',
+    fontSize: 14,
+    fontFamily: 'Inter-Regular',
   },
   inputGroup: {
     marginBottom: 20,

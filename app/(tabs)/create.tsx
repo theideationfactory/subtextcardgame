@@ -66,6 +66,7 @@ export default function CreateScreen() {
           <Text style={styles.optionDescription}>Create your own card generation style with custom prompts and layouts</Text>
         </Pressable>
 
+        {/* HIDDEN: Create a Deck
         <Pressable 
           style={styles.optionCard}
           onPress={() => router.push('/(tabs)/deck-creation')}
@@ -76,22 +77,21 @@ export default function CreateScreen() {
           <Text style={styles.optionTitle}>Create a Deck</Text>
           <Text style={styles.optionDescription}>Organize your cards into thematic decks for readings or collections</Text>
         </Pressable>
+        */}
 
         
         <Pressable 
-          style={[styles.optionCard, styles.comingSoonCard]}
+          style={styles.optionCard}
           onPress={() => router.push('/(tabs)/ai-card-flow')}
         >
           <View style={styles.optionIconContainer}>
-            <Wand2 size={32} color="#888" />
+            <Wand2 size={32} color="#6366f1" />
           </View>
           <Text style={styles.optionTitle}>AI Card Flow</Text>
-          <Text style={styles.optionDescription}>Generate multiple cards in a guided AI-powered flow (Coming Soon)</Text>
-          <View style={styles.comingSoonBadge}>
-            <Text style={styles.comingSoonText}>Coming Soon</Text>
-          </View>
+          <Text style={styles.optionDescription}>Generate multiple cards in a guided AI-powered flow</Text>
         </Pressable>
         
+        {/* HIDDEN: AI Suggestion
         <Pressable style={[styles.optionCard, styles.comingSoonCard]}>
           <View style={styles.optionIconContainer}>
             <Wand2 size={32} color="#888" />
@@ -102,6 +102,7 @@ export default function CreateScreen() {
             <Text style={styles.comingSoonText}>Coming Soon</Text>
           </View>
         </Pressable>
+        */}
       </View>
     </ScrollView>
   );

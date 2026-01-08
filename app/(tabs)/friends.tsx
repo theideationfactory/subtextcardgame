@@ -49,7 +49,7 @@ const DEFAULT_AVATAR = 'https://images.unsplash.com/photo-1472099645785-5658abf4
 export default function FriendsScreen() {
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState('');
-  const [activeSection, setActiveSection] = useState<Section>(SECTIONS.CHATS);
+  const [activeSection, setActiveSection] = useState<Section>(SECTIONS.REQUESTS);
   const [loading, setLoading] = useState(false);
   const [searchResults, setSearchResults] = useState<User[]>([]);
   const [friendRequests, setFriendRequests] = useState<FriendRequest[]>([]);
@@ -418,7 +418,10 @@ export default function FriendsScreen() {
 
   const renderSectionSelector = () => (
     <View style={styles.sectionSelector}>
-      {Object.entries(SECTIONS).map(([key, value]) => (
+      {/* HIDDEN: Chats section - only show Requests and Discover */}
+      {Object.entries(SECTIONS)
+        .filter(([key]) => key !== 'CHATS')
+        .map(([key, value]) => (
         <TouchableOpacity
           key={key}
           style={[
@@ -541,6 +544,7 @@ export default function FriendsScreen() {
             )}
           </TouchableOpacity>
         )}  
+        {/* HIDDEN: Chat button for search results who are friends
         {isSearchUser(item) && item.friendship_status === 'friend' && (
           <TouchableOpacity
             style={styles.messageButton}
@@ -549,6 +553,7 @@ export default function FriendsScreen() {
             <MessageCircle size={20} color="#22c55e" />
           </TouchableOpacity>
         )}
+        */}
         {isSearchUser(item) && item.friendship_status === 'request_sent' && (
           <View style={[styles.actionButton, styles.sentIndicator]}>
             <Check size={20} color="#4CAF50" />
@@ -580,6 +585,7 @@ export default function FriendsScreen() {
             </TouchableOpacity>
           </View>
         )}  
+        {/* HIDDEN: Chat button for friends
         {isFriend(item) && (
           <TouchableOpacity
             style={styles.messageButton}
@@ -588,6 +594,7 @@ export default function FriendsScreen() {
             <MessageCircle size={20} color="#6366f1" />
           </TouchableOpacity>
         )}
+        */}
       </TouchableOpacity>
     );
   };
@@ -691,7 +698,7 @@ export default function FriendsScreen() {
       ) : null}
       {renderContent()}
       
-      {/* Floating Action Button for New Chat */}
+      {/* HIDDEN: Floating Action Button for New Chat
       {activeSection === SECTIONS.CHATS && (
         <TouchableOpacity
           style={styles.fab}
@@ -700,6 +707,7 @@ export default function FriendsScreen() {
           <MessageCircle size={24} color="#fff" />
         </TouchableOpacity>
       )}
+      */}
     </LinearGradient>
   );
 }
