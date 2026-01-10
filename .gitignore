@@ -29,6 +29,13 @@ yarn-error.*
 
 # local env files
 .env*.local
+.env
+
+# Security - Never commit secrets
+*.pem
+*.key
+*.p12
+*.p8
 
 # typescript
 *.tsbuildinfo
