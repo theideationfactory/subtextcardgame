@@ -16,6 +16,7 @@ import { ArrowLeft, FileText, Trash2, Send, Check, X } from 'lucide-react-native
 import { useAuth } from '@/contexts/AuthContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase } from '@/lib/supabase';
+import { log, logError } from '@/utils/logger';
 
 // Define the structure of a draft object
 interface Draft {
@@ -71,14 +72,14 @@ export default function DraftsScreen() {
     // Prevent duplicate fetches
     const now = Date.now();
     if (isFetchingRef.current || now - lastFetchAtRef.current < 1500) {
-      // console.log('Already fetching or throttled, skipping...');
+      // log('Already fetching or throttled, skipping...');
       return;
     }
 
     try {
       isFetchingRef.current = true;
       lastFetchAtRef.current = now;
-      console.log('[Drafts] fetch start at', now);
+      log('[Drafts] fetch start at', now);
       const showSpinner = !initialLoadDoneRef.current;
       if (showSpinner) setLoading(true);
       setError('');
@@ -89,7 +90,7 @@ export default function DraftsScreen() {
         throw new Error('Not authenticated');
       }
       
-      console.log('Fetching drafts for user:', uid);
+      log('Fetching drafts for user:', uid);
       
       const { data, error: fetchError } = await supabase
         .from('spreads')
@@ -100,14 +101,14 @@ export default function DraftsScreen() {
 
       if (fetchError) throw fetchError;
       
-      console.log('[Drafts] fetch success, count:', data?.length || 0);
+      log('[Drafts] fetch success, count:', data?.length || 0);
       setDrafts((prev) => {
         const next = data || [];
         return JSON.stringify(prev) === JSON.stringify(next) ? prev : next;
       });
       
     } catch (err) {
-      console.error('[Drafts] fetch error:', err);
+      logError('[Drafts] fetch error:', err);
       const errorMessage = err instanceof Error ? err.message : 'Failed to load drafts';
       setError(errorMessage);
       
@@ -118,7 +119,7 @@ export default function DraftsScreen() {
         }, 2000);
       }
     } finally {
-      console.log('[Drafts] fetch end');
+      log('[Drafts] fetch end');
       if (!initialLoadDoneRef.current) {
         setLoading(false);
         initialLoadDoneRef.current = true;
@@ -152,7 +153,7 @@ export default function DraftsScreen() {
       if (fetchError) throw fetchError;
       setFriends(data || []);
     } catch (err) {
-      console.error('Error fetching friends for modal:', err);
+      logError('Error fetching friends for modal:', err);
       setError('Failed to load friends for sharing.');
     } finally {
       setFriendsLoading(false);
@@ -184,8 +185,8 @@ export default function DraftsScreen() {
     setSending(true);
     
     try {
-      console.log('Sharing spread:', currentDraftToSend.name);
-      console.log('Sharing with users:', selectedFriends);
+      log('Sharing spread:', currentDraftToSend.name);
+      log('Sharing with users:', selectedFriends);
       
       // 0. First, ensure all cards in the spread are properly linked via spread_id
       const draftData = currentDraftToSend.draft_data;
@@ -200,7 +201,7 @@ export default function DraftsScreen() {
       }
       
       if (allCardIds.length > 0) {
-        console.log('Linking cards to spread:', allCardIds);
+        log('Linking cards to spread:', allCardIds);
         const { error: linkError } = await supabase
           .from('cards')
           .update({ spread_id: currentDraftToSend.id })
@@ -208,7 +209,7 @@ export default function DraftsScreen() {
           .eq('user_id', user.id);
         
         if (linkError) {
-          console.error('Error linking cards to spread:', linkError);
+          logError('Error linking cards to spread:', linkError);
           throw new Error(linkError.message || 'Failed to link cards to spread');
         }
       }
@@ -225,7 +226,7 @@ export default function DraftsScreen() {
         .eq('user_id', user.id); // Ensure only the owner can share
       
       if (spreadError) {
-        console.error('Error updating spread sharing:', spreadError);
+        logError('Error updating spread sharing:', spreadError);
         throw new Error(spreadError.message || 'Failed to share spread');
       }
       
@@ -240,11 +241,11 @@ export default function DraftsScreen() {
         .eq('user_id', user.id); // Ensure only cards owned by the user are updated
       
       if (cardsError) {
-        console.error('Error updating cards sharing:', cardsError);
+        logError('Error updating cards sharing:', cardsError);
         throw new Error(cardsError.message || 'Failed to share cards in spread');
       }
       
-      console.log('Sharing successful');
+      log('Sharing successful');
       
       // 3. Update local state
       setShowSendModal(false);
@@ -260,7 +261,7 @@ export default function DraftsScreen() {
       
       setError('');
     } catch (err) {
-      console.error('Error sharing spread:', err);
+      logError('Error sharing spread:', err);
       
       // More specific error handling
       let errorMessage = 'Failed to share spread.';
@@ -292,14 +293,14 @@ export default function DraftsScreen() {
         .rpc('delete_spread_and_unlink_cards', { target_spread_id: draftId });
 
       if (rpcError) {
-        console.error('RPC delete_spread_and_unlink_cards error:', rpcError);
+        logError('RPC delete_spread_and_unlink_cards error:', rpcError);
         throw rpcError;
       }
 
       setDrafts(prev => prev.filter(draft => draft.id !== draftId));
       setError('');
     } catch (err) {
-      console.error('Error deleting draft:', err);
+      logError('Error deleting draft:', err);
       const msg = (err as any)?.message || 'Failed to delete draft';
       setError(msg);
     } finally {

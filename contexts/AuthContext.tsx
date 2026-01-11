@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, useCallback, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
 import type { User, Session, PostgrestError } from '@supabase/supabase-js';
+import { log, logError } from '@/utils/logger';
 
 type Card = {
   id: string;
@@ -53,16 +54,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signInAnonymously = useCallback(async () => {
     try {
-      console.log('👤 Creating anonymous session...');
+      log('👤 Creating anonymous session...');
       const { data, error } = await supabase.auth.signInAnonymously();
 
       if (error) {
-        console.error('❌ Anonymous sign-in error:', error.message);
+        logError('❌ Anonymous sign-in error:', error.message);
         return null;
       }
 
       if (data?.user) {
-        console.log('✅ Anonymous user created:', data.user.id);
+        log('✅ Anonymous user created:', data.user.id);
         setUser(data.user);
         setIsAnonymous(true);
         return data.user;
@@ -70,7 +71,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       return null;
     } catch (e) {
-      console.error('❌ Unexpected error during anonymous sign-in:', e);
+      logError('❌ Unexpected error during anonymous sign-in:', e);
       return null;
     }
   }, []);
@@ -81,7 +82,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return { success: false, error: 'Not an anonymous user' };
       }
 
-      console.log('⬆️ Upgrading anonymous account to full account...');
+      log('⬆️ Upgrading anonymous account to full account...');
       
       // Update user with both email and password in one call
       // This works when manual linking is enabled in Supabase
@@ -91,7 +92,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       });
 
       if (error) {
-        console.error('❌ Account upgrade error:', error.message);
+        logError('❌ Account upgrade error:', error.message);
         
         // Provide helpful error messages
         if (error.message.includes('already registered')) {
@@ -105,7 +106,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       if (data?.user) {
-        console.log('✅ Account upgraded successfully:', data.user.email);
+        log('✅ Account upgraded successfully:', data.user.email);
         setUser(data.user);
         setIsAnonymous(false);
         return { success: true };
@@ -113,32 +114,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       return { success: false, error: 'Unknown error' };
     } catch (e) {
-      console.error('❌ Unexpected error during account upgrade:', e);
+      logError('❌ Unexpected error during account upgrade:', e);
       return { success: false, error: e instanceof Error ? e.message : 'Unknown error' };
     }
   }, [isAnonymous, user]);
 
   const refreshSession = useCallback(async () => {
     try {
-      console.log('🔄 Refreshing session...');
+      log('🔄 Refreshing session...');
       const { data: { session }, error } = await supabase.auth.refreshSession();
 
       if (error) {
-        console.error('❌ Session refresh error:', error.message);
+        logError('❌ Session refresh error:', error.message);
         return null;
       }
 
       if (session?.user) {
-        console.log('✅ Session refreshed successfully for user:', session.user.email || 'anonymous');
+        log('✅ Session refreshed successfully for user:', session.user.email || 'anonymous');
         setUser(session.user);
         setIsAnonymous(session.user.is_anonymous || false);
         return session;
       }
 
-      console.log('⚠️ No session returned after refresh');
+      log('⚠️ No session returned after refresh');
       return null;
     } catch (e) {
-      console.error('❌ Unexpected error during session refresh:', e);
+      logError('❌ Unexpected error during session refresh:', e);
       return null;
     }
   }, []);
@@ -149,7 +150,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // Early return if no user for scopes that require authentication
         const uid = user?.id;
         if (!uid) {
-          console.log('No authenticated user, returning empty cards array');
+          log('No authenticated user, returning empty cards array');
           setCards([]);
           return [];
         }
@@ -184,7 +185,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const { data, error } = await query;
 
         if (error) {
-          console.error('Error fetching cards:', error);
+          logError('Error fetching cards:', error);
           return [];
         }
 
@@ -192,7 +193,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setCards(prev => (JSON.stringify(prev) === JSON.stringify(fetchedCards) ? prev : fetchedCards));
         return fetchedCards;
       } catch (e) {
-        console.error('Unexpected error fetching cards:', e);
+        logError('Unexpected error fetching cards:', e);
         return [];
       }
     },
@@ -205,7 +206,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Initial session check
     const initAuth = async () => {
       try {
-        console.log('🔄 Initializing authentication...');
+        log('🔄 Initializing authentication...');
         
         // Get current session from storage
         const { data: { session }, error } = await supabase.auth.getSession();
@@ -213,7 +214,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (!mounted) return;
         
         if (error) {
-          console.error('❌ Error getting session:', error);
+          logError('❌ Error getting session:', error);
           setLoading(false);
           return;
         }
@@ -221,7 +222,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (session?.user) {
           // If it's an anonymous session, sign out and show login screen
           if (session.user.is_anonymous) {
-            console.log('⚠️ Found existing anonymous session, signing out...');
+            log('⚠️ Found existing anonymous session, signing out...');
             await supabase.auth.signOut();
             if (!mounted) return;
             setUser(null);
@@ -230,7 +231,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             return;
           }
           
-          console.log('✅ Found existing session for user:', session.user.email || 'anonymous');
+          log('✅ Found existing session for user:', session.user.email || 'anonymous');
           setUser(session.user);
           setIsAnonymous(session.user.is_anonymous || false);
           
@@ -246,25 +247,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             
             if (testError && testError.code === 'PGRST301') {
               // Session expired, attempt refresh
-              console.log('⚠️ Session expired, attempting refresh...');
+              log('⚠️ Session expired, attempting refresh...');
               const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
               
               if (!mounted) return;
               
               if (refreshError || !refreshData.session) {
-                console.log('❌ Session refresh failed, user needs to sign in again');
+                log('❌ Session refresh failed, user needs to sign in again');
                 setUser(null);
                 setIsAnonymous(false);
               } else {
-                console.log('✅ Session refreshed successfully');
+                log('✅ Session refreshed successfully');
                 setUser(refreshData.session.user);
                 setIsAnonymous(refreshData.session.user.is_anonymous || false);
               }
             } else {
-              console.log('✅ Session is valid');
+              log('✅ Session is valid');
             }
           } catch (sessionError) {
-            console.error('⚠️ Session validation error:', sessionError);
+            logError('⚠️ Session validation error:', sessionError);
             if (!mounted) return;
             
             // Try to refresh on any error
@@ -273,23 +274,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             if (!mounted) return;
             
             if (refreshError || !refreshData.session) {
-              console.log('❌ Session refresh failed');
+              log('❌ Session refresh failed');
               setUser(null);
               setIsAnonymous(false);
             } else {
-              console.log('✅ Session refreshed after error');
+              log('✅ Session refreshed after error');
               setUser(refreshData.session.user);
               setIsAnonymous(refreshData.session.user.is_anonymous || false);
             }
           }
         } else {
-          console.log('ℹ️ No existing session found');
+          log('ℹ️ No existing session found');
           // Don't auto-create anonymous session - let user choose via "Continue as Guest" button
           setUser(null);
           setIsAnonymous(false);
         }
       } catch (error) {
-        console.error('❌ Auth initialization error:', error);
+        logError('❌ Auth initialization error:', error);
         if (mounted) {
           setUser(null);
         }
@@ -306,24 +307,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (!mounted) return;
       
-      console.log('🔄 Auth state changed:', event, session?.user?.email || 'no user');
+      log('🔄 Auth state changed:', event, session?.user?.email || 'no user');
       
       if (event === 'SIGNED_IN' && session?.user) {
-        console.log('✅ User signed in:', session.user.email || 'anonymous');
+        log('✅ User signed in:', session.user.email || 'anonymous');
         setUser(session.user);
         setIsAnonymous(session.user.is_anonymous || false);
       } else if (event === 'SIGNED_OUT') {
-        console.log('👋 User signed out');
+        log('👋 User signed out');
         setUser(null);
         setIsAnonymous(false);
         setCards([]);
       } else if (event === 'TOKEN_REFRESHED' && session?.user) {
-        console.log('🔄 Token refreshed for user:', session.user.email || 'anonymous');
+        log('🔄 Token refreshed for user:', session.user.email || 'anonymous');
         setUser(session.user);
         setIsAnonymous(session.user.is_anonymous || false);
         // Don't refetch cards on token refresh, just update user state
       } else if (event === 'USER_UPDATED' && session?.user) {
-        console.log('👤 User updated:', session.user.email || 'anonymous');
+        log('👤 User updated:', session.user.email || 'anonymous');
         setUser(session.user);
         setIsAnonymous(session.user.is_anonymous || false);
       }

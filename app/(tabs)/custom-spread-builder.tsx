@@ -31,6 +31,7 @@ import {
 import { useRouter } from 'expo-router';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
+import { log, logError } from '@/utils/logger';
 
 // Available icons for zones
 const ZONE_ICONS = [
@@ -165,7 +166,7 @@ export default function CustomSpreadBuilder() {
       
       setSavedTemplates(templates);
     } catch (error) {
-      console.error('Error loading templates:', error);
+      logError('Error loading templates:', error);
     }
   };
 
@@ -189,7 +190,7 @@ export default function CustomSpreadBuilder() {
       Alert.alert('Success', 'Template saved successfully!');
       loadSavedTemplates(); // Refresh templates
     } catch (error) {
-      console.error('Error saving template:', error);
+      logError('Error saving template:', error);
       Alert.alert('Error', 'Failed to save template. Please try again.');
     }
   };
@@ -240,7 +241,7 @@ export default function CustomSpreadBuilder() {
         zones: zones,
       };
 
-      console.log('Custom spread object created:', customSpread);
+      log('Custom spread object created:', customSpread);
 
       // Always save as template for future use, plus save if explicitly requested
       await saveAsTemplateInDB(customSpread);
@@ -250,8 +251,8 @@ export default function CustomSpreadBuilder() {
       const jsonString = JSON.stringify(customSpread);
       const encodedString = encodeURIComponent(jsonString);
       
-      console.log('JSON string:', jsonString);
-      console.log('Encoded string length:', encodedString.length);
+      log('JSON string:', jsonString);
+      log('Encoded string length:', encodedString.length);
       
       router.replace({
         pathname: '/(tabs)/spread',
@@ -261,7 +262,7 @@ export default function CustomSpreadBuilder() {
       });
 
     } catch (error) {
-      console.error('Error saving custom spread:', error);
+      logError('Error saving custom spread:', error);
       Alert.alert('Error', 'Failed to create custom spread. Please try again.');
     } finally {
       setSaving(false);

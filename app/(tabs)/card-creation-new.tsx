@@ -27,6 +27,7 @@ import { supabase } from '@/lib/supabase';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ArrowLeft, Wand2, ChevronDown, ChevronUp, Lock, Users, Globe2, Check, Plus, Edit, PlusCircle, Upload } from 'lucide-react-native';
+import { log, logError } from '@/utils/logger';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -128,7 +129,7 @@ export default function CardCreationNewScreen() {
     useCallback(() => {
       const checkJobStatus = async () => {
         if (generationJobId) {
-          console.log('Checking status for job:', generationJobId);
+          log('Checking status for job:', generationJobId);
           const { data, error } = await supabase
             .from('image_generation_queue')
             .select('status, image_url')
@@ -136,12 +137,12 @@ export default function CardCreationNewScreen() {
             .single();
 
           if (error) {
-            console.error('Error fetching job status:', error);
+            logError('Error fetching job status:', error);
             return;
           }
 
           if (data.status === 'completed' && data.image_url) {
-            console.log('Job completed! Image URL:', data.image_url);
+            log('Job completed! Image URL:', data.image_url);
             setCardImage(data.image_url);
             setGenerationJobId(null); // Clear the job ID
             Alert.alert('Image Ready!', 'Your new card image has been successfully generated.');
@@ -150,7 +151,7 @@ export default function CardCreationNewScreen() {
             setError('Image generation failed. Please try again.');
             setGenerationJobId(null);
           } else {
-            console.log('Job status:', data.status);
+            log('Job status:', data.status);
           }
         }
       };
@@ -542,7 +543,7 @@ export default function CardCreationNewScreen() {
   const loadPhenomenaTypes = async () => {
     try {
       if (!user) {
-        console.log('No user found, using default phenomena types');
+        log('No user found, using default phenomena types');
         return;
       }
 
@@ -554,21 +555,21 @@ export default function CardCreationNewScreen() {
         .single();
 
       if (dbError) {
-        console.error('Error loading phenomena types from database:', dbError);
+        logError('Error loading phenomena types from database:', dbError);
         // Fall back to AsyncStorage
         await loadFromAsyncStorage();
         return;
       }
 
       if (userData?.custom_phenomena_types) {
-        console.log('Loaded custom phenomena types from database:', userData.custom_phenomena_types);
+        log('Loaded custom phenomena types from database:', userData.custom_phenomena_types);
         setTypeOptions(userData.custom_phenomena_types);
       } else {
         // If no database data, try AsyncStorage
         await loadFromAsyncStorage();
       }
     } catch (error) {
-      console.error('Error loading phenomena types:', error);
+      logError('Error loading phenomena types:', error);
       // Fall back to AsyncStorage
       await loadFromAsyncStorage();
     }
@@ -579,13 +580,13 @@ export default function CardCreationNewScreen() {
       const storedPhenomena = await AsyncStorage.getItem('@phenomena_types');
       if (storedPhenomena) {
         const parsedPhenomena = JSON.parse(storedPhenomena);
-        console.log('Loaded custom phenomena types from AsyncStorage:', parsedPhenomena);
+        log('Loaded custom phenomena types from AsyncStorage:', parsedPhenomena);
         setTypeOptions(parsedPhenomena);
       } else {
-        console.log('No custom phenomena types found, using defaults');
+        log('No custom phenomena types found, using defaults');
       }
     } catch (error) {
-      console.error('Error loading from AsyncStorage:', error);
+      logError('Error loading from AsyncStorage:', error);
       // Keep default types if loading fails
     }
   };
@@ -594,7 +595,7 @@ export default function CardCreationNewScreen() {
   const loadCustomDetailOptions = async () => {
     try {
       if (!user) {
-        console.log('No user found, using default detail options');
+        log('No user found, using default detail options');
         return;
       }
 
@@ -606,19 +607,19 @@ export default function CardCreationNewScreen() {
         .single();
 
       if (dbError) {
-        console.error('Error loading custom detail options from database:', dbError);
+        logError('Error loading custom detail options from database:', dbError);
         return;
       }
 
       if (userData?.custom_detail_options) {
-        console.log('Loaded custom detail options from database:', userData.custom_detail_options);
+        log('Loaded custom detail options from database:', userData.custom_detail_options);
         setCustomDetailOptions(userData.custom_detail_options);
       } else {
-        console.log('No custom detail options found, using defaults only');
+        log('No custom detail options found, using defaults only');
         setCustomDetailOptions({});
       }
     } catch (error) {
-      console.error('Error loading custom detail options:', error);
+      logError('Error loading custom detail options:', error);
       // Keep empty custom options if loading fails
       setCustomDetailOptions({});
     }
@@ -628,7 +629,7 @@ export default function CardCreationNewScreen() {
   const loadCustomContexts = async () => {
     try {
       if (!user) {
-        console.log('No user found, using default contexts');
+        log('No user found, using default contexts');
         return;
       }
 
@@ -639,19 +640,19 @@ export default function CardCreationNewScreen() {
         .single();
 
       if (dbError) {
-        console.error('Error loading custom contexts from database:', dbError);
+        logError('Error loading custom contexts from database:', dbError);
         return;
       }
 
       if (userData?.custom_contexts) {
-        console.log('Loaded custom contexts from database:', userData.custom_contexts);
+        log('Loaded custom contexts from database:', userData.custom_contexts);
         setCustomContexts(userData.custom_contexts);
       } else {
-        console.log('No custom contexts found, using defaults only');
+        log('No custom contexts found, using defaults only');
         setCustomContexts([]);
       }
     } catch (error) {
-      console.error('Error loading custom contexts:', error);
+      logError('Error loading custom contexts:', error);
       setCustomContexts([]);
     }
   };
@@ -660,7 +661,7 @@ export default function CardCreationNewScreen() {
   const loadCustomBorderStyles = async () => {
     try {
       if (!user) {
-        console.log('No user found, using default border styles');
+        log('No user found, using default border styles');
         return;
       }
 
@@ -671,24 +672,24 @@ export default function CardCreationNewScreen() {
         .single();
 
       if (dbError) {
-        console.log('Database error for border styles, using defaults:', dbError);
+        log('Database error for border styles, using defaults:', dbError);
         return;
       }
 
       if (userData?.custom_border_styles) {
         const customStyles = JSON.parse(userData.custom_border_styles);
         setCustomBorderStyles(customStyles);
-        console.log('Loaded custom border styles from database:', customStyles.length);
+        log('Loaded custom border styles from database:', customStyles.length);
       }
     } catch (err) {
-      console.error('Error loading custom border styles:', err);
+      logError('Error loading custom border styles:', err);
     }
   };
 
   const loadCustomGenerationTypes = async () => {
     try {
       if (!user) {
-        console.log('No user found, no custom generation types');
+        log('No user found, no custom generation types');
         return;
       }
 
@@ -700,14 +701,14 @@ export default function CardCreationNewScreen() {
         .order('created_at', { ascending: false });
 
       if (error) {
-        console.log('Error loading custom generation types:', error);
+        log('Error loading custom generation types:', error);
         return;
       }
 
       setCustomGenerationTypes(data || []);
-      console.log('Loaded custom generation types:', data?.length || 0);
+      log('Loaded custom generation types:', data?.length || 0);
     } catch (err) {
-      console.error('Error loading custom generation types:', err);
+      logError('Error loading custom generation types:', err);
     }
   };
 
@@ -732,8 +733,8 @@ export default function CardCreationNewScreen() {
   // Use useEffect to properly set the state values from params
   useEffect(() => {
     if (params.id) {
-      console.log('Loading edit data for card:', params.id);
-      console.log('📋 All params received:', JSON.stringify(params, null, 2));
+      log('Loading edit data for card:', params.id);
+      log('📋 All params received:', JSON.stringify(params, null, 2));
       setName(params.name?.toString() || '');
       setDescription(params.description?.toString() || '');
       setImageDescription(params.image_description?.toString() || ''); // Load image description for editing
@@ -749,7 +750,7 @@ export default function CardCreationNewScreen() {
       setBorderStyle(params.border_style?.toString() || 'Classic');
       setBorderColor(params.border_color?.toString() || '#808080');
       setCardImage(params.image_url?.toString() || '');
-      console.log('📋 Card data loaded successfully for editing');
+      log('📋 Card data loaded successfully for editing');
       
       // Load visibility settings
       const loadVisibilitySettings = async () => {
@@ -762,7 +763,7 @@ export default function CardCreationNewScreen() {
             .single();
           
           if (error) {
-            console.error('Error fetching card visibility settings:', error);
+            logError('Error fetching card visibility settings:', error);
             return;
           }
           
@@ -778,7 +779,7 @@ export default function CardCreationNewScreen() {
               visibilitySettings.push('public');
             }
             
-            console.log('Setting visibility to:', visibilitySettings);
+            log('Setting visibility to:', visibilitySettings);
             setVisibility(visibilitySettings);
             
             // Load background gradient if it exists
@@ -786,38 +787,38 @@ export default function CardCreationNewScreen() {
               try {
                 const gradient = JSON.parse(cardData.background_gradient);
                 setBackgroundGradient(gradient);
-                console.log('Loaded background gradient:', gradient);
+                log('Loaded background gradient:', gradient);
               } catch (err) {
-                console.error('Error parsing background gradient:', err);
+                logError('Error parsing background gradient:', err);
                 // Keep default gradient if parsing fails
               }
             }
             
             // Load uploaded image flag
             setIsUploadedImage(cardData.is_uploaded_image || false);
-            console.log('Loaded uploaded image flag:', cardData.is_uploaded_image);
+            log('Loaded uploaded image flag:', cardData.is_uploaded_image);
             
             // Load border style if it exists
             if (cardData.border_style) {
               setBorderStyle(cardData.border_style);
-              console.log('Loaded border style:', cardData.border_style);
+              log('Loaded border style:', cardData.border_style);
             }
             
             // Load border color if it exists
             if (cardData.border_color) {
               setBorderColor(cardData.border_color);
-              console.log('Loaded border color:', cardData.border_color);
+              log('Loaded border color:', cardData.border_color);
             }
           }
         } catch (err) {
-          console.error('Failed to load visibility settings:', err);
+          logError('Failed to load visibility settings:', err);
         }
       };
       
       loadVisibilitySettings();
       
       // Log the loaded data for debugging
-      console.log('Card data loaded successfully for editing');
+      log('Card data loaded successfully for editing');
     }
   }, [params.id, params.name, params.description, params.type, params.role, params.context, params.image_url]);
 
@@ -834,7 +835,7 @@ export default function CardCreationNewScreen() {
   // Handle loading data from Card Inbox (when user clicks on a generation job)
   useEffect(() => {
     if (inboxJobId && !params.id) {
-      console.log('📥 Loading card data from inbox, job ID:', inboxJobId);
+      log('📥 Loading card data from inbox, job ID:', inboxJobId);
       
       // Load all the card data from params
       if (params.name) setName(params.name.toString());
@@ -859,13 +860,13 @@ export default function CardCreationNewScreen() {
       if (params.border_color) setBorderColor(params.border_color.toString());
       if (params.image_url) {
         setCardImage(params.image_url.toString());
-        console.log('📥 Loaded completed image from inbox:', params.image_url.toString());
+        log('📥 Loaded completed image from inbox:', params.image_url.toString());
       }
       
       // Store the job ID so we can delete it after saving
       setGenerationJobId(inboxJobId);
       
-      console.log('📥 Card data loaded from inbox successfully');
+      log('📥 Card data loaded from inbox successfully');
     }
   }, [inboxJobId, params.id]);
 
@@ -876,12 +877,12 @@ export default function CardCreationNewScreen() {
         setAuthChecking(true);
         const { data } = await supabase.auth.getSession();
         if (!data.session) {
-          // console.log('No active session found on component mount');
+          // log('No active session found on component mount');
         } else {
-          // console.log('Active session found on component mount');
+          // log('Active session found on component mount');
         }
       } catch (err: unknown) {
-        console.error('Error checking auth status:', err);
+        logError('Error checking auth status:', err);
       } finally {
         setAuthChecking(false);
       }
@@ -920,21 +921,21 @@ export default function CardCreationNewScreen() {
     // Sync input values before generating - ensures typed values are captured
     const syncedValues = syncInputValues();
     
-    console.log('🚀 queueImageGeneration called with generationType:', generationType);
-    console.log('📝 Current form state:', { name, imageDescription, type: syncedValues.type, role: syncedValues.role, context: syncedValues.context, borderStyle });
+    log('🚀 queueImageGeneration called with generationType:', generationType);
+    log('📝 Current form state:', { name, imageDescription, type: syncedValues.type, role: syncedValues.role, context: syncedValues.context, borderStyle });
     
     if (!name || !imageDescription) {
-      console.log('❌ Missing required fields:', { name: !!name, imageDescription: !!imageDescription });
+      log('❌ Missing required fields:', { name: !!name, imageDescription: !!imageDescription });
       setError('Please provide a card name and image description.');
       return;
     }
 
-    console.log('✅ Form validation passed, starting generation...');
+    log('✅ Form validation passed, starting generation...');
     setIsGenerating(true);
     setError('');
 
     try {
-      console.log('🔄 Refreshing session...');
+      log('🔄 Refreshing session...');
       
       // Add timeout to prevent hanging on session refresh
       const sessionPromise = refreshSession();
@@ -948,7 +949,7 @@ export default function CardCreationNewScreen() {
         throw new Error('Authentication required. Please log in again.');
       }
       
-      console.log('✅ Session refreshed successfully');
+      log('✅ Session refreshed successfully');
 
       // Determine generation parameters based on type
       const isPremium = generationType === true;
@@ -985,9 +986,9 @@ export default function CardCreationNewScreen() {
         returnZone: returnZone || null,
       };
 
-      console.log('🎨 Starting image generation for:', cardDetails);
-      console.log('👤 User ID:', currentSession.user.id);
-      console.log('📤 Calling queue-image-generation function...');
+      log('🎨 Starting image generation for:', cardDetails);
+      log('👤 User ID:', currentSession.user.id);
+      log('📤 Calling queue-image-generation function...');
 
       const { data, error } = await supabase.functions.invoke('queue-image-generation', {
         body: { 
@@ -996,10 +997,10 @@ export default function CardCreationNewScreen() {
         },
       });
 
-      console.log('📥 Function response:', { data, error });
+      log('📥 Function response:', { data, error });
 
       if (error) {
-        console.error('❌ Edge function error:', error);
+        logError('❌ Edge function error:', error);
         throw error;
       }
 
@@ -1016,12 +1017,12 @@ export default function CardCreationNewScreen() {
       );
 
     } catch (err) {
-      console.error('❌ Error queueing image generation:', err);
-      console.error('❌ Error details:', JSON.stringify(err, null, 2));
+      logError('❌ Error queueing image generation:', err);
+      logError('❌ Error details:', JSON.stringify(err, null, 2));
       setError(`Failed to start image generation: ${err instanceof Error ? err.message : 'Unknown error'}`);
-      console.error('Error details:', err);
+      logError('Error details:', err);
     } finally {
-      console.log('🏁 Generation attempt finished, setting isGenerating to false');
+      log('🏁 Generation attempt finished, setting isGenerating to false');
       setIsGenerating(false);
     }
   };
@@ -1046,9 +1047,9 @@ export default function CardCreationNewScreen() {
     // Activate KeepAwake to prevent screen sleep during generation
     try {
       activateKeepAwake('image-generation');
-      console.log('KeepAwake activated for enhanced image generation');
+      log('KeepAwake activated for enhanced image generation');
     } catch (keepAwakeError) {
-      console.warn('Failed to activate KeepAwake:', keepAwakeError);
+      logError('Failed to activate KeepAwake:', keepAwakeError);
     }
 
     try {
@@ -1057,7 +1058,7 @@ export default function CardCreationNewScreen() {
       const currentSession = await refreshSession();
 
       if (!currentSession || !currentSession.access_token) {
-        console.error('No valid session found after refresh attempt');
+        logError('No valid session found after refresh attempt');
         throw new Error('You must be logged in to generate images');
       }
 
@@ -1082,7 +1083,7 @@ export default function CardCreationNewScreen() {
 
       if (!response.ok) {
         const errorData = await response.json();
-        console.error('Server error response (enhanced):', errorData);
+        logError('Server error response (enhanced):', errorData);
         setError(errorData.error || `Failed to generate enhanced image: ${response.status}`);
         setErrorDetails(errorData.details || `Server responded with status: ${response.status}`);
         throw new Error(errorData.error || 'Failed to generate enhanced image');
@@ -1091,7 +1092,7 @@ export default function CardCreationNewScreen() {
       const data = await response.json();
 
       if (!data.imageUrl) {
-        console.error('No image URL in enhanced response:', data);
+        logError('No image URL in enhanced response:', data);
         throw new Error('No image URL received');
       }
 
@@ -1099,7 +1100,7 @@ export default function CardCreationNewScreen() {
       setIsPremiumGeneration(true); // Flag this as premium generation
       setIsUploadedImage(false); // Clear uploaded flag since this is AI generated
     } catch (err) {
-      console.error('Enhanced image generation error:', err);
+      logError('Enhanced image generation error:', err);
       if (err instanceof Error) {
         setError(err.message);
       } else {
@@ -1112,9 +1113,9 @@ export default function CardCreationNewScreen() {
       // Deactivate KeepAwake when generation completes
       try {
         deactivateKeepAwake('image-generation');
-        console.log('KeepAwake deactivated after enhanced image generation');
+        log('KeepAwake deactivated after enhanced image generation');
       } catch (keepAwakeError) {
-        console.warn('Failed to deactivate KeepAwake:', keepAwakeError);
+        logError('Failed to deactivate KeepAwake:', keepAwakeError);
       }
     }
   };
@@ -1137,9 +1138,9 @@ export default function CardCreationNewScreen() {
     // Activate KeepAwake to prevent screen sleep during generation
     try {
       activateKeepAwake('image-generation');
-      console.log('KeepAwake activated for legacy image generation');
+      log('KeepAwake activated for legacy image generation');
     } catch (keepAwakeError) {
-      console.warn('Failed to activate KeepAwake:', keepAwakeError);
+      logError('Failed to activate KeepAwake:', keepAwakeError);
     }
 
     try {
@@ -1148,7 +1149,7 @@ export default function CardCreationNewScreen() {
       const currentSession = await refreshSession();
       
       if (!currentSession || !currentSession.access_token) {
-        console.error('No valid session found after refresh attempt');
+        logError('No valid session found after refresh attempt');
         throw new Error('You must be logged in to generate images');
       }
       
@@ -1171,7 +1172,7 @@ export default function CardCreationNewScreen() {
 
       if (!response.ok) {
         const errorData = await response.json();
-        console.error('Server error response:', errorData);
+        logError('Server error response:', errorData);
         setError(errorData.error || `Failed to generate image: ${response.status}`);
         setErrorDetails(errorData.details || `Server responded with status: ${response.status}`);
         throw new Error(errorData.error || 'Failed to generate image');
@@ -1180,7 +1181,7 @@ export default function CardCreationNewScreen() {
       const data = await response.json();
 
       if (!data.imageUrl) {
-        console.error('No image URL in response:', data);
+        logError('No image URL in response:', data);
         throw new Error('No image URL received');
       }
 
@@ -1188,7 +1189,7 @@ export default function CardCreationNewScreen() {
       setIsPremiumGeneration(false); // Flag this as legacy generation
       setIsUploadedImage(false); // Clear uploaded flag since this is AI generated
     } catch (err) {
-      console.error('Image generation error:', err);
+      logError('Image generation error:', err);
       if (err instanceof Error) {
         setError(err.message);
       } else {
@@ -1201,9 +1202,9 @@ export default function CardCreationNewScreen() {
       // Deactivate KeepAwake when generation completes
       try {
         deactivateKeepAwake('image-generation');
-        console.log('KeepAwake deactivated after legacy image generation');
+        log('KeepAwake deactivated after legacy image generation');
       } catch (keepAwakeError) {
-        console.warn('Failed to deactivate KeepAwake:', keepAwakeError);
+        logError('Failed to deactivate KeepAwake:', keepAwakeError);
       }
     }
   };
@@ -1282,7 +1283,7 @@ export default function CardCreationNewScreen() {
       }
 
     } catch (err) {
-      console.error('Chat error:', err);
+      logError('Chat error:', err);
       const errorMessage = {
         id: (Date.now() + 1).toString(),
         role: 'assistant' as const,
@@ -1339,7 +1340,7 @@ export default function CardCreationNewScreen() {
         await processUploadedImage(result.assets[0]);
       }
     } catch (err) {
-      console.error('Image picker error:', err);
+      logError('Image picker error:', err);
       setError('Failed to access image library. Please try again.');
     }
   };
@@ -1368,7 +1369,7 @@ export default function CardCreationNewScreen() {
         const asset = result.assets[0];
         const orientation = detectImageOrientation(asset.width || 1, asset.height || 1);
         
-        console.log('Image orientation detected:', orientation, 'Dimensions:', asset.width, 'x', asset.height);
+        log('Image orientation detected:', orientation, 'Dimensions:', asset.width, 'x', asset.height);
         
         // If image is portrait and we're in full-bleed mode, show cropping options
         if (orientation === 'portrait' && format === 'fullBleed') {
@@ -1382,7 +1383,7 @@ export default function CardCreationNewScreen() {
         await processUploadedImage(asset);
       }
     } catch (err) {
-      console.error('Image picker error:', err);
+      logError('Image picker error:', err);
       setError('Failed to access image library. Please try again.');
     }
   };
@@ -1402,7 +1403,7 @@ export default function CardCreationNewScreen() {
             throw new Error('Authentication required. Please log in again.');
           }
 
-          console.log('Starting image upload for user:', currentSession.user.id);
+          log('Starting image upload for user:', currentSession.user.id);
 
           // Generate unique filename
           const timestamp = Date.now();
@@ -1419,7 +1420,7 @@ export default function CardCreationNewScreen() {
           } as any;
           const fileName = `${currentSession.user.id}/uploaded_${timestamp}.${fileExtension}`;
           
-          console.log('Uploading file:', fileName, 'with type:', mimeType);
+          log('Uploading file:', fileName, 'with type:', mimeType);
           
           // Upload to Supabase Storage with better error handling
           const { data: uploadData, error: uploadError } = await supabase.storage
@@ -1431,7 +1432,7 @@ export default function CardCreationNewScreen() {
             });
 
           if (uploadError) {
-            console.error('Supabase upload error:', uploadError);
+            logError('Supabase upload error:', uploadError);
             
             // Handle specific error types
             if (uploadError.message?.includes('JWT')) {
@@ -1443,7 +1444,7 @@ export default function CardCreationNewScreen() {
             }
           }
 
-          console.log('Upload successful:', uploadData);
+          log('Upload successful:', uploadData);
 
           // Get the public URL
           const { data: { publicUrl } } = supabase.storage
@@ -1454,7 +1455,7 @@ export default function CardCreationNewScreen() {
             throw new Error('Failed to generate public URL for uploaded image');
           }
 
-          console.log('Generated public URL:', publicUrl);
+          log('Generated public URL:', publicUrl);
 
           // Set the uploaded image URL
           setCardImage(publicUrl);
@@ -1465,10 +1466,10 @@ export default function CardCreationNewScreen() {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
           }
           
-        console.log('Image upload completed successfully');
+        log('Image upload completed successfully');
         
       } catch (uploadErr) {
-        console.error('Image upload error:', uploadErr);
+        logError('Image upload error:', uploadErr);
         
         // Provide more specific error messages
         let errorMessage = 'Failed to upload image. Please try again.';
@@ -1513,7 +1514,7 @@ export default function CardCreationNewScreen() {
   };
 
   const handleGenerateDescription = async () => {
-    console.log('📝 Generate Description button pressed');
+    log('📝 Generate Description button pressed');
     if (!name) {
       setError('Please provide a card name');
       return;
@@ -1547,7 +1548,7 @@ export default function CardCreationNewScreen() {
       
       setDescription(data.description);
     } catch (err) {
-      console.error('Description generation error:', err);
+      logError('Description generation error:', err);
       if (err instanceof Error) {
         setError(err.message);
       } else {
@@ -1559,7 +1560,7 @@ export default function CardCreationNewScreen() {
   };
 
   const handleGenerateImageDescription = async () => {
-    console.log('🖼️ Generate Image Description button pressed');
+    log('🖼️ Generate Image Description button pressed');
     if (!name) {
       setError('Please provide a card name');
       return;
@@ -1594,7 +1595,7 @@ export default function CardCreationNewScreen() {
       
       setImageDescription(data.imageDescription);
     } catch (err) {
-      console.error('Image description generation error:', err);
+      logError('Image description generation error:', err);
       if (err instanceof Error) {
         setError(err.message);
       } else {
@@ -1637,7 +1638,7 @@ export default function CardCreationNewScreen() {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       }
     } catch (error) {
-      console.error('Error adding new type:', error);
+      logError('Error adding new type:', error);
       setError('Failed to add new type. Please try again.');
     }
   };
@@ -1676,7 +1677,7 @@ export default function CardCreationNewScreen() {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       }
     } catch (error) {
-      console.error('Error adding new detail:', error);
+      logError('Error adding new detail:', error);
       setError('Failed to add new detail. Please try again.');
     }
   };
@@ -1711,7 +1712,7 @@ export default function CardCreationNewScreen() {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       }
     } catch (error) {
-      console.error('Error adding new context:', error);
+      logError('Error adding new context:', error);
       setError('Failed to add new context. Please try again.');
     }
   };
@@ -1744,7 +1745,7 @@ export default function CardCreationNewScreen() {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       }
     } catch (error) {
-      console.error('Error adding new border style:', error);
+      logError('Error adding new border style:', error);
       setError('Failed to add new border style. Please try again.');
     }
   };
@@ -1753,7 +1754,7 @@ export default function CardCreationNewScreen() {
   const savePhenomenaTypes = async (types: string[]) => {
     try {
       if (!user) {
-        console.error('No user found for saving phenomena types');
+        logError('No user found for saving phenomena types');
         return;
       }
 
@@ -1763,11 +1764,11 @@ export default function CardCreationNewScreen() {
         .eq('id', user.id);
 
       if (error) {
-        console.error('Error saving phenomena types to database:', error);
+        logError('Error saving phenomena types to database:', error);
         throw error;
       }
     } catch (error) {
-      console.error('Error saving phenomena types:', error);
+      logError('Error saving phenomena types:', error);
       throw error;
     }
   };
@@ -1775,7 +1776,7 @@ export default function CardCreationNewScreen() {
   const saveCustomDetailOptions = async (options: Record<string, string[]>) => {
     try {
       if (!user) {
-        console.error('No user found for saving detail options');
+        logError('No user found for saving detail options');
         return;
       }
 
@@ -1785,11 +1786,11 @@ export default function CardCreationNewScreen() {
         .eq('id', user.id);
 
       if (error) {
-        console.error('Error saving detail options to database:', error);
+        logError('Error saving detail options to database:', error);
         throw error;
       }
     } catch (error) {
-      console.error('Error saving detail options:', error);
+      logError('Error saving detail options:', error);
       throw error;
     }
   };
@@ -1797,7 +1798,7 @@ export default function CardCreationNewScreen() {
   const saveCustomContexts = async (contexts: string[]) => {
     try {
       if (!user) {
-        console.error('No user found for saving contexts');
+        logError('No user found for saving contexts');
         return;
       }
 
@@ -1807,11 +1808,11 @@ export default function CardCreationNewScreen() {
         .eq('id', user.id);
 
       if (error) {
-        console.error('Error saving contexts to database:', error);
+        logError('Error saving contexts to database:', error);
         throw error;
       }
     } catch (error) {
-      console.error('Error saving contexts:', error);
+      logError('Error saving contexts:', error);
       throw error;
     }
   };
@@ -1819,7 +1820,7 @@ export default function CardCreationNewScreen() {
   const saveCustomBorderStyles = async (borderStyles: string[]) => {
     try {
       if (!user) {
-        console.error('No user found for saving border styles');
+        logError('No user found for saving border styles');
         return;
       }
 
@@ -1829,11 +1830,11 @@ export default function CardCreationNewScreen() {
         .eq('id', user.id);
 
       if (error) {
-        console.error('Error saving border styles to database:', error);
+        logError('Error saving border styles to database:', error);
         throw error;
       }
     } catch (error) {
-      console.error('Error saving border styles:', error);
+      logError('Error saving border styles:', error);
       throw error;
     }
   };
@@ -1945,7 +1946,7 @@ export default function CardCreationNewScreen() {
           }
         }, 1500);
       } else {
-        console.log('Creating new card with data:', cardData);
+        log('Creating new card with data:', cardData);
         const { data: newCard, error: insertError } = await supabase
           .from('cards')
           .insert(cardData)
@@ -1953,32 +1954,32 @@ export default function CardCreationNewScreen() {
           .single();
 
         if (insertError) {
-          console.error('Card creation error:', insertError);
+          logError('Card creation error:', insertError);
           throw insertError;
         }
         
-        console.log('Card created successfully:', newCard);
+        log('Card created successfully:', newCard);
         
         // If this card came from the inbox, delete the generation job from the queue
         if (generationJobId) {
-          console.log('📥 Deleting generation job from queue:', generationJobId);
+          log('📥 Deleting generation job from queue:', generationJobId);
           const { error: deleteJobError } = await supabase
             .from('image_generation_queue')
             .delete()
             .eq('id', parseInt(generationJobId));
           
           if (deleteJobError) {
-            console.error('Error deleting generation job:', deleteJobError);
+            logError('Error deleting generation job:', deleteJobError);
             // Don't throw - the card was created successfully
           } else {
-            console.log('📥 Generation job deleted from queue');
+            log('📥 Generation job deleted from queue');
           }
           setGenerationJobId(null);
         }
         
         // If this card is being created as a shadow for another card, link them
         if (shadowForCardId && newCard) {
-          console.log('Linking shadow card:', newCard.id, 'to original card:', shadowForCardId);
+          log('Linking shadow card:', newCard.id, 'to original card:', shadowForCardId);
           const { error: linkError } = await supabase
             .from('cards')
             .update({ shadow_card_id: newCard.id })
@@ -1986,10 +1987,10 @@ export default function CardCreationNewScreen() {
             .eq('user_id', currentSession.user.id);
             
           if (linkError) {
-            console.error('Error linking shadow card:', linkError);
+            logError('Error linking shadow card:', linkError);
             // Don't throw error - the card was created successfully, just the linking failed
           } else {
-            console.log('Shadow card linked successfully');
+            log('Shadow card linked successfully');
           }
         }
         
@@ -2000,7 +2001,7 @@ export default function CardCreationNewScreen() {
         setTimeout(() => {
           setSuccessMessage('');
           if (returnTo === 'spread' && returnZone) {
-            console.log('Navigating back to spread with card ID:', newCard?.id, 'and zone:', returnZone);
+            log('Navigating back to spread with card ID:', newCard?.id, 'and zone:', returnZone);
             router.replace({
               pathname: '/spread',
               params: { 
@@ -2023,7 +2024,7 @@ export default function CardCreationNewScreen() {
       }
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'An unknown error occurred');
-      console.error('Card operation error:', err);
+      logError('Card operation error:', err);
     } finally {
       setIsCreating(false);
     }
@@ -2373,45 +2374,45 @@ export default function CardCreationNewScreen() {
                         styles.generateButtonDisabled,
                     ]}
                     onPress={() => {
-                      console.log(
+                      log(
                         `🎯 Assisted Generate Image button pressed - ${selectedGenerationType.toUpperCase()}`,
                       );
-                      console.log('📋 Button state:', {
+                      log('📋 Button state:', {
                         name: !!name,
                         imageDescription: !!imageDescription,
                         isGenerating,
                       });
-                      console.log('📝 Form values:', { name, imageDescription });
+                      log('📝 Form values:', { name, imageDescription });
 
                       if (!name || !imageDescription || isGenerating) {
                         return;
                       }
 
                       if (selectedGenerationType === 'legacy') {
-                        console.log('🎨 Legacy generation selected (assisted)');
+                        log('🎨 Legacy generation selected (assisted)');
                         setFormat('framed');
                         queueImageGeneration(false);
                       } else if (selectedGenerationType === 'premium') {
-                        console.log(
+                        log(
                           '🃏 Premium Classic generation selected (assisted, enhanced prompt)',
                         );
                         setFormat('fullBleed');
                         queueImageGeneration(true);
                       } else if (selectedGenerationType === 'classic') {
-                        console.log(
+                        log(
                           '💎 Full Bleed generation selected (assisted, classic function)',
                         );
                         setFormat('fullBleed');
                         queueImageGeneration('classic');
                       } else if (selectedGenerationType === 'modern_parchment') {
-                        console.log(
+                        log(
                           '📜 Modern Parchment generation selected (assisted, queue system)',
                         );
                         setFormat('fullBleed');
                         queueImageGeneration('modern_parchment');
                       } else if (selectedGenerationType?.startsWith('custom_')) {
                         const customTypeId = selectedGenerationType.replace('custom_', '');
-                        console.log('🎨 Custom generation type selected (assisted):', customTypeId);
+                        log('🎨 Custom generation type selected (assisted):', customTypeId);
                         setSelectedCustomGenerationType(customTypeId);
                         setFormat('fullBleed');
                         queueImageGeneration('custom');
@@ -3082,30 +3083,30 @@ export default function CardCreationNewScreen() {
             <TouchableOpacity 
               style={[styles.generateButton, (!name || !imageDescription || isGenerating) && styles.generateButtonDisabled]} 
               onPress={() => {
-                console.log(`🎯 Generate Image button pressed - ${selectedGenerationType.toUpperCase()}`);
-                console.log('📋 Button state:', { name: !!name, imageDescription: !!imageDescription, isGenerating });
-                console.log('📝 Form values:', { name, imageDescription });
+                log(`🎯 Generate Image button pressed - ${selectedGenerationType.toUpperCase()}`);
+                log('📋 Button state:', { name: !!name, imageDescription: !!imageDescription, isGenerating });
+                log('📝 Form values:', { name, imageDescription });
                 
                 // Execute the selected generation type directly
                 if (selectedGenerationType === 'legacy') {
-                  console.log('🎨 Legacy generation selected');
+                  log('🎨 Legacy generation selected');
                   setFormat('framed');
                   queueImageGeneration(false);
                 } else if (selectedGenerationType === 'premium') {
-                  console.log('🃏 Premium Classic generation selected (using enhanced prompt)');
+                  log('🃏 Premium Classic generation selected (using enhanced prompt)');
                   setFormat('fullBleed');
                   queueImageGeneration(true); // Use enhanced function for premium classic
                 } else if (selectedGenerationType === 'classic') {
-                  console.log('💎 Full Bleed generation selected (using classic function)');
+                  log('💎 Full Bleed generation selected (using classic function)');
                   setFormat('fullBleed');
                   queueImageGeneration('classic'); // Use classic function for full bleed
                 } else if (selectedGenerationType === 'modern_parchment') {
-                  console.log('📜 Modern Parchment generation selected (using queue system)');
+                  log('📜 Modern Parchment generation selected (using queue system)');
                   setFormat('fullBleed');
                   queueImageGeneration('modern_parchment');
                 } else if (selectedGenerationType?.startsWith('custom_')) {
                   const customTypeId = selectedGenerationType.replace('custom_', '');
-                  console.log('🎨 Custom generation type selected:', customTypeId);
+                  log('🎨 Custom generation type selected:', customTypeId);
                   setSelectedCustomGenerationType(customTypeId);
                   setFormat('fullBleed');
                   queueImageGeneration('custom');

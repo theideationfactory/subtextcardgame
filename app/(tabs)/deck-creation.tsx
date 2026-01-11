@@ -9,6 +9,7 @@ import * as ImagePicker from 'expo-image-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
+import { log, logError } from '@/utils/logger';
 
 const PHENOMENA_STORAGE_KEY = '@phenomena_types';
 const DEFAULT_PHENOMENA = ['Intention', 'Context', 'Impact', 'Accuracy', 'Agenda', 'Needs', 'Emotion', 'Role'];
@@ -76,7 +77,7 @@ export default function DeckCreationScreen() {
         .single();
 
       if (dbError) {
-        console.error('Error loading phenomena types from database:', dbError);
+        logError('Error loading phenomena types from database:', dbError);
         // Fall back to AsyncStorage
         await loadFromAsyncStorage();
         return;
@@ -89,7 +90,7 @@ export default function DeckCreationScreen() {
         await migrateFromAsyncStorage();
       }
     } catch (error) {
-      console.error('Error loading phenomena types:', error);
+      logError('Error loading phenomena types:', error);
       // Fall back to AsyncStorage
       await loadFromAsyncStorage();
     } finally {
@@ -105,7 +106,7 @@ export default function DeckCreationScreen() {
         setPhenomenaTypes(parsed);
       }
     } catch (error) {
-      console.error('Error loading from AsyncStorage:', error);
+      logError('Error loading from AsyncStorage:', error);
     }
   };
 
@@ -121,14 +122,14 @@ export default function DeckCreationScreen() {
         await AsyncStorage.removeItem(PHENOMENA_STORAGE_KEY);
       }
     } catch (error) {
-      console.error('Error migrating from AsyncStorage:', error);
+      logError('Error migrating from AsyncStorage:', error);
     }
   };
 
   const savePhenomenaTypes = async (types: string[]) => {
     try {
       if (!user) {
-        console.error('No user found for saving phenomena types');
+        logError('No user found for saving phenomena types');
         return;
       }
 
@@ -139,17 +140,17 @@ export default function DeckCreationScreen() {
         .eq('id', user.id);
 
       if (error) {
-        console.error('Error saving phenomena types to database:', error);
+        logError('Error saving phenomena types to database:', error);
         // Fall back to AsyncStorage
         await AsyncStorage.setItem(PHENOMENA_STORAGE_KEY, JSON.stringify(types));
       }
     } catch (error) {
-      console.error('Error saving phenomena types:', error);
+      logError('Error saving phenomena types:', error);
       // Fall back to AsyncStorage
       try {
         await AsyncStorage.setItem(PHENOMENA_STORAGE_KEY, JSON.stringify(types));
       } catch (storageError) {
-        console.error('Error saving to AsyncStorage:', storageError);
+        logError('Error saving to AsyncStorage:', storageError);
       }
     }
   };
@@ -168,7 +169,7 @@ export default function DeckCreationScreen() {
         .single();
 
       if (error) {
-        console.error('Error loading custom deck images:', error);
+        logError('Error loading custom deck images:', error);
         return;
       }
 
@@ -176,7 +177,7 @@ export default function DeckCreationScreen() {
         setCustomDeckImages(userData.custom_deck_images);
       }
     } catch (error) {
-      console.error('Error loading custom deck images:', error);
+      logError('Error loading custom deck images:', error);
     }
   };
 
@@ -184,7 +185,7 @@ export default function DeckCreationScreen() {
   const saveCustomDeckImages = async (images: Record<string, string>) => {
     try {
       if (!user) {
-        console.error('No user found for saving deck images');
+        logError('No user found for saving deck images');
         return;
       }
 
@@ -194,10 +195,10 @@ export default function DeckCreationScreen() {
         .eq('id', user.id);
 
       if (error) {
-        console.error('Error saving deck images to database:', error);
+        logError('Error saving deck images to database:', error);
       }
     } catch (error) {
-      console.error('Error saving deck images:', error);
+      logError('Error saving deck images:', error);
     }
   };
 
@@ -277,7 +278,7 @@ export default function DeckCreationScreen() {
 
   // Handle long press to open image upload modal
   const handleLongPress = (phenomenaType: string) => {
-    console.log('[DeckCreation] Long press detected for', phenomenaType);
+    log('[DeckCreation] Long press detected for', phenomenaType);
     if (Platform.OS !== 'web') {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
     }
@@ -325,7 +326,7 @@ export default function DeckCreationScreen() {
         setSelectedPhenomena(null);
       }
     } catch (error) {
-      console.error('Error uploading image:', error);
+      logError('Error uploading image:', error);
       Alert.alert('Error', 'Failed to upload image. Please try again.');
     } finally {
       setUploadingImage(false);
@@ -369,7 +370,7 @@ export default function DeckCreationScreen() {
       });
 
       if (error) {
-        console.error('Generate image error:', error);
+        logError('Generate image error:', error);
         throw new Error(error.message || 'Failed to generate image');
       }
 
@@ -393,7 +394,7 @@ export default function DeckCreationScreen() {
       setSelectedPhenomena(null);
       setImagePrompt('');
     } catch (err) {
-      console.error('AI generation failed:', err);
+      logError('AI generation failed:', err);
       Alert.alert('Generation failed', err instanceof Error ? err.message : 'Please try again.');
     } finally {
       setGeneratingImage(false);

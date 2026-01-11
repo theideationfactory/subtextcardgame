@@ -16,6 +16,7 @@ import { ArrowLeft, Inbox, Clock, CheckCircle, XCircle, Trash2 } from 'lucide-re
 import * as Haptics from 'expo-haptics';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
+import { log, logError } from '@/utils/logger';
 
 interface GenerationJob {
   id: number;
@@ -72,13 +73,13 @@ export default function CardInboxScreen() {
         .limit(50);
       
       if (error) {
-        console.error('Error fetching generation jobs:', error);
+        logError('Error fetching generation jobs:', error);
         return;
       }
       
       setGenerationJobs(data || []);
     } catch (err) {
-      console.error('Error fetching generation jobs:', err);
+      logError('Error fetching generation jobs:', err);
     } finally {
       setIsLoading(false);
       setIsRefreshing(false);
@@ -114,7 +115,7 @@ export default function CardInboxScreen() {
         
         setGenerationJobs(prev => prev.filter(j => j.id !== job.id));
       } catch (err) {
-        console.error('Error deleting completed job:', err);
+        logError('Error deleting completed job:', err);
       }
       
       // Navigate to Cards tab
@@ -158,14 +159,14 @@ export default function CardInboxScreen() {
                 .eq('id', jobId);
               
               if (error) {
-                console.error('Error deleting job:', error);
+                logError('Error deleting job:', error);
                 return;
               }
               
               setGenerationJobs(prev => prev.filter(job => job.id !== jobId));
               Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
             } catch (err) {
-              console.error('Error deleting job:', err);
+              logError('Error deleting job:', err);
             }
           },
         },
@@ -197,14 +198,14 @@ export default function CardInboxScreen() {
                 .in('id', ids);
               
               if (error) {
-                console.error('Error clearing jobs:', error);
+                logError('Error clearing jobs:', error);
                 return;
               }
               
               setGenerationJobs(prev => prev.filter(job => job.status !== 'completed' && job.status !== 'failed'));
               Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
             } catch (err) {
-              console.error('Error clearing jobs:', err);
+              logError('Error clearing jobs:', err);
             }
           },
         },

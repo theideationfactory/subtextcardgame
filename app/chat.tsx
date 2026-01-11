@@ -28,6 +28,7 @@ import { supabase } from '@/lib/supabase';
 import { ChatService } from '@/services/chatService';
 import { Message } from '@/types/chat';
 import { formatMessageTime, shouldShowDateSeparator, getInitials, getAvatarColor } from '@/utils/chatUtils';
+import { log, logError } from '@/utils/logger';
 
 const DEFAULT_AVATAR = 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150';
 
@@ -39,10 +40,10 @@ export default function ChatScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   
-  console.log('=== CHAT SCREEN LOADED ===');
-  console.log('Received friendId:', friendId);
-  console.log('Received friendEmail:', friendEmail);
-  console.log('Params type:', typeof friendId, typeof friendEmail);
+  log('=== CHAT SCREEN LOADED ===');
+  log('Received friendId:', friendId);
+  log('Received friendEmail:', friendEmail);
+  log('Params type:', typeof friendId, typeof friendEmail);
   
 
   
@@ -75,19 +76,19 @@ export default function ChatScreen() {
 
   // Load messages and set up real-time subscription
   useEffect(() => {
-    console.log('Chat useEffect running...');
+    log('Chat useEffect running...');
     if (!friendId) {
-      console.log('No friendId, skipping useEffect');
+      log('No friendId, skipping useEffect');
       return;
     }
 
     try {
-      console.log('Loading messages and getting current user...');
+      log('Loading messages and getting current user...');
       loadMessages();
       getCurrentUser();
       
       // Set up real-time subscription
-      console.log('Setting up real-time subscription...');
+      log('Setting up real-time subscription...');
       const subscription = ChatService.subscribeToMessages(async (newMessage) => {
         if (
           (newMessage.sender_id === friendId && newMessage.receiver_id === currentUserId) ||
@@ -104,7 +105,7 @@ export default function ChatScreen() {
                 : msg
             ));
           } catch (analysisError) {
-            console.log('Auto-analysis failed for incoming message:', analysisError);
+            log('Auto-analysis failed for incoming message:', analysisError);
           }
           
           // Mark as read if message is from friend
@@ -115,11 +116,11 @@ export default function ChatScreen() {
       });
 
       return () => {
-        console.log('Cleaning up chat subscription...');
+        log('Cleaning up chat subscription...');
         subscription.unsubscribe();
       };
     } catch (error) {
-      console.error('Error in chat useEffect:', error);
+      logError('Error in chat useEffect:', error);
     }
   }, [friendId, currentUserId]);
 
@@ -173,43 +174,43 @@ export default function ChatScreen() {
 
   const getCurrentUser = async () => {
     try {
-      console.log('Getting current user...');
+      log('Getting current user...');
       const { data: { user } } = await supabase.auth.getUser();
-      console.log('Current user result:', user?.id);
+      log('Current user result:', user?.id);
       if (user) {
         setCurrentUserId(user.id);
-        console.log('Set current user ID:', user.id);
+        log('Set current user ID:', user.id);
       } else {
-        console.log('No user found');
+        log('No user found');
       }
     } catch (error) {
-      console.error('Error getting current user:', error);
+      logError('Error getting current user:', error);
     }
   };
 
   const loadMessages = async () => {
     if (!friendId) {
-      console.log('No friendId in loadMessages');
+      log('No friendId in loadMessages');
       return;
     }
 
     try {
-      console.log('Loading messages for friendId:', friendId);
+      log('Loading messages for friendId:', friendId);
       setLoading(true);
       const fetchedMessages = await ChatService.getMessages(friendId);
-      console.log('Fetched messages count:', fetchedMessages.length);
+      log('Fetched messages count:', fetchedMessages.length);
       setMessages(fetchedMessages);
       
       // Mark messages as read
-      console.log('Marking messages as read...');
+      log('Marking messages as read...');
       await ChatService.markMessagesAsRead(friendId);
-      console.log('Messages marked as read');
+      log('Messages marked as read');
     } catch (error) {
-      console.error('Error loading messages:', error);
+      logError('Error loading messages:', error);
       Alert.alert('Error', 'Failed to load messages');
     } finally {
       setLoading(false);
-      console.log('Loading messages completed');
+      log('Loading messages completed');
     }
   };
 
@@ -237,7 +238,7 @@ export default function ChatScreen() {
               : msg
           ));
         } catch (analysisError) {
-          console.log('Auto-analysis failed:', analysisError);
+          log('Auto-analysis failed:', analysisError);
           // Don't show error to user, just log it
         }
       }
@@ -246,7 +247,7 @@ export default function ChatScreen() {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       }
     } catch (error) {
-      console.error('Error sending message:', error);
+      logError('Error sending message:', error);
       Alert.alert('Error', 'Failed to send message');
       setInputText(messageText); // Restore message text on error
     } finally {
@@ -351,7 +352,7 @@ export default function ChatScreen() {
       }
       
     } catch (error) {
-      console.error('Error analyzing speech acts:', error);
+      logError('Error analyzing speech acts:', error);
       Alert.alert('Error', 'Failed to analyze message. Please try again.');
       
       if (Platform.OS !== 'web') {
@@ -572,7 +573,7 @@ export default function ChatScreen() {
       const strategies = await ChatService.generateResponseStrategies(speechAct);
       setResponseStrategies(strategies);
     } catch (error) {
-      console.error('Error generating response strategies:', error);
+      logError('Error generating response strategies:', error);
       Alert.alert('Error', 'Failed to generate response strategies');
       setSelectedSpeechAct(null);
     } finally {

@@ -21,6 +21,7 @@ import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
+import { log, logError } from '@/utils/logger';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
@@ -123,7 +124,7 @@ export default function DeckDetailScreen() {
           .single();
         
         if (error) {
-          console.error('Error fetching custom detail options:', error);
+          logError('Error fetching custom detail options:', error);
         } else if (data?.custom_detail_options?.[phenomenaType]) {
           customOptions = data.custom_detail_options[phenomenaType];
         }
@@ -150,7 +151,7 @@ export default function DeckDetailScreen() {
       
       setDetailOptions(detailOptions);
     } catch (error) {
-      console.error('Error loading detail options for phenomena:', error);
+      logError('Error loading detail options for phenomena:', error);
     } finally {
       setLoading(false);
     }
@@ -166,14 +167,14 @@ export default function DeckDetailScreen() {
         .eq('id', user.id)
         .single();
       if (error) {
-        console.error('Error fetching custom detail images:', error);
+        logError('Error fetching custom detail images:', error);
         return;
       }
       if (data?.custom_detail_images) {
         setCustomDetailImages(data.custom_detail_images as Record<string, Record<string, string>>);
       }
     } catch (e) {
-      console.error('Error loading custom detail images:', e);
+      logError('Error loading custom detail images:', e);
     }
   };
 
@@ -186,10 +187,10 @@ export default function DeckDetailScreen() {
         .update({ custom_detail_images: images })
         .eq('id', user.id);
       if (error) {
-        console.error('Error saving custom detail images:', error);
+        logError('Error saving custom detail images:', error);
       }
     } catch (e) {
-      console.error('Error saving custom detail images:', e);
+      logError('Error saving custom detail images:', e);
     }
   };
 
@@ -280,7 +281,7 @@ export default function DeckDetailScreen() {
         setSelectedOptionName(null);
       }
     } catch (err) {
-      console.error('Error uploading image:', err);
+      logError('Error uploading image:', err);
       Alert.alert('Error', 'Failed to upload image. Please try again.');
     } finally {
       setUploadingImage(false);
@@ -320,7 +321,7 @@ export default function DeckDetailScreen() {
         },
       });
       if (error) {
-        console.error('Generate image error:', error);
+        logError('Generate image error:', error);
         throw new Error(error.message || 'Failed to generate image');
       }
       if (!data?.imageUrl) {
@@ -338,7 +339,7 @@ export default function DeckDetailScreen() {
       setSelectedOptionName(null);
       setImagePrompt('');
     } catch (err) {
-      console.error('AI generation failed:', err);
+      logError('AI generation failed:', err);
       Alert.alert('Generation failed', err instanceof Error ? err.message : 'Please try again.');
     } finally {
       setGeneratingImage(false);
@@ -398,7 +399,7 @@ export default function DeckDetailScreen() {
         .eq('id', user.id);
       
       if (updateError) {
-        throw updateError;
+        logError('Error adding custom option:', updateError);
       }
       
       // Refresh the options list
@@ -414,7 +415,7 @@ export default function DeckDetailScreen() {
       }
       
     } catch (error) {
-      console.error('Error adding custom option:', error);
+      logError('Error adding custom option:', error);
       Alert.alert('Error', 'Failed to add custom option. Please try again.');
     } finally {
       setSaving(false);
@@ -484,7 +485,7 @@ export default function DeckDetailScreen() {
         .eq('id', user.id);
       
       if (updateError) {
-        throw updateError;
+        logError('Error editing custom option:', updateError);
       }
       
       // Refresh the options list
@@ -501,7 +502,7 @@ export default function DeckDetailScreen() {
       }
       
     } catch (error) {
-      console.error('Error editing custom option:', error);
+      logError('Error editing custom option:', error);
       Alert.alert('Error', 'Failed to edit option. Please try again.');
     } finally {
       setSaving(false);
@@ -555,6 +556,7 @@ export default function DeckDetailScreen() {
                 .eq('id', user.id);
               
               if (updateError) {
+                logError('Error deleting custom option:', updateError);
                 throw updateError;
               }
               
@@ -572,7 +574,7 @@ export default function DeckDetailScreen() {
               }
               
             } catch (error) {
-              console.error('Error deleting custom option:', error);
+              logError('Error deleting custom option:', error);
               Alert.alert('Error', 'Failed to delete option. Please try again.');
             } finally {
               setSaving(false);

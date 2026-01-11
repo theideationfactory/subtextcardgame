@@ -5,6 +5,7 @@ import { useRouter } from 'expo-router';
 import { ArrowLeft, FileText } from 'lucide-react-native';
 import { createClient } from '@supabase/supabase-js';
 import { useAuth } from '@/contexts/AuthContext';
+import { log, logError } from '@/utils/logger';
 
 interface SharedDraft {
   id: string;
@@ -88,7 +89,7 @@ export default function InboxScreen() {
       // Combine both types of drafts
       setSharedDrafts([...incomingDrafts, ...outgoingDrafts]);
     } catch (err) {
-      console.error('Error fetching shared drafts:', err);
+      logError('Error fetching shared drafts:', err);
       const errorMessage = err instanceof Error ? err.message : 'Failed to load shared drafts';
       setError(errorMessage);
     } finally {

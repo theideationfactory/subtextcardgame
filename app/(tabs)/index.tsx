@@ -16,6 +16,7 @@ import ViewShot from 'react-native-view-shot';
 import * as Sharing from 'expo-sharing';
 import * as ImagePicker from 'expo-image-picker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { log, logError } from '@/utils/logger';
 // NFT minting now handled server-side via Edge Function
 
 const COLLECTION_TYPES = [
@@ -232,7 +233,7 @@ export default function CollectionScreen() {
             }
           } catch (columnCheckError) {
             // Column doesn't exist, use the basic query
-            console.log('is_public or is_shared_with_friends column not found, using basic friend filter');
+            log('is_public or is_shared_with_friends column not found, using basic friend filter');
           }
 
           const { data: friendCards, error: friendCardsError } = await friendCardsQuery;
@@ -254,7 +255,7 @@ export default function CollectionScreen() {
             if (publicError) {
               // If is_public column doesn't exist (error code 42703), fall back to showing cards from other users
               if (publicError.code === '42703' || publicError.message?.includes('is_public') && publicError.message?.includes('does not exist')) {
-                console.log('is_public column not found, falling back to showing other users\' cards');
+                log('is_public column not found, falling back to showing other users\' cards');
                 const { data: fallbackCards, error: fallbackError } = await supabase
                   .from('cards')
                   .select('id, name, description, type, role, context, image_url, frame_width, frame_color, name_color, type_color, description_color, context_color, format, background_gradient, is_premium_generation, custom_generation_type_id, is_uploaded_image, user_id, collection_id')
@@ -274,7 +275,7 @@ export default function CollectionScreen() {
           } catch (publicErr: any) {
             // Check if this is the column not found error one more time
             if (publicErr.code === '42703' || (publicErr.message?.includes('is_public') && publicErr.message?.includes('does not exist'))) {
-              console.log('Caught is_public column error in catch block, using fallback');
+              log('Caught is_public column error in catch block, using fallback');
               const { data: fallbackCards, error: fallbackError } = await supabase
                 .from('cards')
                 .select('id, name, description, type, role, context, image_url, frame_width, frame_color, name_color, type_color, description_color, context_color, format, background_gradient, is_premium_generation, is_uploaded_image, user_id, collection_id')
@@ -285,14 +286,14 @@ export default function CollectionScreen() {
               if (fallbackError) throw fallbackError;
               setAllCards(fallbackCards as Card[] ?? []);
             } else {
-              console.error('Public cards query error:', publicErr);
+              logError('Public cards query error:', publicErr);
               throw publicErr;
             }
           }
           break;
       }
     } catch (err) {
-      console.error('Error in fetchCards:', err instanceof Error ? err.message : 'Unknown error');
+      logError('Error in fetchCards:', err instanceof Error ? err.message : 'Unknown error');
       setError('Failed to load cards');
     } finally {
       setLoading(false);
@@ -344,7 +345,7 @@ export default function CollectionScreen() {
         .single();
 
       if (dbError) {
-        console.error('Error loading phenomena types from database:', dbError);
+        logError('Error loading phenomena types from database:', dbError);
         // Fall back to AsyncStorage
         await loadFromAsyncStorage();
         return;
@@ -357,7 +358,7 @@ export default function CollectionScreen() {
         await loadFromAsyncStorage();
       }
     } catch (error) {
-      console.error('Error loading phenomena types:', error);
+      logError('Error loading phenomena types:', error);
       // Fall back to AsyncStorage
       await loadFromAsyncStorage();
     }
@@ -375,7 +376,7 @@ export default function CollectionScreen() {
         setPhenomenaTypes(['All', ...defaultTypes]);
       }
     } catch (error) {
-      console.error('Error loading from AsyncStorage:', error);
+      logError('Error loading from AsyncStorage:', error);
       // Fallback to default types
       const defaultTypes = ['Intention', 'Context', 'Impact', 'Accuracy', 'Agenda', 'Needs', 'Emotion', 'Role'];
       setPhenomenaTypes(['All', ...defaultTypes]);
@@ -396,7 +397,7 @@ export default function CollectionScreen() {
         .single();
 
       if (error) {
-        console.error('Error loading custom deck images:', error);
+        logError('Error loading custom deck images:', error);
         return;
       }
 
@@ -404,7 +405,7 @@ export default function CollectionScreen() {
         setCustomDeckImages(userData.custom_deck_images);
       }
     } catch (error) {
-      console.error('Error loading custom deck images:', error);
+      logError('Error loading custom deck images:', error);
     }
   };
 
@@ -412,7 +413,7 @@ export default function CollectionScreen() {
   const saveCustomDeckImages = async (images: Record<string, string>) => {
     try {
       if (!user) {
-        console.error('No user found for saving deck images');
+        logError('No user found for saving deck images');
         return;
       }
 
@@ -422,10 +423,10 @@ export default function CollectionScreen() {
         .eq('id', user.id);
 
       if (error) {
-        console.error('Error saving deck images to database:', error);
+        logError('Error saving deck images to database:', error);
       }
     } catch (error) {
-      console.error('Error saving deck images:', error);
+      logError('Error saving deck images:', error);
     }
   };
 
@@ -433,7 +434,7 @@ export default function CollectionScreen() {
   const savePhenomenaTypes = async (types: string[]) => {
     try {
       if (!user) {
-        console.error('No user found for saving phenomena types');
+        logError('No user found for saving phenomena types');
         return;
       }
 
@@ -444,17 +445,17 @@ export default function CollectionScreen() {
         .eq('id', user.id);
 
       if (error) {
-        console.error('Error saving phenomena types to database:', error);
+        logError('Error saving phenomena types to database:', error);
         // Fall back to AsyncStorage
         await AsyncStorage.setItem('@phenomena_types', JSON.stringify(types));
       }
     } catch (error) {
-      console.error('Error saving phenomena types:', error);
+      logError('Error saving phenomena types:', error);
       // Fall back to AsyncStorage
       try {
         await AsyncStorage.setItem('@phenomena_types', JSON.stringify(types));
       } catch (storageError) {
-        console.error('Error saving to AsyncStorage:', storageError);
+        logError('Error saving to AsyncStorage:', storageError);
       }
     }
   };
@@ -565,7 +566,7 @@ export default function CollectionScreen() {
         setImagePrompt('');
       }
     } catch (error) {
-      console.error('Error uploading image:', error);
+      logError('Error uploading image:', error);
       Alert.alert('Error', 'Failed to upload image. Please try again.');
     } finally {
       setUploadingImage(false);
@@ -610,7 +611,7 @@ export default function CollectionScreen() {
       });
 
       if (error) {
-        console.error('Generate image error:', error);
+        logError('Generate image error:', error);
         throw new Error(error.message || 'Failed to generate image');
       }
 
@@ -634,7 +635,7 @@ export default function CollectionScreen() {
       setSelectedDeckForImage(null);
       setImagePrompt('');
     } catch (err) {
-      console.error('AI generation failed:', err);
+      logError('AI generation failed:', err);
       Alert.alert('Generation failed', err instanceof Error ? err.message : 'Please try again.');
     } finally {
       setGeneratingImage(false);
@@ -728,7 +729,7 @@ export default function CollectionScreen() {
     setDeleteError('');
 
     try {
-      console.log('🗑️ Attempting to delete card:', cardId, 'for user:', user.id);
+      log('🗑️ Attempting to delete card:', cardId, 'for user:', user.id);
       
       // First, check if this card is being used as a shadow card by other cards
       const { data: referencingCards, error: checkError } = await supabase
@@ -738,14 +739,14 @@ export default function CollectionScreen() {
         .eq('user_id', user.id);
 
       if (checkError) {
-        console.error('Error checking shadow card references:', checkError);
+        logError('Error checking shadow card references:', checkError);
         throw new Error(`Database error: ${checkError.message}`);
       }
 
       // If this card is used as a shadow card, unlink it first
       if (referencingCards && referencingCards.length > 0) {
-        console.log('🔗 Card is used as shadow by:', referencingCards.map(c => c.name).join(', '));
-        console.log('🔗 Unlinking shadow card references...');
+        log('🔗 Card is used as shadow by:', referencingCards.map(c => c.name).join(', '));
+        log('🔗 Unlinking shadow card references...');
         
         const { error: unlinkError } = await supabase
           .from('cards')
@@ -754,11 +755,11 @@ export default function CollectionScreen() {
           .eq('user_id', user.id);
 
         if (unlinkError) {
-          console.error('Error unlinking shadow card:', unlinkError);
+          logError('Error unlinking shadow card:', unlinkError);
           throw new Error(`Failed to unlink shadow card: ${unlinkError.message}`);
         }
 
-        console.log('✅ Shadow card references unlinked successfully');
+        log('✅ Shadow card references unlinked successfully');
       }
       
       // Now delete the card
@@ -769,10 +770,10 @@ export default function CollectionScreen() {
         .eq('user_id', user.id)
         .select(); // Add select to see what was deleted
 
-      console.log('Delete response:', { error: deleteError, data });
+      log('Delete response:', { error: deleteError, data });
 
       if (deleteError) {
-        console.error('Supabase delete error:', deleteError);
+        logError('Supabase delete error:', deleteError);
         throw new Error(`Database error: ${deleteError.message} (Code: ${deleteError.code})`);
       }
 
@@ -780,15 +781,15 @@ export default function CollectionScreen() {
         throw new Error('Card not found or you do not have permission to delete it');
       }
 
-      console.log('✅ Card deleted successfully:', data);
+      log('✅ Card deleted successfully:', data);
       setAllCards(prevCards => prevCards.filter(card => card.id !== cardId));
       setShowActions(false);
       setSelectedCard(null);
       
     } catch (err) {
-      console.error('Delete error details:', err);
+      logError('Delete error details:', err);
       const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred';
-      console.error('Final error message:', errorMessage);
+      logError('Final error message:', errorMessage);
       setDeleteError(errorMessage);
     } finally {
       setDeleteLoading(false);
@@ -799,8 +800,8 @@ export default function CollectionScreen() {
     // Close modal
     setShowActions(false);
     
-    console.log('📝 handleEdit called with card:', card.name, card.id);
-    console.log('📝 Current selectedCard state:', selectedCard?.name, selectedCard?.id);
+    log('📝 handleEdit called with card:', card.name, card.id);
+    log('📝 Current selectedCard state:', selectedCard?.name, selectedCard?.id);
     
     // Navigate to Edit page
     router.push({
@@ -856,7 +857,7 @@ export default function CollectionScreen() {
     setMintingNFT(true);
     
     try {
-      console.log('🎴 Minting card to official collection:', card.name);
+      log('🎴 Minting card to official collection:', card.name);
       
       // Call server-side Edge Function to mint NFT
       const { data, error } = await supabase.functions.invoke('mint-nft', {
@@ -906,10 +907,10 @@ export default function CollectionScreen() {
         ]
       );
       
-      console.log('✅ NFT minted successfully:', data.tokenId);
+      log('✅ NFT minted successfully:', data.tokenId);
       
     } catch (error: any) {
-      console.error('❌ Minting error:', error);
+      logError('❌ Minting error:', error);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       Alert.alert(
         'Minting Failed',
@@ -925,7 +926,7 @@ export default function CollectionScreen() {
     const viewShotRef = viewShotRefs.current.get(card.id);
     if (!viewShotRef || !viewShotRef.capture) {
       Alert.alert('Error', 'Unable to capture card image. Please try again.');
-      console.error('ViewShot ref not found for card:', card.id);
+      logError('ViewShot ref not found for card:', card.id);
       return;
     }
 
@@ -937,7 +938,7 @@ export default function CollectionScreen() {
       await new Promise(resolve => setTimeout(resolve, 300));
       
       // Capture the specific card as image
-      console.log('📸 Capturing card:', card.name, card.id);
+      log('📸 Capturing card:', card.name, card.id);
       const uri = await viewShotRef.capture();
 
       // Check if sharing is available
@@ -959,7 +960,7 @@ export default function CollectionScreen() {
       }
 
     } catch (error) {
-      console.error('Error sharing card:', error);
+      logError('Error sharing card:', error);
       Alert.alert('Error', 'Failed to share card. Please try again.');
     } finally {
       setSharingCard(false);
@@ -1029,7 +1030,7 @@ export default function CollectionScreen() {
             return [gradient[0], gradient[1]];
           }
         } catch (error) {
-          console.error('Error parsing background gradient:', error);
+          logError('Error parsing background gradient:', error);
         }
       }
       return null; // No background gradient
@@ -1047,7 +1048,7 @@ export default function CollectionScreen() {
         
         if (isDeck) {
           // Show deck management actions modal
-          console.log('🎯 DECK DOUBLE TAP - showing deck actions:', item.name);
+          log('🎯 DECK DOUBLE TAP - showing deck actions:', item.name);
           setSelectedDeck(item);
           setShowDeckActions(true);
           if (Platform.OS !== 'web') {
@@ -1060,7 +1061,7 @@ export default function CollectionScreen() {
           if (!isFlipped) {
             // User is viewing FRONT side → always edit original card
             targetCard = item;
-            console.log('🟢 FRONT SIDE DOUBLE TAP - editing original card:', item.name, item.id);
+            log('🟢 FRONT SIDE DOUBLE TAP - editing original card:', item.name, item.id);
           } else {
             // User is viewing BACK side → edit what's displayed on back
             const shadowCard = item.shadow_card 
@@ -1070,16 +1071,16 @@ export default function CollectionScreen() {
             if (shadowCard) {
               // Shadow exists and is displayed → edit shadow
               targetCard = shadowCard;
-              console.log('🔵 BACK SIDE DOUBLE TAP (with shadow) - editing shadow card:', shadowCard.name, shadowCard.id);
+              log('🔵 BACK SIDE DOUBLE TAP (with shadow) - editing shadow card:', shadowCard.name, shadowCard.id);
             } else {
               // No shadow, showing default back → edit original
               targetCard = item;
-              console.log('🟡 BACK SIDE DOUBLE TAP (no shadow) - editing original card:', item.name, item.id);
+              log('🟡 BACK SIDE DOUBLE TAP (no shadow) - editing original card:', item.name, item.id);
             }
           }
           
           // Double tap detected - show modal for the contextually correct card
-          console.log('🎯 Setting selectedCard to:', targetCard.name, targetCard.id);
+          log('🎯 Setting selectedCard to:', targetCard.name, targetCard.id);
           setSelectedCard(targetCard);
           setShowActions(true);
           setDeleteError('');
@@ -1102,7 +1103,7 @@ export default function CollectionScreen() {
       
       if (isDeck) {
         // Deck long press - open image upload modal
-        console.log('🔗 DECK LONG PRESS - opening image modal:', item.name);
+        log('🔗 DECK LONG PRESS - opening image modal:', item.name);
         setSelectedDeckForImage(item.name);
         setShowImageModal(true);
         if (Platform.OS !== 'web') {

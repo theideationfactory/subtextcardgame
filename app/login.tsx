@@ -1,19 +1,28 @@
-import { useState, useEffect } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, Platform } from 'react-native';
+import { useState, useEffect, useRef } from 'react';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, Platform, Modal, ScrollView, Linking } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import { useFonts, Inter_400Regular, Inter_700Bold } from '@expo-google-fonts/inter';
 import * as SplashScreen from 'expo-splash-screen';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
+import { log, logError } from '@/utils/logger';
 import 'react-native-url-polyfill/auto';
 
 SplashScreen.preventAutoHideAsync();
+
+const TOS_ACCEPTED_KEY = 'subtext_tos_accepted';
+const TOS_VERSION = '2026-01-10'; // Update this when ToS changes
 
 export default function LoginScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showTosModal, setShowTosModal] = useState(false);
+  const [tosChecking, setTosChecking] = useState(true);
+  const [hasScrolledToBottom, setHasScrolledToBottom] = useState(false);
+  const scrollViewRef = useRef<ScrollView>(null);
   const router = useRouter();
   const { refreshSession, signInAnonymously } = useAuth();
 
@@ -27,6 +36,46 @@ export default function LoginScreen() {
       SplashScreen.hideAsync();
     }
   }, [fontsLoaded]);
+
+  // Check if user has accepted ToS
+  useEffect(() => {
+    const checkTosAcceptance = async () => {
+      try {
+        const accepted = await AsyncStorage.getItem(TOS_ACCEPTED_KEY);
+        if (accepted !== TOS_VERSION) {
+          setShowTosModal(true);
+        }
+      } catch (err) {
+        logError('Error checking ToS acceptance:', err);
+        setShowTosModal(true);
+      } finally {
+        setTosChecking(false);
+      }
+    };
+    checkTosAcceptance();
+  }, []);
+
+  const handleAcceptTos = async () => {
+    try {
+      await AsyncStorage.setItem(TOS_ACCEPTED_KEY, TOS_VERSION);
+      setShowTosModal(false);
+    } catch (err) {
+      logError('Error saving ToS acceptance:', err);
+    }
+  };
+
+  const handleScroll = (event: any) => {
+    const { layoutMeasurement, contentOffset, contentSize } = event.nativeEvent;
+    const isCloseToBottom = layoutMeasurement.height + contentOffset.y >= contentSize.height - 50;
+    if (isCloseToBottom) {
+      setHasScrolledToBottom(true);
+    }
+  };
+
+  const openPrivacyPolicy = () => {
+    // You can replace this with your actual privacy policy URL
+    Linking.openURL('https://openai.com/policies/usage-policies/');
+  };
 
   const handleLogin = async () => {
     if (!email || !password) {
@@ -45,7 +94,7 @@ export default function LoginScreen() {
       });
 
       if (signInError) {
-        console.error('Sign in error:', signInError);
+        logError('Sign in error:', signInError);
         throw signInError;
       }
 
@@ -65,7 +114,7 @@ export default function LoginScreen() {
         throw new Error('No session returned after login');
       }
     } catch (err: any) {
-      console.error('Login error:', err);
+      logError('Login error:', err);
       setError(err.message || 'Failed to sign in');
       setPassword('');
     } finally {
@@ -76,6 +125,19 @@ export default function LoginScreen() {
   const handleSignUp = async () => {
     if (!email || !password) {
       setError('Please fill in all fields');
+      return;
+    }
+
+    // Password strength validation
+    if (password.length < 8) {
+      setError('Password must be at least 8 characters long');
+      return;
+    }
+
+    // Email format validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email.trim())) {
+      setError('Please enter a valid email address');
       return;
     }
 
@@ -95,7 +157,7 @@ export default function LoginScreen() {
       });
 
       if (signUpError) {
-        console.error('Sign up error:', signUpError);
+        logError('Sign up error:', signUpError);
         throw signUpError;
       }
 
@@ -109,7 +171,7 @@ export default function LoginScreen() {
         throw new Error('No user data returned after signup');
       }
     } catch (err: any) {
-      console.error('Signup error:', err);
+      logError('Signup error:', err);
       setError(err.message || 'Failed to sign up');
       setPassword('');
     } finally {
@@ -122,11 +184,11 @@ export default function LoginScreen() {
     setError('');
 
     try {
-      console.log('Creating guest session...');
+      log('Creating guest session...');
       const user = await signInAnonymously();
       
       if (user) {
-        console.log('✅ Guest session created, navigating to AI card flow...');
+        log('✅ Guest session created, navigating to AI card flow...');
         
         if (Platform.OS !== 'web') {
           // Small delay for mobile to ensure session is properly set
@@ -139,19 +201,128 @@ export default function LoginScreen() {
         throw new Error('Failed to create guest session');
       }
     } catch (err: any) {
-      console.error('Guest mode error:', err);
+      logError('Guest mode error:', err);
       setError(err.message || 'Failed to start guest mode');
     } finally {
       setLoading(false);
     }
   };
 
-  if (!fontsLoaded) {
-    return null;
+  if (!fontsLoaded || tosChecking) {
+    return <View style={{ flex: 1, backgroundColor: '#121212' }} />;
   }
 
   return (
     <View style={styles.container}>
+      {/* Terms of Service Modal */}
+      <Modal
+        visible={showTosModal}
+        animationType="slide"
+        transparent={false}
+        onRequestClose={() => {}}
+      >
+        <View style={styles.tosContainer}>
+          <View style={styles.tosHeader}>
+            <Text style={styles.tosTitle}>Terms of Service</Text>
+            <Text style={styles.tosSubtitle}>Please read and accept to continue</Text>
+          </View>
+          
+          <ScrollView 
+            ref={scrollViewRef}
+            style={styles.tosScrollView}
+            contentContainerStyle={styles.tosContent}
+            onScroll={handleScroll}
+            scrollEventThrottle={16}
+          >
+            <Text style={styles.tosLastUpdated}>Last Updated: January 10, 2026</Text>
+            
+            <Text style={styles.tosSectionTitle}>Agreement</Text>
+            <Text style={styles.tosText}>
+              These Terms of Service ("Terms") govern your use of the Subtext Card Game mobile application ("App") provided by Adam Kretz ("we," "us," or "our"). By downloading, installing, or using the App, you agree to be bound by these Terms.
+            </Text>
+            
+            <Text style={styles.tosSectionTitle}>App Purpose</Text>
+            <Text style={styles.tosText}>
+              Subtext is a creative platform designed for users to enjoy making unique trading cards and learn about themselves and their communication through personal reflection. The App combines game elements with artistic expression to facilitate self-discovery and meaningful social interaction.
+            </Text>
+            
+            <Text style={styles.tosSectionTitle}>Eligibility</Text>
+            <Text style={styles.tosText}>
+              You must be at least 13 years old to use this App. By using the App, you represent and warrant that you are at least 13 years of age. If you are under 18, you should have your parent or legal guardian review these Terms with you.
+            </Text>
+            
+            <Text style={styles.tosSectionTitle}>Acceptable Use</Text>
+            <Text style={styles.tosText}>
+              You agree to use the App only for lawful purposes and in accordance with these Terms. Specifically, you may not:{"\n\n"}
+              • Create or share content that violates applicable laws{"\n"}
+              • Generate images that violate OpenAI's Usage Policies{"\n"}
+              • Harass, abuse, or harm other users{"\n"}
+              • Attempt unauthorized access to our systems{"\n"}
+              • Use the App for commercial purposes without consent
+            </Text>
+            
+            <Text style={styles.tosSectionTitle}>User-Generated Content</Text>
+            <Text style={styles.tosText}>
+              You retain ownership of all cards, images, and other content you create within the App. We only review User Content when investigating reports of violations. All content must comply with OpenAI's Usage Policies.
+            </Text>
+            
+            <Text style={styles.tosSectionTitle}>NFT Minting</Text>
+            <Text style={styles.tosText}>
+              NFT minting is entirely optional and free. We pay all gas fees for minting. When you mint a card, the NFT is initially owned by us. You may request transfer by emailing ark44@thegotimer.com - you will pay transfer gas fees (rounded up to nearest dollar).
+            </Text>
+            
+            <Text style={styles.tosSectionTitle}>Privacy</Text>
+            <Text style={styles.tosText}>
+              Your privacy is important to us. We collect email addresses for account management, store your card creations, and use third-party services (Supabase, OpenAI) to provide the App's features. We do not sell your data.
+            </Text>
+            
+            <Text style={styles.tosSectionTitle}>Disclaimers</Text>
+            <Text style={styles.tosText}>
+              The App is for entertainment and self-reflection only - not professional advice. AI-generated content may contain inaccuracies. We do not guarantee uninterrupted service.
+            </Text>
+            
+            <Text style={styles.tosSectionTitle}>Limitation of Liability</Text>
+            <Text style={styles.tosText}>
+              To the maximum extent permitted by law, our total liability shall not exceed $100. We are not liable for indirect, incidental, or consequential damages.
+            </Text>
+            
+            <Text style={styles.tosSectionTitle}>Governing Law</Text>
+            <Text style={styles.tosText}>
+              These Terms are governed by the laws of Minnesota, USA. Disputes will be resolved through binding arbitration in Minnesota.
+            </Text>
+            
+            <Text style={styles.tosSectionTitle}>Contact</Text>
+            <Text style={styles.tosText}>
+              Questions? Email us at ark44@thegotimer.com
+            </Text>
+            
+            <TouchableOpacity onPress={openPrivacyPolicy} style={styles.tosLink}>
+              <Text style={styles.tosLinkText}>View OpenAI Usage Policies →</Text>
+            </TouchableOpacity>
+            
+            <View style={styles.tosBottomSpacer} />
+          </ScrollView>
+          
+          <View style={styles.tosFooter}>
+            {!hasScrolledToBottom && (
+              <Text style={styles.tosScrollHint}>↓ Scroll to read all terms</Text>
+            )}
+            <TouchableOpacity
+              style={[
+                styles.tosAcceptButton,
+                !hasScrolledToBottom && styles.tosAcceptButtonDisabled
+              ]}
+              onPress={handleAcceptTos}
+              disabled={!hasScrolledToBottom}
+            >
+              <Text style={styles.tosAcceptButtonText}>
+                {hasScrolledToBottom ? 'I Accept the Terms of Service' : 'Please read all terms'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
       <View style={styles.formContainer}>
         <Text style={styles.title}>Welcome Back</Text>
         <Text style={styles.subtitle}>Sign in to continue creating cards</Text>
@@ -334,6 +505,101 @@ const styles = StyleSheet.create({
   },
   guestButtonText: {
     color: '#6366f1',
+    fontSize: 16,
+    fontFamily: 'Inter-Bold',
+  },
+  // Terms of Service Modal Styles
+  tosContainer: {
+    flex: 1,
+    backgroundColor: '#121212',
+  },
+  tosHeader: {
+    padding: 24,
+    paddingTop: 60,
+    borderBottomWidth: 1,
+    borderBottomColor: '#2a2a2a',
+  },
+  tosTitle: {
+    fontSize: 28,
+    fontFamily: 'Inter-Bold',
+    color: '#fff',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  tosSubtitle: {
+    fontSize: 14,
+    fontFamily: 'Inter-Regular',
+    color: '#888',
+    textAlign: 'center',
+  },
+  tosScrollView: {
+    flex: 1,
+  },
+  tosContent: {
+    padding: 24,
+    paddingBottom: 40,
+  },
+  tosLastUpdated: {
+    fontSize: 12,
+    fontFamily: 'Inter-Regular',
+    color: '#666',
+    marginBottom: 24,
+    textAlign: 'center',
+  },
+  tosSectionTitle: {
+    fontSize: 18,
+    fontFamily: 'Inter-Bold',
+    color: '#fff',
+    marginTop: 20,
+    marginBottom: 8,
+  },
+  tosText: {
+    fontSize: 14,
+    fontFamily: 'Inter-Regular',
+    color: '#ccc',
+    lineHeight: 22,
+  },
+  tosLink: {
+    marginTop: 24,
+    padding: 12,
+    backgroundColor: '#2a2a2a',
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  tosLinkText: {
+    fontSize: 14,
+    fontFamily: 'Inter-Bold',
+    color: '#6366f1',
+  },
+  tosBottomSpacer: {
+    height: 40,
+  },
+  tosFooter: {
+    padding: 24,
+    paddingBottom: 40,
+    borderTopWidth: 1,
+    borderTopColor: '#2a2a2a',
+    backgroundColor: '#121212',
+  },
+  tosScrollHint: {
+    fontSize: 14,
+    fontFamily: 'Inter-Regular',
+    color: '#888',
+    textAlign: 'center',
+    marginBottom: 12,
+  },
+  tosAcceptButton: {
+    backgroundColor: '#6366f1',
+    borderRadius: 12,
+    padding: 16,
+    alignItems: 'center',
+  },
+  tosAcceptButtonDisabled: {
+    backgroundColor: '#3a3a3a',
+    opacity: 0.7,
+  },
+  tosAcceptButtonText: {
+    color: '#fff',
     fontSize: 16,
     fontFamily: 'Inter-Bold',
   },

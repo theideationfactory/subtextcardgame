@@ -16,6 +16,7 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { ArrowLeft, ChevronRight, ChevronLeft, Check } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { supabase } from '@/lib/supabase';
+import { log, logError } from '@/utils/logger';
 
 // Get screen dimensions for responsive layout
 const { width } = Dimensions.get('window');
@@ -129,7 +130,7 @@ export default function AICardFlowStep3() {
           await generateCardsInForeground(parsedCards);
         }
       } catch (error) {
-        console.error('Error setting up card generation:', error);
+        logError('Error setting up card generation:', error);
         setCardData({});
         setIsLoading(false);
       }
@@ -176,7 +177,7 @@ export default function AICardFlowStep3() {
         });
 
         if (!cardError && cardData?.jobId) {
-          console.log('✅ Card queued for background generation, jobId:', cardData.jobId);
+          log('✅ Card queued for background generation, jobId:', cardData.jobId);
           setCardData(prev => ({
             ...prev,
             [card.id]: {
@@ -199,7 +200,7 @@ export default function AICardFlowStep3() {
                 .single();
               
               if (job?.status === 'completed' && job.image_url) {
-                console.log('✅ Card generation completed:', job.image_url);
+                log('✅ Card generation completed:', job.image_url);
                 
                 // Save the card to the database
                 try {
@@ -248,13 +249,13 @@ export default function AICardFlowStep3() {
                       .single();
 
                     if (saveError) {
-                      console.error('❌ Error saving card:', saveError);
+                      logError('❌ Error saving card:', saveError);
                     } else {
-                      console.log('✅ Card saved to database:', savedCard.id);
+                      log('✅ Card saved to database:', savedCard.id);
                     }
                   }
                 } catch (saveErr) {
-                  console.error('❌ Error during card save:', saveErr);
+                  logError('❌ Error during card save:', saveErr);
                 }
 
                 setCardData(prev => ({
@@ -268,7 +269,7 @@ export default function AICardFlowStep3() {
                 }));
                 return;
               } else if (job?.status === 'failed') {
-                console.error('❌ Card generation failed:', job.error_message);
+                logError('❌ Card generation failed:', job.error_message);
                 setCardData(prev => ({
                   ...prev,
                   [card.id]: {
@@ -283,7 +284,7 @@ export default function AICardFlowStep3() {
             }
             
             // Timeout
-            console.error('❌ Card generation timed out');
+            logError('❌ Card generation timed out');
             setCardData(prev => ({
               ...prev,
               [card.id]: {
@@ -298,7 +299,7 @@ export default function AICardFlowStep3() {
           pollForCompletion();
         } else if (!cardError && cardData?.imageUrl) {
           // Old response format - direct image URL
-          console.log('✅ Card generated successfully:', cardData.imageUrl);
+          log('✅ Card generated successfully:', cardData.imageUrl);
           setCardData(prev => ({
             ...prev,
             [card.id]: {
@@ -309,7 +310,7 @@ export default function AICardFlowStep3() {
             }
           }));
         } else {
-          console.error('❌ Error generating card:', cardError?.message || 'Failed to generate card');
+          logError('❌ Error generating card:', cardError?.message || 'Failed to generate card');
           setCardData(prev => ({
             ...prev,
             [card.id]: {
@@ -321,7 +322,7 @@ export default function AICardFlowStep3() {
           }));
         }
       } catch (error) {
-        console.error('Error generating card:', error);
+        logError('Error generating card:', error);
         setCardData(prev => ({
           ...prev,
           [card.id]: {

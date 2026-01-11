@@ -10,6 +10,7 @@ import { supabase } from '@/lib/supabase';
 import { ChatService } from '@/services/chatService';
 import { Conversation } from '@/types/chat';
 import { formatRelativeTime, getMessagePreview, getInitials, getAvatarColor } from '@/utils/chatUtils';
+import { log, logError } from '@/utils/logger';
 
 const SECTIONS = {
   CHATS: 'chats',
@@ -82,7 +83,7 @@ export default function FriendsScreen() {
       const conversations = await ChatService.getConversations();
       setConversations(conversations);
     } catch (error) {
-      console.error('Error fetching conversations:', error);
+      logError('Error fetching conversations:', error);
       setError('Failed to load conversations');
     }
   };
@@ -121,7 +122,7 @@ export default function FriendsScreen() {
 
       setFriends(data || []);
     } catch (err) {
-      console.error('Error fetching friends:', err);
+      logError('Error fetching friends:', err);
       setError('Failed to load friends');
     }
   };
@@ -138,7 +139,7 @@ export default function FriendsScreen() {
 
       setFriendRequests(data || []);
     } catch (err) {
-      console.error('Error fetching friend requests:', err);
+      logError('Error fetching friend requests:', err);
       setError('Failed to load friend requests');
     }
   };
@@ -169,7 +170,7 @@ export default function FriendsScreen() {
         return;
       }
     } catch (authError) {
-      console.error('Auth check error:', authError);
+      logError('Auth check error:', authError);
       // Don't return here, try to continue with the search
     }
 
@@ -188,7 +189,7 @@ export default function FriendsScreen() {
         });
     
       if (searchError) {
-        console.error('Search error from Supabase:', searchError);
+        logError('Search error from Supabase:', searchError);
         throw searchError;
       }
 
@@ -223,7 +224,7 @@ export default function FriendsScreen() {
       // Force a re-render by setting activeSection
       setActiveSection(prev => prev);
     } catch (err) {
-      console.error('Search error:', err);
+      logError('Search error:', err);
       setError('Search failed: ' + (err instanceof Error ? err.message : 'Unknown error'));
     } finally {
       setLoading(false);
@@ -235,10 +236,10 @@ export default function FriendsScreen() {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     }
     
-    console.log('=== OPENING CHAT ===');
-    console.log('Friend ID:', friendId);
-    console.log('Friend Email:', friendEmail);
-    console.log('Router available:', !!router);
+    log('=== OPENING CHAT ===');
+    log('Friend ID:', friendId);
+    log('Friend Email:', friendEmail);
+    log('Router available:', !!router);
     
     if (!friendId || !friendEmail) {
       Alert.alert('Error', 'Missing friend information');
@@ -246,7 +247,7 @@ export default function FriendsScreen() {
     }
     
     try {
-      console.log('Attempting navigation to /chat');
+      log('Attempting navigation to /chat');
       router.push({
         pathname: '/chat',
         params: { 
@@ -254,9 +255,9 @@ export default function FriendsScreen() {
           friendEmail: friendEmail.toString() 
         }
       });
-      console.log('Navigation call completed');
+      log('Navigation call completed');
     } catch (error) {
-      console.error('Navigation error:', error);
+      logError('Navigation error:', error);
       Alert.alert('Navigation Error', `Could not open chat: ${error}`);
     }
   };
@@ -283,7 +284,7 @@ export default function FriendsScreen() {
         .or(`sender_id.eq.${userId},receiver_id.eq.${userId}`);
         
       if (checkError) {
-        console.error('Error checking existing requests:', checkError);
+        logError('Error checking existing requests:', checkError);
         throw checkError;
       }
       
@@ -316,7 +317,7 @@ export default function FriendsScreen() {
         });
 
       if (insertError) {
-        console.error('Error inserting friend request:', insertError);
+        logError('Error inserting friend request:', insertError);
         throw insertError;
       }
 
@@ -333,7 +334,7 @@ export default function FriendsScreen() {
       
       setSearchResults(updatedResults as User[]);
     } catch (err) {
-      console.error('Error sending friend request:', err);
+      logError('Error sending friend request:', err);
       setError('Failed to send friend request: ' + (err instanceof Error ? err.message : 'Unknown error'));
     } finally {
       setLoading(false);
@@ -354,7 +355,7 @@ export default function FriendsScreen() {
         fetchFriends()
       ]);
     } catch (err) {
-      console.error('Error accepting friend request:', err);
+      logError('Error accepting friend request:', err);
       setError('Failed to accept friend request');
     }
   };
@@ -370,7 +371,7 @@ export default function FriendsScreen() {
 
       await fetchFriendRequests();
     } catch (err) {
-      console.error('Error rejecting friend request:', err);
+      logError('Error rejecting friend request:', err);
       setError('Failed to reject friend request');
     }
   };

@@ -8,6 +8,7 @@ import * as Linking from 'expo-linking';
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import 'react-native-url-polyfill/auto';
+import { log, logError } from '@/utils/logger';
 
 function useProtectedRoute() {
   const segments = useSegments();
@@ -26,11 +27,11 @@ function useProtectedRoute() {
       try {
         if (!user && inAuthGroup) {
           // No user at all, redirect to login
-          console.log('No user, redirecting to login');
+          log('No user, redirecting to login');
           await router.replace('/login');
         } else if (user && !inAuthGroup && !inPublicGroup) {
           // User exists (authenticated or anonymous), allow access to tabs
-          console.log('User authenticated, redirecting to tabs');
+          log('User authenticated, redirecting to tabs');
           await router.replace('/(tabs)');
         }
       } finally {
@@ -95,7 +96,7 @@ export default function RootLayout() {
       try {
         await SplashScreen.hideAsync();
       } catch (e) {
-        console.warn('Error hiding splash screen in RootLayout:', e);
+        logError('Error hiding splash screen in RootLayout:', e);
       }
     };
 
@@ -104,7 +105,7 @@ export default function RootLayout() {
       const subscription = Linking.addEventListener('url', ({ url }) => {
         if (url) {
           // Handle the deep link URL
-          console.log('Deep link URL:', url);
+          log('Deep link URL:', url);
         }
       });
 

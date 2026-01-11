@@ -1,4 +1,4 @@
-import { useState, useEffect, useContext, useCallback } from 'react';
+import { useState, useEffect, useContext, useCallback, useRef } from 'react';
 import { 
   View, 
   Text, 
@@ -18,6 +18,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { ArrowLeft, Plus, Trash2, Save, Wand2, Settings, Palette, Type, Layout, Image as ImageIcon } from 'lucide-react-native';
+import { log, logError } from '@/utils/logger';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -35,6 +36,8 @@ interface CustomGenerationType {
 export default function CustomGenerationBuilderScreen() {
   const router = useRouter();
   const { user } = useAuth();
+  const scrollViewRef = useRef<ScrollView>(null);
+  const formSectionY = useRef<number>(0);
 
   const [fontsLoaded] = useFonts({
     'Inter-Regular': Inter_400Regular,
@@ -76,7 +79,7 @@ export default function CustomGenerationBuilderScreen() {
       if (error) throw error;
       setCustomTypes(data || []);
     } catch (err) {
-      console.error('Error loading custom generation types:', err);
+      logError('Error loading custom generation types:', err);
       setError('Failed to load custom generation types');
     } finally {
       setLoading(false);
@@ -137,7 +140,7 @@ export default function CustomGenerationBuilderScreen() {
       setTimeout(() => setSuccessMessage(''), 3000);
       
     } catch (err) {
-      console.error('Error saving custom generation type:', err);
+      logError('Error saving custom generation type:', err);
       setError('Failed to save custom generation type');
     } finally {
       setSaving(false);
@@ -166,7 +169,7 @@ export default function CustomGenerationBuilderScreen() {
       setTimeout(() => setSuccessMessage(''), 3000);
       
     } catch (err) {
-      console.error('Error deleting custom generation type:', err);
+      logError('Error deleting custom generation type:', err);
       setError('Failed to delete custom generation type');
     }
   };
@@ -191,6 +194,11 @@ export default function CustomGenerationBuilderScreen() {
     setSpecialInstructions(type.special_instructions);
     setIsActive(type.is_active);
     setIsEditing(true);
+    
+    // Auto-scroll to form section
+    setTimeout(() => {
+      scrollViewRef.current?.scrollTo({ y: formSectionY.current, animated: true });
+    }, 100);
   };
 
   // Load data on focus
@@ -218,7 +226,7 @@ export default function CustomGenerationBuilderScreen() {
         <View style={styles.headerSpacer} />
       </View>
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView ref={scrollViewRef} style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Success/Error Messages */}
         {successMessage ? (
           <View style={styles.successMessage}>
@@ -280,7 +288,12 @@ export default function CustomGenerationBuilderScreen() {
         </View>
 
         {/* Create/Edit Form */}
-        <View style={styles.section}>
+        <View 
+          style={styles.section}
+          onLayout={(event) => {
+            formSectionY.current = event.nativeEvent.layout.y;
+          }}
+        >
           <Text style={styles.sectionTitle}>
             {isEditing ? 'Edit Custom Generation Type' : 'Create New Custom Generation Type'}
           </Text>

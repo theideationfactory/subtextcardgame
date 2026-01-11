@@ -16,6 +16,7 @@ import { ArrowLeft, Check, Edit2, Trash2, Share2 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
+import { log, logError } from '@/utils/logger';
 
 const { width } = Dimensions.get('window');
 const cardWidth = width * 0.85; // Card takes most of the width for review
@@ -101,7 +102,7 @@ export default function AICardFlowReview() {
       // Navigate to the inbox or home screen
       router.replace('/(tabs)');
     } catch (error) {
-      console.error('Error saving cards:', error);
+      logError('Error saving cards:', error);
       Alert.alert('Error', 'Failed to save cards. Please try again.');
     } finally {
       setIsSaving(false);

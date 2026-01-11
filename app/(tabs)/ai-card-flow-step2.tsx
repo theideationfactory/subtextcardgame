@@ -13,6 +13,7 @@ import {
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { ArrowLeft, ChevronRight, RefreshCw, CheckCircle2 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
+import { log, logError } from '@/utils/logger';
 
 // Card type icons (simplified for now)
 import { Zap, Shield, HandHeart, MessageCircle, Eye } from 'lucide-react-native';
@@ -83,7 +84,7 @@ export default function AICardFlowStep2() {
 
       setCardSuggestions(formattedCards);
     } catch (error) {
-      console.error('Error fetching card suggestions:', error);
+      logError('Error fetching card suggestions:', error);
       // Fallback to mock data if API fails
       const fallbackCards = [
         { id: '1', name: 'Emotional Deflection', type: 'Impact', icon: Zap },

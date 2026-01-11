@@ -5,6 +5,7 @@
 
 import { ethers } from 'ethers';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { log, logError } from '@/utils/logger';
 
 export interface WalletConnectionResult {
   address: string;
@@ -43,7 +44,7 @@ export class WalletService {
       );
       
     } catch (error) {
-      console.error('Wallet connection error:', error);
+      logError('Wallet connection error:', error);
       throw error;
     }
   }
@@ -75,7 +76,7 @@ export class WalletService {
         );
       } else if (network === 'mumbai') {
         // Mumbai (deprecated but kept for backwards compatibility)
-        console.warn('⚠️ Mumbai testnet is deprecated. Use Amoy testnet instead.');
+        logError('⚠️ Mumbai testnet is deprecated. Use Amoy testnet instead.');
         provider = new ethers.providers.AlchemyProvider('maticmum', alchemyApiKey);
       } else {
         // Polygon Mainnet - using public RPC for better reliability
@@ -86,15 +87,15 @@ export class WalletService {
             name: 'matic'
           }
         );
-        console.log('🌐 Using public Polygon RPC endpoint');
+        log('🌐 Using public Polygon RPC endpoint');
       }
       
       // Create wallet from private key
       const wallet = new ethers.Wallet(privateKey, provider);
       const address = await wallet.getAddress();
       
-      console.log('✅ Connected to', network, 'network');
-      console.log('📍 Wallet address:', address);
+      log('✅ Connected to', network, 'network');
+      log('📍 Wallet address:', address);
       
       this.provider = provider as any;
       this.signer = wallet;
@@ -109,7 +110,7 @@ export class WalletService {
         signer: wallet
       };
     } catch (error) {
-      console.error('Private key connection error:', error);
+      logError('Private key connection error:', error);
       throw error;
     }
   }
@@ -126,9 +127,9 @@ export class WalletService {
       // Clear stored address
       await AsyncStorage.removeItem('wallet_address');
       
-      console.log('Wallet disconnected');
+      log('Wallet disconnected');
     } catch (error) {
-      console.error('Disconnect error:', error);
+      logError('Disconnect error:', error);
       throw error;
     }
   }
@@ -202,7 +203,7 @@ export class WalletService {
       const storedAddress = await AsyncStorage.getItem('wallet_address');
       return storedAddress;
     } catch (error) {
-      console.error('Failed to restore connection:', error);
+      logError('Failed to restore connection:', error);
       return null;
     }
   }

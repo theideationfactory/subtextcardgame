@@ -47,6 +47,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Spacer } from '@/components/Spacer';
 import { hasDynamicIsland } from '@/utils/deviceDimensions';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { log, logError } from '@/utils/logger';
 
 // Define the types for our data structures
 interface Card {
@@ -293,7 +294,7 @@ export default function SpreadScreen() {
     if (autoAddCardData && autoAddZone) {
       try {
         const cardToAdd = JSON.parse(autoAddCardData);
-        console.log('Successfully parsed card to add:', cardToAdd.name);
+        log('Successfully parsed card to add:', cardToAdd.name);
 
         setZoneCards(prev => ({
           ...prev,
@@ -308,7 +309,7 @@ export default function SpreadScreen() {
         setAutoAddZone(null);
 
       } catch (error) {
-        console.error('Failed to parse auto-add card data:', error);
+        logError('Failed to parse auto-add card data:', error);
         // Clear state even if parsing fails to prevent retries
         setAutoAddCardData(null);
         setAutoAddZone(null);
@@ -341,9 +342,9 @@ export default function SpreadScreen() {
           // Clear params to prevent re-processing by navigating without the parameter
           router.replace('/(tabs)/spread');
         } catch (error) {
-          console.error('Error parsing custom spread data:', error);
-          console.error('Raw params.customSpread:', params.customSpread);
-          console.error('Type of params.customSpread:', typeof params.customSpread);
+          logError('Error parsing custom spread data:', error);
+          logError('Raw params.customSpread:', params.customSpread);
+          logError('Type of params.customSpread:', typeof params.customSpread);
           setError('Failed to load custom spread data. Please try creating the spread again.');
         }
       }
@@ -366,7 +367,7 @@ export default function SpreadScreen() {
       
       setSavedCustomSpreads(data || []);
     } catch (error) {
-      console.error('Error loading saved custom spreads:', error);
+      logError('Error loading saved custom spreads:', error);
     }
   };
 
@@ -379,7 +380,7 @@ export default function SpreadScreen() {
         // Load saved custom spreads
         await loadSavedCustomSpreads();
       } catch (err) {
-        console.error('Error initializing screen:', err);
+        logError('Error initializing screen:', err);
         setError('Failed to initialize screen');
       } finally {
         setLoading(false);
@@ -400,7 +401,7 @@ export default function SpreadScreen() {
           setPhenomenaTypes(['All', ...parsed]);
         }
       } catch (err) {
-        console.error('Error loading phenomena types:', err);
+        logError('Error loading phenomena types:', err);
       }
     };
 
@@ -417,7 +418,7 @@ export default function SpreadScreen() {
           setGalleryLoading(false);
         })
         .catch(err => {
-          console.error('Error fetching scoped cards:', err);
+          logError('Error fetching scoped cards:', err);
           setError('Failed to load cards for this view.');
           setGalleryLoading(false);
         });
@@ -429,7 +430,7 @@ export default function SpreadScreen() {
     useCallback(() => {
       // Only refresh if we have auto-add parameters or if cards might be stale
       if (params.autoAddCard || params.autoAddZone) {
-        console.log('Refreshing cards due to auto-add parameters');
+        log('Refreshing cards due to auto-add parameters');
         fetchCards();
       }
     }, [params.autoAddCard, params.autoAddZone, fetchCards])
@@ -447,7 +448,7 @@ export default function SpreadScreen() {
             }
             await loadDraft(draftIdToLoad);
           } catch (err) {
-            console.error('Error loading draft:', err);
+            logError('Error loading draft:', err);
             setError('Failed to load draft. Please try again.');
           }
         }
@@ -546,19 +547,19 @@ export default function SpreadScreen() {
         setSpreadName(SPREADS[spreadType as keyof typeof SPREADS].name);
       }
     } catch (err) {
-      console.error('Error checking for existing draft:', err);
+      logError('Error checking for existing draft:', err);
       setError('Failed to check for existing draft');
     }
   };
 
   const loadDraft = async (draftId: string) => {
     try {
-      console.log('Loading draft with ID:', draftId);
+      log('Loading draft with ID:', draftId);
       
       // Ensure cards are loaded first
       let currentCards = cards;
       if (!currentCards || currentCards.length === 0) {
-        console.log('Cards not loaded, fetching cards first...');
+        log('Cards not loaded, fetching cards first...');
         currentCards = await fetchCards(0, 1000, false); // Capture the returned cards, ensure no cache, fetch a larger limit
       }
 
@@ -569,26 +570,26 @@ export default function SpreadScreen() {
         .single();
 
       if (draftError) {
-        console.error('Error fetching draft:', draftError);
+        logError('Error fetching draft:', draftError);
         throw draftError;
       }
 
       if (!draft) {
-        console.error('No draft found with ID:', draftId);
+        logError('No draft found with ID:', draftId);
         setError('Draft not found or you may not have access to it.');
         return;
       }
 
-      console.log('Draft loaded successfully:', draft);
+      log('Draft loaded successfully:', draft);
     if (draft?.draft_data?.zoneCards) {
-      console.log('Card IDs in shared draft zoneCards:', JSON.stringify(draft.draft_data.zoneCards));
+      log('Card IDs in shared draft zoneCards:', JSON.stringify(draft.draft_data.zoneCards));
     }
 
       if (draft?.draft_data) {
         if (draft.draft_data.wordsRemembered) {
           setWordsRemembered(draft.draft_data.wordsRemembered);
         }
-        console.log('Setting spread type to:', draft.draft_data.type);
+        log('Setting spread type to:', draft.draft_data.type);
         
         // Handle custom spreads vs predefined spreads
         if (draft.draft_data.type === 'custom' && draft.draft_data.customSpread) {
@@ -612,7 +613,7 @@ export default function SpreadScreen() {
           .eq('spread_id', draft.id);
 
         if (spreadCardsError) {
-          console.error('Error fetching cards for spread:', spreadCardsError);
+          logError('Error fetching cards for spread:', spreadCardsError);
         }
 
         // Build a fresh map from spread-scoped cards, with a fallback to currentCards
@@ -626,33 +627,33 @@ export default function SpreadScreen() {
             cardsById[card.id] = card;
           });
         }
-        console.log('Available card IDs in cardMap:', Object.keys(cardsById));
+        log('Available card IDs in cardMap:', Object.keys(cardsById));
         setCardMap(cardsById);
 
         const restoredZoneCards: Record<string, any[]> = {};
         Object.entries(draft.draft_data.zoneCards).forEach(([zoneName, cardIds]: [string, any]) => {
-          console.log(`Processing zone ${zoneName} with card IDs:`, cardIds);
+          log(`Processing zone ${zoneName} with card IDs:`, cardIds);
           
           const zoneCards = (cardIds as string[]).map((id: string) => {
             const card = cardsById[id];
             if (!card) {
-              console.warn(`Card ${id} not found in cardsById map for zone ${zoneName}`);
+              logError(`Card ${id} not found in cardsById map for zone ${zoneName}`);
             }
             return card;
           }).filter(Boolean);
           
           restoredZoneCards[zoneName] = zoneCards;
-          console.log(`Zone ${zoneName} restored with ${zoneCards.length} of ${cardIds.length} cards`);
+          log(`Zone ${zoneName} restored with ${zoneCards.length} of ${cardIds.length} cards`);
         });
         
         setZoneCards(restoredZoneCards);
-        console.log('Draft state restored successfully');
+        log('Draft state restored successfully');
       } else {
-        console.error('Invalid draft data structure:', draft);
+        logError('Invalid draft data structure:', draft);
         setError('Invalid draft data. The draft may be corrupted.');
       }
     } catch (err) {
-      console.error('Error loading draft:', err);
+      logError('Error loading draft:', err);
       const errorMessage = err instanceof Error ? err.message : 'Failed to load draft. Please try again.';
       setError(errorMessage);
     }
@@ -660,7 +661,7 @@ export default function SpreadScreen() {
 
   const saveDraft = async (name?: string) => {
     if (!selectedSpread && !customSpread) {
-      console.error('No spread selected');
+      logError('No spread selected');
       return false;
     }
 
@@ -669,13 +670,13 @@ export default function SpreadScreen() {
       
       // Check if user is authenticated using AuthContext
       if (!user || !user.id) {
-        console.error('No authenticated user from AuthContext');
+        logError('No authenticated user from AuthContext');
         const error = new Error('No authenticated user');
-        console.error('Auth error details:', { user, hasId: user?.id ? 'yes' : 'no' });
+        logError('Auth error details:', { user, hasId: user?.id ? 'yes' : 'no' });
         throw error;
       }
       
-      console.log('Saving draft for user:', user.id);
+      log('Saving draft for user:', user.id);
       
       // Prepare zone cards data
       const zoneCardIds: Record<string, string[]> = {};
@@ -690,7 +691,7 @@ export default function SpreadScreen() {
         ...(customSpread && { customSpread }), // Include custom spread data if it exists
       };
 
-      console.log('Prepared draft data:', JSON.stringify(draftData, null, 2));
+      log('Prepared draft data:', JSON.stringify(draftData, null, 2));
 
       const spreadNameToUse = (name && name.trim()) || spreadName || (selectedSpread ? SPREADS[selectedSpread].name : customSpread?.name || 'Untitled Spread');
       const iconName = (selectedSpread && SPREADS[selectedSpread]?.icon?.name) || 'Sparkles';
@@ -722,14 +723,14 @@ export default function SpreadScreen() {
         last_modified: currentTimestamp
       };
       
-      console.log('Data being saved to database:', JSON.stringify(dataToSave, null, 2));
+      log('Data being saved to database:', JSON.stringify(dataToSave, null, 2));
       
       let result: Spread | null = null;
       
       try {
         if (currentSpreadId) {
           // Update existing spread
-          console.log('Updating existing spread with ID:', currentSpreadId);
+          log('Updating existing spread with ID:', currentSpreadId);
           const updateData = {
             name: spreadNameToUse,
             draft_data: draftData,
@@ -737,7 +738,7 @@ export default function SpreadScreen() {
             last_modified: currentTimestamp,
           };
           
-          console.log('Update data:', JSON.stringify(updateData, null, 2));
+          log('Update data:', JSON.stringify(updateData, null, 2));
           
           const { data, error: updateError } = await supabase
             .from('spreads')
@@ -747,15 +748,15 @@ export default function SpreadScreen() {
             .single();
 
           if (updateError) {
-            console.error('Update error details:', updateError);
+            logError('Update error details:', updateError);
             throw updateError;
           }
           
-          console.log('Successfully updated spread:', data);
+          log('Successfully updated spread:', data);
           result = data;
         } else {
           // Create new spread
-          console.log('Creating new spread');
+          log('Creating new spread');
           
           const insertData = {
             name: spreadNameToUse,
@@ -769,7 +770,7 @@ export default function SpreadScreen() {
             last_modified: currentTimestamp
           };
           
-          console.log('Insert data:', JSON.stringify(insertData, null, 2));
+          log('Insert data:', JSON.stringify(insertData, null, 2));
           
           // Try a direct SQL insert as a fallback
           try {
@@ -780,10 +781,10 @@ export default function SpreadScreen() {
               .single();
 
             if (insertError) {
-              console.error('Insert error details:', insertError);
+              logError('Insert error details:', insertError);
               
               // Try with RPC function as fallback
-              console.log('Trying with RPC function as fallback...');
+              log('Trying with RPC function as fallback...');
               const { data: rpcResult, error: rpcError } = await supabase.rpc('create_spread', {
                 p_name: insertData.name,
                 p_description: insertData.description,
@@ -796,18 +797,18 @@ export default function SpreadScreen() {
               
               if (rpcError) throw rpcError;
               
-              console.log('Successfully created spread via RPC:', rpcResult);
+              log('Successfully created spread via RPC:', rpcResult);
               setCurrentSpreadId(rpcResult.id);
               result = rpcResult;
             } else {
               if (!newDraft) throw new Error('No data returned when creating spread');
               
-              console.log('Successfully created new spread:', newDraft);
+              log('Successfully created new spread:', newDraft);
               setCurrentSpreadId(newDraft.id);
               result = newDraft;
             }
           } catch (insertErr) {
-            console.error('Error during spread creation:', insertErr);
+            logError('Error during spread creation:', insertErr);
             throw insertErr;
           }
         }
@@ -817,7 +818,7 @@ export default function SpreadScreen() {
           const spreadId = result.id;
           const allCardIds = Object.values(zoneCardIds).flat();
           if (allCardIds.length > 0) {
-            console.log(`Linking ${allCardIds.length} cards to spread ${spreadId}`);
+            log(`Linking ${allCardIds.length} cards to spread ${spreadId}`);
             
             const linkPromises = allCardIds.map(cardId =>
               supabase.rpc('link_card_to_spread', {
@@ -830,9 +831,9 @@ export default function SpreadScreen() {
             
             results.forEach((promiseResult, index) => {
               if (promiseResult.status === 'rejected') {
-                console.error(`Error linking card ${allCardIds[index]} to spread:`, promiseResult.reason);
+                logError(`Error linking card ${allCardIds[index]} to spread:`, promiseResult.reason);
               } else if (promiseResult.value.error) {
-                console.error(`Error linking card ${allCardIds[index]} to spread:`, promiseResult.value.error);
+                logError(`Error linking card ${allCardIds[index]} to spread:`, promiseResult.value.error);
               }
             });
           }
@@ -849,7 +850,7 @@ export default function SpreadScreen() {
         return true;
         
       } catch (dbError: any) {
-        console.error('Database error details:', {
+        logError('Database error details:', {
           code: dbError.code,
           message: dbError.message,
           details: dbError.details,
@@ -863,8 +864,8 @@ export default function SpreadScreen() {
           const hint = dbError.hint ? `\n\nHint: ${dbError.hint}` : '';
           setError(errorMessage + 'Please contact support or check the console for details.' + hint);
           
-          console.error('RLS Policy Error:', dbError.message);
-          console.error('Current RLS policies:');
+          logError('RLS Policy Error:', dbError.message);
+          logError('Current RLS policies:');
           
           // Log current RLS policies
           const { data: policies } = await supabase
@@ -874,17 +875,17 @@ export default function SpreadScreen() {
           console.table(policies);
           
           // Log current user and role
-          console.log('Current auth user:', user.id);
+          log('Current auth user:', user.id);
           
           // Log RLS context
           const { data: rlsContext } = await supabase.rpc('current_setting', { name: 'role' });
-          console.log('Current RLS role:', rlsContext);
+          log('Current RLS role:', rlsContext);
           
           // Suggest next steps
-          console.log('\nNext steps to debug:');
-          console.log('1. Check if RLS is enabled on the spreads table');
-          console.log('2. Verify the user has the authenticated role');
-          console.log('3. Check for any BEFORE INSERT triggers that might be modifying the data');
+          log('\nNext steps to debug:');
+          log('1. Check if RLS is enabled on the spreads table');
+          log('2. Verify the user has the authenticated role');
+          log('3. Check for any BEFORE INSERT triggers that might be modifying the data');
           
         } else {
           throw dbError;
@@ -892,7 +893,7 @@ export default function SpreadScreen() {
       }
       
     } catch (err) {
-      console.error('Error in saveDraft:', err);
+      logError('Error in saveDraft:', err);
       const errorMessage = err instanceof Error ? err.message : 'Unknown error';
       setError(`Failed to save draft: ${errorMessage}`);
       return false;
@@ -931,7 +932,7 @@ export default function SpreadScreen() {
       });
 
       if (error) {
-        console.error('Error linking card to spread:', error);
+        logError('Error linking card to spread:', error);
         // Don't throw error - the UI update already happened and this is a background operation
       }
     }
@@ -974,7 +975,7 @@ export default function SpreadScreen() {
     });
 
     if (error) {
-      console.error('Error unlinking card from spread:', error);
+      logError('Error unlinking card from spread:', error);
       // Don't throw error - UI update already happened
     }
     
@@ -1694,7 +1695,7 @@ export default function SpreadScreen() {
                 style={[styles.iconButton, styles.sendButton]}
                 onPress={() => {
                   // Send functionality will be added later
-                  console.log('Send button pressed');
+                  log('Send button pressed');
                 }}
               >
                 <Send size={24} color="#6366f1" />
@@ -1779,7 +1780,7 @@ export default function SpreadScreen() {
                       setShowSaveAs(false);
                     }
                   } catch (err) {
-                    console.error('Error in save handler:', err);
+                    logError('Error in save handler:', err);
                     setError(`Failed to save: ${err instanceof Error ? err.message : 'Unknown error'}`);
                   }
                 }}
