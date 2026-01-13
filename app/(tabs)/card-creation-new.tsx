@@ -48,6 +48,14 @@ const GRADIENT_OPTIONS = [
 export default function CardCreationNewScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
+  
+  // Debug: Log all params on component mount
+  log('=== CardCreationNewScreen mounted ===');
+  log('All params:', JSON.stringify(params, null, 2));
+  log('draftId param:', params.draftId);
+  log('edit_mode param:', params.edit_mode);
+  log('returnTo param:', params.returnTo);
+  
   // Treat the screen as "editing" only when explicitly opened in edit mode
   // (e.g., from the Cards tab with edit_mode='true' and an existing card id).
   const isEditing = params.edit_mode === 'true' && !!params.id;
@@ -68,6 +76,90 @@ export default function CardCreationNewScreen() {
   const returnZone = params.zone as string | undefined;
   const shadowForCardId = params.shadowForCardId as string | undefined;
   const inboxJobId = params.generation_job_id as string | undefined;
+  const draftId = params.draftId as string | undefined;
+  
+  // Track if draft is still loading - use ref for immediate access
+  const [isDraftLoading, setIsDraftLoading] = useState(!!draftId);
+  const isDraftLoadedRef = useRef(false);
+  // Store the original draft data for comparison when saving
+  const loadedDraftDataRef = useRef<any>(null);
+
+  // Load draft data if draftId is provided - use useFocusEffect to reload on every screen focus
+  useFocusEffect(
+    useCallback(() => {
+      const loadDraft = async () => {
+        if (!draftId) {
+          isDraftLoadedRef.current = true;
+          return;
+        }
+        
+        setIsDraftLoading(true);
+        isDraftLoadedRef.current = false;
+        loadedDraftDataRef.current = null;
+        log('Loading draft with ID:', draftId);
+        
+        try {
+          const { data, error } = await supabase
+            .from('card_drafts')
+            .select('*')
+            .eq('id', draftId)
+            .single();
+          
+          if (error) {
+            logError('Error loading draft:', error);
+            setIsDraftLoading(false);
+            isDraftLoadedRef.current = true;
+            return;
+          }
+          
+          if (data) {
+            log('Draft loaded successfully:', data.name);
+            // Store the loaded data in ref for later use
+            loadedDraftDataRef.current = data;
+            
+            setName(data.name || '');
+            setDescription(data.description || '');
+            setImageDescription(data.image_description || '');
+            setType(data.type || 'Intention');
+            setRole(data.role || '');
+            setContext(data.context || 'TBD');
+            setCardImage(data.image_url || '');
+            setFormat(data.format || 'fullBleed');
+            setBorderStyle(data.border_style || 'Classic');
+            setBorderColor(data.border_color || '#808080');
+            setIsUploadedImage(data.is_uploaded_image || false);
+            
+            // Parse background gradient if it exists
+            if (data.background_gradient) {
+              try {
+                const gradient = JSON.parse(data.background_gradient);
+                if (Array.isArray(gradient)) {
+                  setBackgroundGradient(gradient);
+                }
+              } catch (e) {
+                log('Could not parse background gradient');
+              }
+            }
+            
+            // Parse visibility if it exists
+            if (data.visibility && Array.isArray(data.visibility)) {
+              setVisibility(data.visibility);
+            }
+            
+            isDraftLoadedRef.current = true;
+            log('Draft data applied to form, isDraftLoadedRef:', isDraftLoadedRef.current);
+          }
+        } catch (err) {
+          logError('Error in loadDraft:', err);
+          isDraftLoadedRef.current = true;
+        } finally {
+          setIsDraftLoading(false);
+        }
+      };
+      
+      loadDraft();
+    }, [draftId])
+  );
   
   const [isGeneratingDescription, setIsGeneratingDescription] = useState(false);
   const [isGeneratingImageDescription, setIsGeneratingImageDescription] = useState(false);
@@ -82,6 +174,10 @@ export default function CardCreationNewScreen() {
   const [customGenerationTypes, setCustomGenerationTypes] = useState<any[]>([]);
   const [selectedCustomGenerationType, setSelectedCustomGenerationType] = useState<string | null>(null);
   const [isUploadedImage, setIsUploadedImage] = useState(false); // Track if image was uploaded vs generated
+
+  // Draft modal state
+  const [showSaveDraftModal, setShowSaveDraftModal] = useState(false);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
   const [assistedMode, setAssistedMode] = useState(!isEditing);
   const [assistedStep, setAssistedStep] = useState(0);
@@ -162,8 +258,31 @@ export default function CardCreationNewScreen() {
     }, [generationJobId])
   );
 
-  // Collapsible section states
+  // Track unsaved changes
+  const [borderStyle, setBorderStyle] = useState('Classic');
+  const [borderColor, setBorderColor] = useState('#808080'); // Default medium gray
   const [visibility, setVisibility] = useState<string[]>(['personal']);
+
+  useEffect(() => {
+    const hasChanges = 
+      name.trim() !== '' || 
+      description.trim() !== '' || 
+      imageDescription.trim() !== '' || 
+      type !== 'Intention' || 
+      role.trim() !== '' || 
+      context !== 'TBD' || 
+      cardImage.trim() !== '' || 
+      format !== 'fullBleed' || 
+      backgroundGradient.join(',') !== ['#1a1a1a', '#000000'].join(',') ||
+      borderStyle !== 'Classic' || 
+      borderColor !== '#808080' ||
+      visibility.length > 1 || // More than just 'personal'
+      isUploadedImage;
+    
+    setHasUnsavedChanges(hasChanges);
+  }, [name, description, imageDescription, type, role, context, cardImage, format, backgroundGradient, borderStyle, borderColor, visibility, isUploadedImage]);
+
+  // Collapsible section states
   const [showVisibility, setShowVisibility] = useState(false);
 
 
@@ -206,12 +325,6 @@ export default function CardCreationNewScreen() {
   const [contextInputValue, setContextInputValue] = useState('');
   const [filteredContextOptions, setFilteredContextOptions] = useState<string[]>([]);
   const [showContextSuggestions, setShowContextSuggestions] = useState(false);
-  
-  // Border style state
-  const [borderStyle, setBorderStyle] = useState('Classic');
-  
-  // Border color state
-  const [borderColor, setBorderColor] = useState('#808080'); // Default medium gray
   
   // Border color options
   const borderColorOptions = [
@@ -2030,13 +2143,96 @@ export default function CardCreationNewScreen() {
     }
   };
   
-  const handleBack = () => {
+  const handleBack = async () => {
     if (Platform.OS !== 'web') {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     }
+    
+    log('handleBack called - draftId:', draftId, 'isDraftLoadedRef:', isDraftLoadedRef.current, 'isDraftLoading:', isDraftLoading);
+    
+    // If editing an existing draft
+    if (draftId) {
+      // If draft hasn't loaded yet, don't save - just navigate back
+      if (!isDraftLoadedRef.current) {
+        log('Draft not loaded yet, navigating back without saving');
+        performBackNavigation();
+        return;
+      }
+      
+      // Draft is loaded, auto-save and navigate back
+      await updateExistingDraft();
+      performBackNavigation();
+      return;
+    }
+    
+    // Check if there are unsaved changes (new card only)
+    if (hasUnsavedChanges) {
+      setShowSaveDraftModal(true);
+    } else {
+      // No unsaved changes, navigate back normally
+      performBackNavigation();
+    }
+  };
+
+  // Update an existing draft in the database
+  const updateExistingDraft = async () => {
+    try {
+      log('updateExistingDraft called - user:', user?.id, 'draftId:', draftId);
+      
+      if (!user || !draftId) {
+        log('Cannot update draft - missing user or draftId');
+        return;
+      }
+
+      // Use current state values, but fall back to loaded draft data if state is still default
+      // This handles the case where React state updates haven't propagated yet
+      const loadedData = loadedDraftDataRef.current;
+      
+      // Check if name is still the default - if so, use loaded data
+      const isStateStillDefault = name === '' || name === 'Untitled Card Draft';
+      
+      const draftData = {
+        name: (isStateStillDefault && loadedData?.name) ? loadedData.name : (name.trim() || 'Untitled Card Draft'),
+        description: (isStateStillDefault && loadedData?.description !== undefined) ? loadedData.description : description.trim(),
+        image_description: (isStateStillDefault && loadedData?.image_description !== undefined) ? loadedData.image_description : imageDescription.trim(),
+        type: (isStateStillDefault && loadedData?.type) ? loadedData.type : type,
+        role: (isStateStillDefault && loadedData?.role !== undefined) ? loadedData.role : role.trim(),
+        context: (isStateStillDefault && loadedData?.context) ? loadedData.context : context,
+        image_url: (isStateStillDefault && loadedData?.image_url !== undefined) ? loadedData.image_url : cardImage,
+        format: (isStateStillDefault && loadedData?.format) ? loadedData.format : format,
+        background_gradient: (isStateStillDefault && loadedData?.background_gradient) ? loadedData.background_gradient : JSON.stringify(backgroundGradient),
+        border_style: (isStateStillDefault && loadedData?.border_style) ? loadedData.border_style : borderStyle,
+        border_color: (isStateStillDefault && loadedData?.border_color) ? loadedData.border_color : borderColor,
+        visibility: (isStateStillDefault && loadedData?.visibility) ? loadedData.visibility : visibility,
+        is_uploaded_image: (isStateStillDefault && loadedData?.is_uploaded_image !== undefined) ? loadedData.is_uploaded_image : isUploadedImage,
+        last_modified: new Date().toISOString()
+      };
+
+      log('Auto-saving draft:', draftId, 'isStateStillDefault:', isStateStillDefault);
+      log('Draft data to save:', JSON.stringify(draftData, null, 2));
+
+      const { data, error } = await supabase
+        .from('card_drafts')
+        .update(draftData)
+        .eq('id', draftId)
+        .select();
+
+      if (error) {
+        logError('Error updating draft:', error.message, error.code, error.details);
+      } else {
+        log('Draft auto-saved successfully, result:', data);
+      }
+    } catch (err) {
+      logError('Error in updateExistingDraft:', err);
+    }
+  };
+
+  const performBackNavigation = () => {
     // Navigate back to the appropriate tab based on returnTo parameter
     if (returnTo === 'cards') {
       router.push('/(tabs)');
+    } else if (returnTo === 'card-inbox') {
+      router.push('/(tabs)/card-inbox');
     } else if (returnTo === 'deck-detail') {
       const returnPhenomena = params.returnPhenomena as string;
       router.push({
@@ -2050,7 +2246,103 @@ export default function CardCreationNewScreen() {
     }
   };
 
+  const checkTableExists = async () => {
+    try {
+      log('Checking if card_drafts table exists...');
+      const { data, error } = await supabase
+        .from('card_drafts')
+        .select('id')
+        .limit(1);
+      
+      log('Table check result - data:', data, 'error:', error);
+      
+      if (error) {
+        logError('Table check error:', error.message, error.code, error.details);
+        return false;
+      }
+      return true;
+    } catch (err) {
+      logError('Table check exception:', err);
+      return false;
+    }
+  };
+
+  const saveDraft = async () => {
+    try {
+      log('Starting saveDraft...');
+      
+      if (!user) {
+        Alert.alert('Error', 'You must be logged in to save drafts.');
+        return;
+      }
+
+      log('User ID:', user.id);
+
+      // Check if the card_drafts table exists
+      const tableExists = await checkTableExists();
+      log('Table exists:', tableExists);
+      
+      if (!tableExists) {
+        Alert.alert(
+          'Database Setup Required',
+          'The card drafts feature needs to be set up. Please run the database migration:\n\n1. Go to Supabase Dashboard\n2. Open SQL Editor\n3. Run migration: 20250810120000_create_card_drafts_table.sql\n\nThis is a one-time setup step.'
+        );
+        return;
+      }
+
+      const draftData = {
+        user_id: user.id,
+        name: name.trim() || 'Untitled Card Draft',
+        description: description.trim(),
+        image_description: imageDescription.trim(),
+        type,
+        role: role.trim(),
+        context,
+        image_url: cardImage,
+        format,
+        background_gradient: JSON.stringify(backgroundGradient),
+        border_style: borderStyle,
+        border_color: borderColor,
+        visibility,
+        is_uploaded_image: isUploadedImage,
+        draft_type: 'card',
+        created_at: new Date().toISOString(),
+        last_modified: new Date().toISOString()
+      };
+
+      log('Attempting to save draft with data:', JSON.stringify(draftData, null, 2));
+
+      const { data, error } = await supabase
+        .from('card_drafts')
+        .insert(draftData)
+        .select()
+        .single();
+
+      log('Insert result - data:', data, 'error:', error);
+
+      if (error) {
+        logError('Error saving draft - message:', error.message, 'code:', error.code, 'details:', error.details, 'hint:', error.hint);
+        Alert.alert('Error', `Failed to save draft: ${error.message || JSON.stringify(error)}`);
+        return;
+      }
+
+      log('Draft saved successfully:', data);
+      Alert.alert('Draft Saved', 'Your card draft has been saved to your inbox.');
+      setShowSaveDraftModal(false);
+      performBackNavigation();
+    } catch (err) {
+      logError('Error in saveDraft:', err);
+      Alert.alert('Error', `An unexpected error occurred: ${err instanceof Error ? err.message : JSON.stringify(err)}`);
+    }
+  };
+
+  const discardChanges = () => {
+    setShowSaveDraftModal(false);
+    performBackNavigation();
+  };
+
   return (
+    <>
     <KeyboardAvoidingView 
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -3424,6 +3716,45 @@ export default function CardCreationNewScreen() {
         </View>
       </Modal>
     </KeyboardAvoidingView>
+
+    {/* Save Draft Confirmation Modal */}
+    <Modal
+      visible={showSaveDraftModal}
+      transparent={true}
+      animationType="fade"
+      onRequestClose={() => setShowSaveDraftModal(false)}
+    >
+      <View style={styles.modalOverlay}>
+        <View style={styles.saveDraftModal}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>Save Draft?</Text>
+          </View>
+          
+          <View style={styles.modalContent}>
+            <Text style={styles.modalMessage}>
+              You have unsaved changes to your card. Would you like to save this as a draft and continue working on it later?
+            </Text>
+            
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.cancelButton]}
+                onPress={discardChanges}
+              >
+                <Text style={styles.cancelButtonText}>Discard</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                style={[styles.modalButton, styles.saveButton]}
+                onPress={saveDraft}
+              >
+                <Text style={styles.saveButtonText}>Save Draft</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  </>
   );
 }
 
@@ -4494,4 +4825,56 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-});
+  
+  // Save Draft Modal Styles
+  saveDraftModal: {
+    backgroundColor: '#1a1a1a',
+    borderRadius: 16,
+    width: '100%',
+    maxWidth: 400,
+    borderWidth: 1,
+    borderColor: '#333',
+  },
+  modalHeader: {
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#333',
+  },
+  modalTitle: {
+    color: '#fff',
+    fontSize: 20,
+    fontWeight: 'bold',
+    textAlign: 'center',
+  },
+  modalContent: {
+    padding: 20,
+  },
+  modalMessage: {
+    color: '#ccc',
+    fontSize: 16,
+    lineHeight: 24,
+    textAlign: 'center',
+    marginBottom: 24,
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  modalButton: {
+    flex: 1,
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  cancelButton: {
+    backgroundColor: '#333',
+    borderWidth: 1,
+    borderColor: '#444',
+  },
+  cancelButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  });

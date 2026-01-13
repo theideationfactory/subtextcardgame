@@ -41,13 +41,33 @@ interface GenerationJob {
   updated_at: string;
 }
 
+interface CardDraft {
+  id: string;
+  name: string;
+  description?: string;
+  type: string;
+  role?: string;
+  context?: string;
+  image_url?: string;
+  format: string;
+  background_gradient?: string;
+  border_style: string;
+  border_color: string;
+  visibility: string[];
+  is_uploaded_image: boolean;
+  created_at: string;
+  last_modified: string;
+}
+
 export default function CardInboxScreen() {
   const router = useRouter();
   const { user } = useAuth();
   
   const [generationJobs, setGenerationJobs] = useState<GenerationJob[]>([]);
+  const [cardDrafts, setCardDrafts] = useState<CardDraft[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [activeTab, setActiveTab] = useState<'generation' | 'drafts'>('generation');
 
   const [fontsLoaded] = useFonts({
     'Inter-Regular': Inter_400Regular,
@@ -86,10 +106,41 @@ export default function CardInboxScreen() {
     }
   }, [user]);
 
+  // Fetch card drafts from database
+  const fetchCardDrafts = useCallback(async () => {
+    if (!user) return;
+    
+    log('Fetching card drafts for user:', user.id);
+    
+    try {
+      const { data, error } = await supabase
+        .from('card_drafts')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('draft_type', 'card')
+        .order('last_modified', { ascending: false });
+      
+      if (error) {
+        logError('Error fetching card drafts:', error);
+        return;
+      }
+      
+      log('Card drafts fetched:', data?.length, 'drafts');
+      if (data && data.length > 0) {
+        log('First draft:', data[0].id, data[0].name);
+      }
+      
+      setCardDrafts(data || []);
+    } catch (err) {
+      logError('Error fetching card drafts:', err);
+    }
+  }, [user]);
+
   // Refresh jobs when screen is focused
   useFocusEffect(
     useCallback(() => {
       fetchGenerationJobs();
+      fetchCardDrafts();
       
       // Set up polling for pending jobs
       const intervalId = setInterval(() => {
@@ -97,8 +148,58 @@ export default function CardInboxScreen() {
       }, 5000);
       
       return () => clearInterval(intervalId);
-    }, [fetchGenerationJobs])
+    }, [fetchGenerationJobs, fetchCardDrafts])
   );
+
+  // Handle tapping on a card draft
+  const handleDraftPress = (draft: CardDraft) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    
+    // Navigate to card creation with ONLY draftId
+    // The card creation screen will load all data from database
+    router.push({
+      pathname: '/(tabs)/card-creation-new',
+      params: {
+        draftId: draft.id,
+        returnTo: 'card-inbox',
+      },
+    });
+  };
+
+  // Delete a card draft
+  const handleDeleteDraft = async (draftId: string) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    
+    Alert.alert(
+      'Delete Draft',
+      'Are you sure you want to delete this card draft?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const { error } = await supabase
+                .from('card_drafts')
+                .delete()
+                .eq('id', draftId);
+              
+              if (error) {
+                logError('Error deleting draft:', error);
+                return;
+              }
+              
+              setCardDrafts(prev => prev.filter(d => d.id !== draftId));
+              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            } catch (err) {
+              logError('Error deleting draft:', err);
+            }
+          },
+        },
+      ]
+    );
+  };
 
   // Handle tapping on a generation job
   const handleJobPress = async (job: GenerationJob) => {
@@ -314,12 +415,54 @@ export default function CardInboxScreen() {
     );
   };
 
+  const renderDraft = ({ item: draft }: { item: CardDraft }) => {
+    return (
+      <Pressable
+        style={styles.jobCard}
+        onPress={() => handleDraftPress(draft)}
+      >
+        <View style={styles.jobContent}>
+          <View style={[styles.jobIconContainer, { backgroundColor: '#6366f120' }]}>
+            <Inbox size={24} color="#6366f1" />
+          </View>
+          
+          <View style={styles.jobInfo}>
+            <Text style={styles.jobName} numberOfLines={1}>
+              {draft.name || 'Untitled Draft'}
+            </Text>
+            <Text style={styles.jobDescription} numberOfLines={1}>
+              {draft.type} • {draft.role || 'No role'} • {draft.context || 'No context'}
+            </Text>
+            <View style={styles.jobMeta}>
+              <View style={[styles.statusBadge, { backgroundColor: '#6366f120' }]}>
+                <Text style={[styles.statusText, { color: '#6366f1' }]}>Draft</Text>
+              </View>
+              <Text style={styles.jobTime}>{formatTimeAgo(draft.last_modified)}</Text>
+            </View>
+          </View>
+          
+          <TouchableOpacity
+            style={styles.deleteButton}
+            onPress={() => handleDeleteDraft(draft.id)}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
+            <Trash2 size={18} color="#666" />
+          </TouchableOpacity>
+        </View>
+      </Pressable>
+    );
+  };
+
   const renderEmptyState = () => (
     <View style={styles.emptyState}>
       <Inbox size={64} color="#444" />
-      <Text style={styles.emptyTitle}>No Card Drafts</Text>
+      <Text style={styles.emptyTitle}>
+        {activeTab === 'generation' ? 'No Generation Jobs' : 'No Card Drafts'}
+      </Text>
       <Text style={styles.emptyDescription}>
-        When you generate card images, they'll appear here so you can complete them later.
+        {activeTab === 'generation' 
+          ? 'When you generate card images, they\'ll appear here so you can complete them later.'
+          : 'When you save a card draft, it will appear here so you can continue working on it later.'}
       </Text>
       <TouchableOpacity
         style={styles.createButton}
@@ -338,16 +481,36 @@ export default function CardInboxScreen() {
           <ArrowLeft size={24} color="#fff" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Card Inbox</Text>
-        {(readyCount > 0 || failedCount > 0) && (
+        {activeTab === 'generation' && (readyCount > 0 || failedCount > 0) && (
           <TouchableOpacity onPress={handleClearCompleted} style={styles.clearButton}>
             <Text style={styles.clearButtonText}>Clear</Text>
           </TouchableOpacity>
         )}
-        {readyCount === 0 && failedCount === 0 && <View style={styles.placeholder} />}
+        {(activeTab === 'drafts' || (readyCount === 0 && failedCount === 0)) && <View style={styles.placeholder} />}
       </View>
 
-      {/* Stats Bar */}
-      {generationJobs.length > 0 && (
+      {/* Tab Selector */}
+      <View style={styles.tabContainer}>
+        <TouchableOpacity
+          style={[styles.tab, activeTab === 'generation' && styles.activeTab]}
+          onPress={() => setActiveTab('generation')}
+        >
+          <Text style={[styles.tabText, activeTab === 'generation' && styles.activeTabText]}>
+            Generation Queue
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.tab, activeTab === 'drafts' && styles.activeTab]}
+          onPress={() => setActiveTab('drafts')}
+        >
+          <Text style={[styles.tabText, activeTab === 'drafts' && styles.activeTabText]}>
+            Saved Drafts {cardDrafts.length > 0 && `(${cardDrafts.length})`}
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Stats Bar - only show for generation tab */}
+      {activeTab === 'generation' && generationJobs.length > 0 && (
         <View style={styles.statsBar}>
           {pendingCount > 0 && (
             <View style={styles.statItem}>
@@ -374,9 +537,9 @@ export default function CardInboxScreen() {
       {isLoading ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#6366f1" />
-          <Text style={styles.loadingText}>Loading drafts...</Text>
+          <Text style={styles.loadingText}>Loading...</Text>
         </View>
-      ) : (
+      ) : activeTab === 'generation' ? (
         <FlatList
           data={generationJobs}
           renderItem={renderJob}
@@ -387,6 +550,24 @@ export default function CardInboxScreen() {
             <RefreshControl
               refreshing={isRefreshing}
               onRefresh={() => fetchGenerationJobs(true)}
+              tintColor="#6366f1"
+            />
+          }
+        />
+      ) : (
+        <FlatList
+          data={cardDrafts}
+          renderItem={renderDraft}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={styles.listContent}
+          ListEmptyComponent={renderEmptyState}
+          refreshControl={
+            <RefreshControl
+              refreshing={isRefreshing}
+              onRefresh={() => {
+                setIsRefreshing(true);
+                fetchCardDrafts().finally(() => setIsRefreshing(false));
+              }}
               tintColor="#6366f1"
             />
           }
@@ -568,6 +749,31 @@ const styles = StyleSheet.create({
   createButtonText: {
     fontFamily: 'Inter-Bold',
     fontSize: 16,
+    color: '#fff',
+  },
+  tabContainer: {
+    flexDirection: 'row',
+    backgroundColor: '#1a1a1a',
+    borderBottomWidth: 1,
+    borderBottomColor: '#333',
+  },
+  tab: {
+    flex: 1,
+    paddingVertical: 14,
+    alignItems: 'center',
+    borderBottomWidth: 2,
+    borderBottomColor: 'transparent',
+  },
+  activeTab: {
+    borderBottomColor: '#6366f1',
+  },
+  tabText: {
+    fontFamily: 'Inter-Regular',
+    fontSize: 14,
+    color: '#888',
+  },
+  activeTabText: {
+    fontFamily: 'Inter-Bold',
     color: '#fff',
   },
 });
