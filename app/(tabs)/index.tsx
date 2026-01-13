@@ -122,6 +122,8 @@ export default function CollectionScreen() {
   const viewShotRefs = useRef<Map<string, ViewShot | null>>(new Map());
   const { height: screenHeight } = useWindowDimensions();
   const router = useRouter();
+  const [hiddenCards, setHiddenCards] = useState<Set<string>>(new Set());
+  const [favoritedCards, setFavoritedCards] = useState<Set<string>>(new Set());
   
   // New deck viewing state
   const [viewMode, setViewMode] = useState<'cards' | 'decks'>('cards');
@@ -188,6 +190,8 @@ export default function CollectionScreen() {
             .limit(50); // Add reasonable limit
 
           if (personalError) throw personalError;
+          console.log('🔵 DEBUG: Personal cards loaded:', personalCards?.length);
+          console.log('🔵 DEBUG: Sample personal card:', personalCards?.[0]);
           setAllCards(personalCards as Card[] ?? []);
           break;
 
@@ -239,6 +243,9 @@ export default function CollectionScreen() {
           const { data: friendCards, error: friendCardsError } = await friendCardsQuery;
 
           if (friendCardsError) throw friendCardsError;
+          console.log('🟢 DEBUG: Friends cards loaded:', friendCards?.length);
+          console.log('🟢 DEBUG: Sample friend card:', friendCards?.[0]);
+          console.log('🟢 DEBUG: Friend card has is_shared_with_friends?', friendCards?.[0]?.hasOwnProperty('is_shared_with_friends'));
           setAllCards(friendCards as Card[] || []);
           break;
 
@@ -270,6 +277,9 @@ export default function CollectionScreen() {
                 throw publicError;
               }
             } else {
+              console.log('🟡 DEBUG: Public cards loaded:', publicCards?.length);
+              console.log('🟡 DEBUG: Sample public card:', publicCards?.[0]);
+              console.log('🟡 DEBUG: Public card has is_public?', publicCards?.[0]?.hasOwnProperty('is_public'));
               setAllCards(publicCards as Card[] ?? []);
             }
           } catch (publicErr: any) {
@@ -284,6 +294,8 @@ export default function CollectionScreen() {
                 .limit(50);
 
               if (fallbackError) throw fallbackError;
+              console.log('🟡 DEBUG: Public fallback cards loaded:', fallbackCards?.length);
+              console.log('🟡 DEBUG: Sample fallback card:', fallbackCards?.[0]);
               setAllCards(fallbackCards as Card[] ?? []);
             } else {
               logError('Public cards query error:', publicErr);
@@ -688,6 +700,11 @@ export default function CollectionScreen() {
       if (selectedPhenomena !== 'All') {
         filtered = filtered.filter(card => card.type === selectedPhenomena);
       }
+      
+      // Filter out hidden cards (only for Friends and Public tabs)
+      if (selectedType === 'friends' || selectedType === 'public') {
+        filtered = filtered.filter(card => !hiddenCards.has(card.id));
+      }
     }
     
     // Filter by search query (name)
@@ -699,7 +716,7 @@ export default function CollectionScreen() {
     }
     
     return filtered;
-  }, [selectedPhenomena, searchQuery, viewMode]);
+  }, [selectedPhenomena, searchQuery, viewMode, selectedType, hiddenCards]);
 
   // Update displayed items based on view mode and filters
   useEffect(() => {
@@ -964,6 +981,38 @@ export default function CollectionScreen() {
       Alert.alert('Error', 'Failed to share card. Please try again.');
     } finally {
       setSharingCard(false);
+    }
+  };
+
+  const handleHideCard = (card: Card) => {
+    setShowActions(false);
+    setHiddenCards(prev => new Set(prev.add(card.id)));
+    if (Platform.OS !== 'web') {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    }
+    log('🙈 Card hidden:', card.name, card.id);
+  };
+
+  const handleFavoriteCard = (card: Card) => {
+    setShowActions(false);
+    const isFavorited = favoritedCards.has(card.id);
+    
+    if (isFavorited) {
+      // Unfavorite
+      setFavoritedCards(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(card.id);
+        return newSet;
+      });
+      log('💔 Card unfavorited:', card.name, card.id);
+    } else {
+      // Favorite
+      setFavoritedCards(prev => new Set(prev.add(card.id)));
+      log('❤️ Card favorited:', card.name, card.id);
+    }
+    
+    if (Platform.OS !== 'web') {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     }
   };
 
@@ -1348,46 +1397,12 @@ export default function CollectionScreen() {
         >
           <Image source={{ uri: item.image_url }} style={styles.fullBleedImage} resizeMode="cover" />
 
-          {/* Adaptive gradient overlay - hide for uploaded images */}
-          {!item.is_uploaded_image && (() => {
-            // Calculate adaptive gradient height based on content
-            const titleLines = item.name ? Math.ceil(item.name.length / 20) : 0; // Rough estimate of title lines
-            const titleHeight = titleLines * nameFontSize * 1.2; // Line height factor
-            const descriptionLines = Math.min(4, Math.ceil(item.description.length / 30)); // Estimate description lines
-            const descriptionHeight = descriptionLines * descriptionFontSize * 1.4;
-            const padding = 28; // Top and bottom padding
-            const spacing = 6; // Space between title and description
-            
-            // Calculate total content height
-            const totalContentHeight = titleHeight + descriptionHeight + padding + spacing;
-            
-            // Ensure gradient covers at least the content area plus some buffer
-            const adaptiveGradientHeight = Math.max(totalContentHeight + 20, cardHeight * 0.4);
-            
-            // Calculate gradient start position (where title should begin)
-            const gradientStartFromBottom = totalContentHeight;
-            
-            return (
-              <LinearGradient
-                colors={[ 'rgba(0,0,0,0)', 'rgba(0,0,0,0.3)', 'rgba(0,0,0,0.75)' ]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 0, y: 1 }}
-                style={[
-                  styles.fullBleedGradient, 
-                  { 
-                    height: adaptiveGradientHeight,
-                    bottom: 0
-                  }
-                ]}
-                pointerEvents="none"
-              />
-            );
-          })()}
+          {/* Gradient overlay removed - no longer needed since text overlays are hidden */}
 
 
 
-          {/* Hide text overlays for premium generation and uploaded images */}
-          {!item.is_premium_generation && !item.is_uploaded_image && item.type ? (
+          {/* Hide text overlays for all fullBleed cards - text should be integrated into the image */}
+          {false && item.type ? (
             <Text
               style={[
                 styles.fullBleedCorner,
@@ -1399,7 +1414,7 @@ export default function CollectionScreen() {
             </Text>
           ) : null}
 
-          {!item.is_premium_generation && !item.is_uploaded_image && item.role ? (
+          {false && item.role ? (
             <Text
               style={[
                 styles.fullBleedCorner,
@@ -1411,8 +1426,8 @@ export default function CollectionScreen() {
             </Text>
           ) : null}
 
-          {/* Hide name and description overlays for premium generation and uploaded images */}
-          {!item.is_premium_generation && !item.is_uploaded_image && item.description ? (
+          {/* Hide name and description overlays for all fullBleed cards */}
+          {false && item.description ? (
             <View style={styles.cornerTextContainer}>
               {item.name ? (
                 <Text
@@ -1906,38 +1921,10 @@ export default function CollectionScreen() {
                     <>
                       <Image source={{ uri: shadowItem.image_url }} style={styles.fullBleedImage} resizeMode="cover" />
 
-                      {/* Adaptive gradient overlay - same logic as normal full bleed */}
-                      {(() => {
-                        // Calculate adaptive gradient height based on content
-                        const titleLines = shadowItem.name ? Math.ceil(shadowItem.name.length / 20) : 0;
-                        const titleHeight = titleLines * shadowNameFontSize * 1.2;
-                        const descriptionLines = Math.min(4, Math.ceil((shadowItem.description || '').length / 30));
-                        const descriptionHeight = descriptionLines * shadowDescriptionFontSize * 1.4;
-                        const padding = 28;
-                        const spacing = 6;
-                        
-                        const totalContentHeight = titleHeight + descriptionHeight + padding + spacing;
-                        const adaptiveGradientHeight = Math.max(totalContentHeight + 20, cardHeight * 0.4);
-                        
-                        return (
-                          <LinearGradient
-                            colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0.1)', 'rgba(0,0,0,0.4)', 'rgba(0,0,0,0.8)']}
-                            start={{ x: 0, y: 0 }}
-                            end={{ x: 0, y: 1 }}
-                            style={[
-                              styles.fullBleedGradient, 
-                              { 
-                                height: adaptiveGradientHeight,
-                                bottom: 0
-                              }
-                            ]}
-                            pointerEvents="none"
-                          />
-                        );
-                      })()}
+                      {/* Gradient overlay removed - no longer needed since text overlays are hidden */}
 
-                      {/* Type label in top right - hidden for premium generation and uploaded images */}
-                      {!shadowItem.is_premium_generation && !shadowItem.is_uploaded_image && shadowItem.type ? (
+                      {/* Type label in top right - hidden for all fullBleed shadow cards */}
+                      {false && shadowItem.type ? (
                         <Text
                           style={[
                             styles.fullBleedCorner,
@@ -1949,8 +1936,8 @@ export default function CollectionScreen() {
                         </Text>
                       ) : null}
 
-                      {/* Role label in top left - hidden for premium generation and uploaded images */}
-                      {!shadowItem.is_premium_generation && !shadowItem.is_uploaded_image && shadowItem.role ? (
+                      {/* Role label in top left - hidden for all fullBleed shadow cards */}
+                      {false && shadowItem.role ? (
                         <Text
                           style={[
                             styles.fullBleedCorner,
@@ -1962,8 +1949,8 @@ export default function CollectionScreen() {
                         </Text>
                       ) : null}
 
-                      {/* Title and description in corner layout - hidden for premium generation and uploaded images */}
-                      {!shadowItem.is_premium_generation && !shadowItem.is_uploaded_image && shadowItem.description ? (
+                      {/* Title and description in corner layout - hidden for all fullBleed shadow cards */}
+                      {false && shadowItem.description ? (
                         <View style={styles.cornerTextContainer}>
                           {shadowItem.name ? (
                             <Text
@@ -2708,6 +2695,8 @@ export default function CollectionScreen() {
             {deleteError ? (
               <Text style={styles.modalErrorText}>{deleteError}</Text>
             ) : null}
+            
+            {/* Personal cards: Full edit controls */}
             {selectedType === 'personal' && (
               <>
                 <TouchableOpacity
@@ -2771,6 +2760,50 @@ export default function CollectionScreen() {
                       </Text>
                     </>
                   )}
+                </TouchableOpacity>
+              </>
+            )}
+            
+            {/* Friends and Public cards: Share, Hide, Favorite */}
+            {(selectedType === 'friends' || selectedType === 'public') && selectedCard && (
+              <>
+                <TouchableOpacity
+                  style={[styles.modalButton, styles.shareButton]}
+                  onPress={() => handleShareCard(selectedCard)}
+                  disabled={sharingCard}
+                >
+                  {sharingCard ? (
+                    <Text style={styles.modalButtonText}>
+                      Capturing...
+                    </Text>
+                  ) : (
+                    <>
+                      <Share2 size={20} color="#10b981" />
+                      <Text style={styles.modalButtonText}>Share Card</Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+                
+                <TouchableOpacity
+                  style={[styles.modalButton, styles.favoriteButton]}
+                  onPress={() => handleFavoriteCard(selectedCard)}
+                >
+                  <Heart 
+                    size={20} 
+                    color={favoritedCards.has(selectedCard.id) ? "#ff4444" : "#fbbf24"}
+                    fill={favoritedCards.has(selectedCard.id) ? "#ff4444" : "none"}
+                  />
+                  <Text style={styles.modalButtonText}>
+                    {favoritedCards.has(selectedCard.id) ? 'Unfavorite' : 'Favorite'}
+                  </Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity
+                  style={[styles.modalButton, styles.hideButton]}
+                  onPress={() => handleHideCard(selectedCard)}
+                >
+                  <X size={20} color="#6b7280" />
+                  <Text style={styles.modalButtonText}>Hide Card</Text>
                 </TouchableOpacity>
               </>
             )}
@@ -3280,6 +3313,12 @@ const styles = StyleSheet.create({
   },
   shareButton: {
     backgroundColor: 'rgba(16, 185, 129, 0.2)', // Green with transparency
+  },
+  favoriteButton: {
+    backgroundColor: 'rgba(251, 191, 36, 0.2)', // Yellow/gold with transparency
+  },
+  hideButton: {
+    backgroundColor: 'rgba(107, 114, 128, 0.2)', // Gray with transparency
   },
   errorText: {
     color: '#ff4444',
