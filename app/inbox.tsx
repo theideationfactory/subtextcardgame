@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, FlatList, ActivityIndicator, Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { ArrowLeft, FileText, Save } from 'lucide-react-native';
+import { ArrowLeft, FileText } from 'lucide-react-native';
 import { createClient } from '@supabase/supabase-js';
 import { useAuth } from '@/contexts/AuthContext';
 import { log, logError } from '@/utils/logger';
@@ -17,24 +17,6 @@ interface SharedDraft {
   direction: 'incoming' | 'outgoing'; // Whether this draft was shared with the user or by the user
 }
 
-interface CardDraft {
-  id: string;
-  name: string;
-  description?: string;
-  type: string;
-  role?: string;
-  context?: string;
-  image_url?: string;
-  format: string;
-  background_gradient?: string;
-  border_style: string;
-  border_color: string;
-  visibility: string[];
-  is_uploaded_image: boolean;
-  created_at: string;
-  last_modified: string;
-}
-
 const supabase = createClient(
   process.env.EXPO_PUBLIC_SUPABASE_URL!,
   process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY!
@@ -46,23 +28,17 @@ export default function InboxScreen() {
   const topPadding = Platform.OS === 'web' ? 0 : Math.max(insets.top, 4);
   const { user, loading: authLoading } = useAuth();
   const [sharedDrafts, setSharedDrafts] = useState<SharedDraft[]>([]);
-  const [cardDrafts, setCardDrafts] = useState<CardDraft[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [activeTab, setActiveTab] = useState<'shared' | 'card'>('shared');
 
   useEffect(() => {
     if (!authLoading && user) {
-      if (activeTab === 'shared') {
-        fetchSharedDrafts();
-      } else {
-        fetchCardDrafts();
-      }
+      fetchSharedDrafts();
     } else if (!authLoading && !user) {
       setError('Please log in to view your inbox.');
       setLoading(false);
     }
-  }, [user, authLoading, activeTab]);
+  }, [user, authLoading]);
 
   const fetchSharedDrafts = async () => {
     try {
@@ -121,40 +97,6 @@ export default function InboxScreen() {
     }
   };
 
-  const fetchCardDrafts = async () => {
-    try {
-      setLoading(true);
-      setError('');
-
-      if (!user) {
-        setError('User not authenticated.');
-        setLoading(false);
-        return;
-      }
-
-      // Query for user's card drafts
-      const { data, error } = await supabase
-        .from('card_drafts')
-        .select(`
-          id, name, description, type, role, context, image_url, format,
-          background_gradient, border_style, border_color, visibility,
-          is_uploaded_image, created_at, last_modified
-        `)
-        .eq('user_id', user.id)
-        .eq('draft_type', 'card')
-        .order('last_modified', { ascending: false });
-
-      if (error) throw error;
-
-      setCardDrafts(data || []);
-    } catch (err) {
-      logError('Error fetching card drafts:', err);
-      const errorMessage = err instanceof Error ? err.message : 'Failed to load card drafts';
-      setError(errorMessage);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const formatDate = (date: string) => {
     const options: Intl.DateTimeFormatOptions = {
@@ -200,36 +142,6 @@ export default function InboxScreen() {
     );
   };
 
-  const renderCardDraft = ({ item }: { item: CardDraft }) => {
-    return (
-      <TouchableOpacity 
-        style={styles.draftItem}
-        onPress={() => router.push({
-          pathname: '/card-creation-new',
-          params: { 
-            draftId: item.id,
-            edit_mode: 'true'
-          }
-        })}
-      >
-        <View style={styles.draftInfo}>
-          <View style={styles.draftHeader}>
-            <Save size={20} color="#6366f1" style={styles.draftIcon} />
-            <Text style={styles.draftName}>{item.name}</Text>
-            <View style={styles.cardDraftBadge}>
-              <Text style={styles.cardDraftBadgeText}>Draft</Text>
-            </View>
-          </View>
-          <Text style={styles.draftSubtitle}>
-            {item.type} • {item.role || 'No role'} • {item.context || 'No context'}
-          </Text>
-          <Text style={styles.draftDate}>
-            Modified: {formatDate(item.last_modified)}
-          </Text>
-        </View>
-      </TouchableOpacity>
-    );
-  };
 
   return (
     <View style={styles.container}>
@@ -240,27 +152,7 @@ export default function InboxScreen() {
         >
           <ArrowLeft size={24} color="#fff" />
         </TouchableOpacity>
-        <Text style={styles.title}>Inbox</Text>
-      </View>
-      
-      {/* Tab Selector */}
-      <View style={styles.tabContainer}>
-        <TouchableOpacity
-          style={[styles.tab, activeTab === 'shared' && styles.activeTab]}
-          onPress={() => setActiveTab('shared')}
-        >
-          <Text style={[styles.tabText, activeTab === 'shared' && styles.activeTabText]}>
-            Shared Drafts
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.tab, activeTab === 'card' && styles.activeTab]}
-          onPress={() => setActiveTab('card')}
-        >
-          <Text style={[styles.tabText, activeTab === 'card' && styles.activeTabText]}>
-            Card Drafts
-          </Text>
-        </TouchableOpacity>
+        <Text style={styles.title}>Shared Spreads</Text>
       </View>
       
       {loading ? (
@@ -271,20 +163,15 @@ export default function InboxScreen() {
         <View style={styles.content}>
           <Text style={styles.errorText}>{error}</Text>
         </View>
-      ) : activeTab === 'shared' && sharedDrafts.length === 0 ? (
+      ) : sharedDrafts.length === 0 ? (
         <View style={styles.content}>
-          <Text style={styles.subtitle}>No shared drafts yet.</Text>
-          <Text style={styles.emptySubtext}>Shared spreads will appear here.</Text>
-        </View>
-      ) : activeTab === 'card' && cardDrafts.length === 0 ? (
-        <View style={styles.content}>
-          <Text style={styles.subtitle}>No card drafts yet.</Text>
-          <Text style={styles.emptySubtext}>Your saved card drafts will appear here.</Text>
+          <Text style={styles.subtitle}>No shared spreads yet.</Text>
+          <Text style={styles.emptySubtext}>Spreads shared with you or by you will appear here.</Text>
         </View>
       ) : (
         <FlatList
-          data={(activeTab === 'shared' ? sharedDrafts : cardDrafts) as any}
-          renderItem={activeTab === 'shared' ? renderSharedDraft : renderCardDraft as any}
+          data={sharedDrafts}
+          renderItem={renderSharedDraft}
           keyExtractor={item => item.id}
           contentContainerStyle={styles.listContent}
         />
@@ -392,46 +279,5 @@ const styles = StyleSheet.create({
     color: '#ff4444',
     fontSize: 16,
     textAlign: 'center',
-  },
-  tabContainer: {
-    flexDirection: 'row',
-    backgroundColor: '#1a1a1a',
-    borderBottomWidth: 1,
-    borderBottomColor: '#333',
-  },
-  tab: {
-    flex: 1,
-    paddingVertical: 16,
-    alignItems: 'center',
-    borderBottomWidth: 2,
-    borderBottomColor: 'transparent',
-  },
-  activeTab: {
-    borderBottomColor: '#6366f1',
-  },
-  tabText: {
-    color: '#999',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  activeTabText: {
-    color: '#fff',
-  },
-  cardDraftBadge: {
-    backgroundColor: '#6366f1',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 10,
-    marginLeft: 8,
-  },
-  cardDraftBadgeText: {
-    color: '#fff',
-    fontSize: 10,
-    fontWeight: 'bold',
-  },
-  draftSubtitle: {
-    color: '#999',
-    fontSize: 14,
-    marginTop: 2,
   },
 });
