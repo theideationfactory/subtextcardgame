@@ -162,45 +162,83 @@ export default function AICardFlowStep3() {
 
         const imageDescription = imageDescData?.imageDescription || card.description;
 
-        // Generate the complete card (now returns jobId for background processing)
-        const { data: cardData, error: cardError } = await supabase.functions.invoke('generate-enhanced-card', {
-          body: { 
-            name: card.name, 
-            description: imageDescription, 
-            type: card.type, 
-            role: card.role, 
-            context: card.context, 
-            format: 'fullBleed', 
-            size: '1024x1536', 
-            quality: 'auto' 
-          },
-        });
+        // Create job in queue directly
+        const { data: { user } } = await supabase.auth.getUser();
+        const { data: job, error: queueError } = await supabase
+          .from('image_generation_queue')
+          .insert({
+            user_id: user?.id,
+            card_data: {
+              name: card.name,
+              description: imageDescription,
+              type: card.type,
+              role: card.role,
+              context: card.context,
+              format: 'fullBleed',
+              size: '1024x1536',
+              quality: 'auto',
+              generation_type: 'enhanced'
+            },
+            status: 'queued'
+          })
+          .select()
+          .single();
 
-        if (!cardError && cardData?.jobId) {
-          log('✅ Card queued for background generation, jobId:', cardData.jobId);
+        if (queueError) {
+          logError('❌ Error creating job:', queueError);
           setCardData(prev => ({
             ...prev,
             [card.id]: {
               ...card,
-              isGenerating: true,
-              status: 'generating',
-              jobId: cardData.jobId
+              isGenerating: false,
+              status: 'error',
+              error: 'Failed to queue card generation'
             }
           }));
-          
-          // Start polling for completion
-          const pollForCompletion = async () => {
-            for (let i = 0; i < 60; i++) { // Poll for up to 2 minutes
-              await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds
+          continue;
+        }
+
+        log('✅ Job created:', job.id);
+
+        // Trigger processing function directly
+        const { error: processError } = await supabase.functions.invoke('process-full-bleed-card-generation', {
+          body: { jobId: job.id }
+        });
+
+        if (processError) {
+          logError('❌ Error triggering processor:', processError);
+        } else {
+          log('✅ Processor triggered for job:', job.id);
+        }
+
+        setCardData(prev => ({
+          ...prev,
+          [card.id]: {
+            ...card,
+            isGenerating: true,
+            status: 'generating',
+            jobId: job.id
+          }
+        }));
+        
+        // Poll for completion using check-job-status function
+        const pollForCompletion = async () => {
+          for (let i = 0; i < 60; i++) { // Poll for up to 2 minutes
+            await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds
+            
+            const { data: jobResponse, error: jobError } = await supabase.functions.invoke('check-job-status', {
+              body: { jobId: job.id }
+            });
               
-              const { data: job } = await supabase
-                .from('image_generation_queue')
-                .select('*')
-                .eq('id', cardData.jobId)
-                .single();
+              if (jobError) {
+                logError('❌ Error checking job status:', jobError);
+                continue;
+              }
               
-              if (job?.status === 'completed' && job.image_url) {
-                log('✅ Card generation completed:', job.image_url);
+              const jobStatus = jobResponse?.job;
+              
+              if (jobStatus?.status === 'completed' && jobStatus.image_url) {
+                log('✅ Card generation completed:', jobStatus.image_url);
                 
                 // Save the card to the database
                 try {
@@ -237,7 +275,7 @@ export default function AICardFlowStep3() {
                         type: card.type,
                         role: card.role || 'TBD',
                         context: card.context || 'TBD',
-                        image_url: job.image_url,
+                        image_url: jobStatus.image_url,
                         user_id: user.id,
                         collection_id: collectionId,
                         format: 'fullBleed',
@@ -263,20 +301,20 @@ export default function AICardFlowStep3() {
                   [card.id]: {
                     ...card,
                     isGenerating: false,
-                    imageUrl: job.image_url,
+                    imageUrl: jobStatus.image_url,
                     status: 'completed'
                   }
                 }));
                 return;
-              } else if (job?.status === 'failed') {
-                logError('❌ Card generation failed:', job.error_message);
+              } else if (jobStatus?.status === 'failed') {
+                logError('❌ Card generation failed:', jobStatus.error_message);
                 setCardData(prev => ({
                   ...prev,
                   [card.id]: {
                     ...card,
                     isGenerating: false,
                     status: 'error',
-                    error: job.error_message || 'Image generation failed'
+                    error: jobStatus.error_message || 'Image generation failed'
                   }
                 }));
                 return;
@@ -297,30 +335,6 @@ export default function AICardFlowStep3() {
           };
           
           pollForCompletion();
-        } else if (!cardError && cardData?.imageUrl) {
-          // Old response format - direct image URL
-          log('✅ Card generated successfully:', cardData.imageUrl);
-          setCardData(prev => ({
-            ...prev,
-            [card.id]: {
-              ...card,
-              isGenerating: false,
-              imageUrl: cardData.imageUrl,
-              status: 'completed'
-            }
-          }));
-        } else {
-          logError('❌ Error generating card:', cardError?.message || 'Failed to generate card');
-          setCardData(prev => ({
-            ...prev,
-            [card.id]: {
-              ...card,
-              isGenerating: false,
-              status: 'error',
-              error: cardError?.message || 'Failed to generate card'
-            }
-          }));
-        }
       } catch (error) {
         logError('Error generating card:', error);
         setCardData(prev => ({

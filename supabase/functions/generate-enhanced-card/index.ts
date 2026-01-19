@@ -112,35 +112,38 @@ Deno.serve(async (req: Request) => {
 
     console.log('✅ Job inserted successfully:', job);
 
-    // Trigger processing function (don't await, but log any errors)
-    supabaseAdmin.functions.invoke('process-enhanced-card-generation', { 
-      body: { jobId: job.id } 
-    }).then(({ data, error }: { data: any, error: any }) => {
-      if (error) {
-        console.error('❌ Failed to trigger processing function:', error);
+    // Call processing function directly via HTTP
+    // This is more reliable than supabase.functions.invoke() from within an Edge Function
+    // Use full-bleed processor for fullBleed format cards
+    const processingUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/process-full-bleed-card-generation`;
+    const anonKey = Deno.env.get('SUPABASE_ANON_KEY');
+    
+    console.log('🔧 Triggering full-bleed processing function for job:', job.id);
+    
+    // Don't await - let it process in background
+    fetch(processingUrl, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${anonKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ jobId: job.id })
+    }).then(async (response) => {
+      if (!response.ok) {
+        const error = await response.text();
+        console.error('❌ Processing function failed:', error);
       } else {
         console.log('✅ Processing function triggered successfully');
       }
-    }).catch((err: any) => {
-      console.error('❌ Error triggering processing function:', err);
+    }).catch((err) => {
+      console.error('❌ Error calling processing function:', err);
     });
 
     console.log('✅ Enhanced card queued successfully:', job.id);
 
-    // Return job info instead of image URL (for polling)
     return new Response(
-      JSON.stringify({ 
-        jobId: job.id,
-        status: 'queued',
-        message: 'Enhanced card generation queued successfully'
-      }),
-      {
-        headers: {
-          ...corsHeaders,
-          'Content-Type': 'application/json',
-        },
-        status: 200,
-      },
+      JSON.stringify({ jobId: job.id }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
