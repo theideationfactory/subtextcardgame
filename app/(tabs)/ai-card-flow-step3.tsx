@@ -239,62 +239,7 @@ export default function AICardFlowStep3() {
               
               if (jobStatus?.status === 'completed' && jobStatus.image_url) {
                 log('✅ Card generation completed:', jobStatus.image_url);
-                
-                // Save the card to the database
-                try {
-                  if (user) {
-                    // Get or create collection
-                    const { data: existingCollections } = await supabase
-                      .from('collections')
-                      .select('id')
-                      .eq('user_id', user.id)
-                      .limit(1);
-
-                    let collectionId = null;
-                    if (existingCollections && existingCollections.length > 0) {
-                      collectionId = existingCollections[0].id;
-                    } else {
-                      const { data: newCollection } = await supabase
-                        .from('collections')
-                        .insert({
-                          name: 'My Collection',
-                          user_id: user.id,
-                          is_public: false
-                        })
-                        .select()
-                        .single();
-                      collectionId = newCollection?.id;
-                    }
-
-                    // Save the card
-                    const { data: savedCard, error: saveError } = await supabase
-                      .from('cards')
-                      .insert({
-                        name: card.name,
-                        description: card.description,
-                        type: card.type,
-                        role: card.role || 'TBD',
-                        context: card.context || 'TBD',
-                        image_url: jobStatus.image_url,
-                        user_id: user.id,
-                        collection_id: collectionId,
-                        format: 'fullBleed',
-                        is_premium_generation: true,
-                        is_public: false,
-                        is_shared_with_friends: false
-                      })
-                      .select()
-                      .single();
-
-                    if (saveError) {
-                      logError('❌ Error saving card:', saveError);
-                    } else {
-                      log('✅ Card saved to database:', savedCard.id);
-                    }
-                  }
-                } catch (saveErr) {
-                  logError('❌ Error during card save:', saveErr);
-                }
+                log('✅ Card already saved by processor');
 
                 setCardData(prev => ({
                   ...prev,
