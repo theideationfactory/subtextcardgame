@@ -213,6 +213,7 @@ Deno.serve(async (req: Request) => {
       is_premium_generation: cardData.isPremium || false,
       custom_generation_type_id: cardData.customGenerationTypeId || null,
       is_uploaded_image: false,
+      generation_type: cardData.generationType || 'legacy',
       background_gradient: backgroundGradient,
       user_id: job.user_id,
       collection_id: collectionId,

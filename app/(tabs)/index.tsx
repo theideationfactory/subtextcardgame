@@ -90,6 +90,7 @@ export default function CollectionScreen() {
     is_premium_generation?: boolean;
     custom_generation_type_id?: string; // Track if this card was generated with a custom type
     is_uploaded_image?: boolean; // Track if image was uploaded by user
+    generation_type?: string; // Track the generation type used (legacy, premium, classic, modern_parchment, custom)
     user_id: string;
     collection_id?: string;
     collections?: any;
@@ -180,7 +181,7 @@ export default function CollectionScreen() {
             .select(`
               id, name, description, image_description, type, role, context, image_url, frame_width, frame_color, 
               name_color, type_color, description_color, context_color, format, background_gradient, 
-              is_premium_generation, custom_generation_type_id, is_uploaded_image, user_id, collection_id, shadow_card_id,
+              is_premium_generation, custom_generation_type_id, is_uploaded_image, generation_type, user_id, collection_id, shadow_card_id,
               shadow_card:shadow_card_id(
                 id, name, description, type, role, context, image_url, frame_width, frame_color,
                 name_color, type_color, description_color, context_color, format, background_gradient,
@@ -217,7 +218,7 @@ export default function CollectionScreen() {
 
           let friendCardsQuery = supabase
             .from('cards')
-            .select('id, name, description, type, role, context, image_url, frame_width, frame_color, name_color, type_color, description_color, context_color, format, background_gradient, is_premium_generation, custom_generation_type_id, is_uploaded_image, user_id, collection_id')
+            .select('id, name, description, type, role, context, image_url, frame_width, frame_color, name_color, type_color, description_color, context_color, format, background_gradient, is_premium_generation, custom_generation_type_id, is_uploaded_image, generation_type, user_id, collection_id')
             .in('user_id', friendIds)
             .order('created_at', { ascending: false });
 
@@ -254,7 +255,7 @@ export default function CollectionScreen() {
             // First try with is_public column (if migration has been run)
             const { data: publicCards, error: publicError } = await supabase
               .from('cards')
-              .select('id, name, description, type, role, context, image_url, frame_width, frame_color, name_color, type_color, description_color, context_color, format, background_gradient, is_premium_generation, custom_generation_type_id, is_uploaded_image, user_id, collection_id')
+              .select('id, name, description, type, role, context, image_url, frame_width, frame_color, name_color, type_color, description_color, context_color, format, background_gradient, is_premium_generation, custom_generation_type_id, is_uploaded_image, generation_type, user_id, collection_id')
               .eq('is_public', true)
               .order('created_at', { ascending: false });
 
@@ -264,7 +265,7 @@ export default function CollectionScreen() {
                 log('is_public column not found, falling back to showing other users\' cards');
                 const { data: fallbackCards, error: fallbackError } = await supabase
                   .from('cards')
-                  .select('id, name, description, type, role, context, image_url, frame_width, frame_color, name_color, type_color, description_color, context_color, format, background_gradient, is_premium_generation, custom_generation_type_id, is_uploaded_image, user_id, collection_id')
+                  .select('id, name, description, type, role, context, image_url, frame_width, frame_color, name_color, type_color, description_color, context_color, format, background_gradient, is_premium_generation, custom_generation_type_id, is_uploaded_image, generation_type, user_id, collection_id')
                   .neq('user_id', user.id)
                   .order('created_at', { ascending: false });
 
@@ -286,7 +287,7 @@ export default function CollectionScreen() {
               log('Caught is_public column error in catch block, using fallback');
               const { data: fallbackCards, error: fallbackError } = await supabase
                 .from('cards')
-                .select('id, name, description, type, role, context, image_url, frame_width, frame_color, name_color, type_color, description_color, context_color, format, background_gradient, is_premium_generation, is_uploaded_image, user_id, collection_id')
+                .select('id, name, description, type, role, context, image_url, frame_width, frame_color, name_color, type_color, description_color, context_color, format, background_gradient, is_premium_generation, is_uploaded_image, generation_type, user_id, collection_id')
                 .neq('user_id', user.id)
                 .order('created_at', { ascending: false });
 
@@ -834,6 +835,8 @@ export default function CollectionScreen() {
         type_color: card.type_color || '',
         description_color: card.description_color || '',
         context_color: card.context_color || '',
+        generation_type: card.generation_type || '',
+        custom_generation_type_id: card.custom_generation_type_id || '',
         edit_mode: 'true',
         returnTo: 'cards'
       }

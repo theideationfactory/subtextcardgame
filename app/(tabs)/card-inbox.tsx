@@ -34,6 +34,7 @@ interface GenerationJob {
     format?: string;
     isPremium?: boolean;
     generationType?: string;
+    customGenerationTypeId?: string | null;
   };
   status: 'queued' | 'processing' | 'completed' | 'failed';
   image_url: string | null;
@@ -235,6 +236,8 @@ export default function CardInboxScreen() {
           context: job.card_data.context || '',
           border_style: job.card_data.borderStyle || '',
           border_color: job.card_data.borderColor || '',
+          generation_type: job.card_data.generationType || '',
+          custom_generation_type_id: job.card_data.customGenerationTypeId || '',
         },
       });
     }

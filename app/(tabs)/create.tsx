@@ -6,6 +6,7 @@ import {
   Pressable,
 } from 'react-native';
 import { useFonts, Inter_400Regular, Inter_700Bold } from '@expo-google-fonts/inter';
+import { Cinzel_400Regular } from '@expo-google-fonts/cinzel';
 import * as SplashScreen from 'expo-splash-screen';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Wand2, PlusCircle, Layers, Inbox } from 'lucide-react-native';
@@ -19,6 +20,7 @@ export default function CreateScreen() {
   const [fontsLoaded] = useFonts({
     'Inter-Regular': Inter_400Regular,
     'Inter-Bold': Inter_700Bold,
+    'Cinzel-Regular': Cinzel_400Regular,
   });
 
   if (!fontsLoaded) {
@@ -117,8 +119,9 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   screenTitle: {
-    fontFamily: 'Inter-Bold',
-    fontSize: 24,
+    fontFamily: 'Cinzel-Regular',
+    fontSize: 22,
+    letterSpacing: 1,
     color: '#fff',
     marginBottom: 24,
     textAlign: 'center',
@@ -148,8 +151,9 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   optionTitle: {
-    fontFamily: 'Inter-Bold',
-    fontSize: 18,
+    fontFamily: 'Cinzel-Regular',
+    fontSize: 16,
+    letterSpacing: 0.5,
     color: '#fff',
     marginBottom: 8,
   },

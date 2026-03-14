@@ -34,6 +34,7 @@ type CardData = {
   isPublic?: boolean;
   isSharedWithFriends?: boolean;
   shadowForCardId?: string | null;
+  generationType?: string;
 };
 
 function buildModernParchmentPrompt(card: CardData) {
@@ -297,6 +298,7 @@ Deno.serve(async (req) => {
       is_premium_generation: true,
       custom_generation_type_id: cardData.customGenerationTypeId || null,
       is_uploaded_image: false,
+      generation_type: cardData.generationType || 'modern_parchment',
       background_gradient: backgroundGradient,
       user_id: job.user_id,
       collection_id: collectionId,

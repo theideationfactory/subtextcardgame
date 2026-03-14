@@ -146,6 +146,17 @@ export default function CardCreationNewScreen() {
               setVisibility(data.visibility);
             }
             
+            // Restore generation type if it exists
+            if (data.generation_type) {
+              if (data.generation_type === 'custom' && data.custom_generation_type_id) {
+                setSelectedGenerationType(`custom_${data.custom_generation_type_id}`);
+                setSelectedCustomGenerationType(data.custom_generation_type_id);
+              } else {
+                setSelectedGenerationType(data.generation_type);
+              }
+              log('Restored generation type from draft:', data.generation_type);
+            }
+            
             isDraftLoadedRef.current = true;
             log('Draft data applied to form, isDraftLoadedRef:', isDraftLoadedRef.current);
           }
@@ -863,6 +874,19 @@ export default function CardCreationNewScreen() {
       setBorderStyle(params.border_style?.toString() || 'Classic');
       setBorderColor(params.border_color?.toString() || '#808080');
       setCardImage(params.image_url?.toString() || '');
+      
+      // Restore generation type from params
+      const loadedGenerationType = params.generation_type?.toString() || '';
+      const loadedCustomGenTypeId = params.custom_generation_type_id?.toString() || '';
+      if (loadedGenerationType) {
+        if (loadedGenerationType === 'custom' && loadedCustomGenTypeId) {
+          setSelectedGenerationType(`custom_${loadedCustomGenTypeId}`);
+          setSelectedCustomGenerationType(loadedCustomGenTypeId);
+        } else {
+          setSelectedGenerationType(loadedGenerationType);
+        }
+        log('📋 Restored generation type from params:', loadedGenerationType);
+      }
       log('📋 Card data loaded successfully for editing');
       
       // Load visibility settings
@@ -871,7 +895,7 @@ export default function CardCreationNewScreen() {
           // Fetch the card from the database to get the actual visibility settings and background gradient
           const { data: cardData, error } = await supabase
             .from('cards')
-            .select('is_public, is_shared_with_friends, background_gradient, is_uploaded_image, border_style, border_color')
+            .select('is_public, is_shared_with_friends, background_gradient, is_uploaded_image, border_style, border_color, generation_type, custom_generation_type_id')
             .eq('id', params.id)
             .single();
           
@@ -921,6 +945,17 @@ export default function CardCreationNewScreen() {
             if (cardData.border_color) {
               setBorderColor(cardData.border_color);
               log('Loaded border color:', cardData.border_color);
+            }
+            
+            // Load generation type from DB (fallback if not in params)
+            if (cardData.generation_type && !loadedGenerationType) {
+              if (cardData.generation_type === 'custom' && cardData.custom_generation_type_id) {
+                setSelectedGenerationType(`custom_${cardData.custom_generation_type_id}`);
+                setSelectedCustomGenerationType(cardData.custom_generation_type_id);
+              } else {
+                setSelectedGenerationType(cardData.generation_type);
+              }
+              log('Loaded generation type from DB:', cardData.generation_type);
             }
           }
         } catch (err) {
@@ -974,6 +1009,19 @@ export default function CardCreationNewScreen() {
       if (params.image_url) {
         setCardImage(params.image_url.toString());
         log('📥 Loaded completed image from inbox:', params.image_url.toString());
+      }
+      
+      // Restore generation type from inbox params
+      const inboxGenType = params.generation_type?.toString();
+      const inboxCustomGenTypeId = params.custom_generation_type_id?.toString();
+      if (inboxGenType) {
+        if (inboxGenType === 'custom' && inboxCustomGenTypeId) {
+          setSelectedGenerationType(`custom_${inboxCustomGenTypeId}`);
+          setSelectedCustomGenerationType(inboxCustomGenTypeId);
+        } else {
+          setSelectedGenerationType(inboxGenType);
+        }
+        log('📥 Restored generation type from inbox:', inboxGenType);
       }
       
       // Store the job ID so we can delete it after saving
@@ -2030,6 +2078,7 @@ export default function CardCreationNewScreen() {
         is_premium_generation: isPremiumGeneration, // Track if this uses premium generation
         custom_generation_type_id: selectedCustomGenerationType, // Track custom generation type if used
         is_uploaded_image: isUploadedImage, // Track if this is a user-uploaded image
+        generation_type: selectedGenerationType?.startsWith('custom_') ? 'custom' : selectedGenerationType, // Track the generation type used
         // Only save background gradient if user selected something other than default black
         ...(JSON.stringify(backgroundGradient) !== JSON.stringify(['#1a1a1a', '#000000']) && {
           background_gradient: JSON.stringify(backgroundGradient)
