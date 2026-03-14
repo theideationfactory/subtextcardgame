@@ -427,6 +427,29 @@ export default function CardCreationNewScreen() {
   }, [customDetailOptions]);
 
   const roleOptions = useMemo(() => subOptionsMap[type] || [], [type]);
+
+  // Default contexts - will be merged with custom ones
+  const defaultContexts = ['TBD', 'Self', 'Family', 'Friendship', 'Therapy', 'Peer', 'Work', 'Art', 'Politics'];
+  
+  // Combined context options (defaults + custom)
+  const contextOptions = useMemo(() => {
+    const allContexts = [...defaultContexts];
+    customContexts.forEach(customContext => {
+      if (!allContexts.includes(customContext)) {
+        allContexts.push(customContext);
+      }
+    });
+    return allContexts;
+  }, [customContexts]);
+
+  // Unified label pool: merge all type, detail, and context options (deduplicated)
+  const allLabelOptions = useMemo(() => {
+    const combined = new Set<string>();
+    typeOptions.forEach(opt => combined.add(opt));
+    Object.values(subOptionsMap).forEach(arr => arr.forEach(opt => combined.add(opt)));
+    contextOptions.forEach(opt => combined.add(opt));
+    return Array.from(combined);
+  }, [typeOptions, subOptionsMap, contextOptions]);
   
   // Auto-complete logic for type input
   const handleTypeInputChange = useCallback((input: string) => {
@@ -438,14 +461,14 @@ export default function CardCreationNewScreen() {
       return;
     }
     
-    // Filter options that contain the input text (case-insensitive)
-    const filtered = typeOptions.filter(option => 
+    // Filter from unified label pool (case-insensitive)
+    const filtered = allLabelOptions.filter(option => 
       option.toLowerCase().includes(input.toLowerCase())
     );
     
     setFilteredTypeOptions(filtered);
     setShowTypeSuggestions(filtered.length > 0);
-  }, [typeOptions]);
+  }, [allLabelOptions]);
   
   // Handle type selection from suggestions
   const handleTypeSelection = useCallback((selectedType: string) => {
@@ -461,14 +484,14 @@ export default function CardCreationNewScreen() {
   // Handle type input submission (Enter key)
   const handleTypeSubmit = useCallback(() => {
     const inputValue = typeInputValue.trim();
-    if (inputValue && !typeOptions.includes(inputValue)) {
-      // Create new type if it doesn't exist
-      addNewType(inputValue);
-    } else if (inputValue && typeOptions.includes(inputValue)) {
-      // Select existing type
+    if (inputValue && allLabelOptions.includes(inputValue)) {
+      // Select existing label
       handleTypeSelection(inputValue);
+    } else if (inputValue && !allLabelOptions.includes(inputValue)) {
+      // Create new type if it doesn't exist in any pool
+      addNewType(inputValue);
     }
-  }, [typeInputValue, typeOptions, handleTypeSelection]);
+  }, [typeInputValue, allLabelOptions, handleTypeSelection]);
   
   // Auto-complete logic for detail input
   const handleDetailInputChange = useCallback((input: string) => {
@@ -480,14 +503,14 @@ export default function CardCreationNewScreen() {
       return;
     }
     
-    // Filter role options that contain the input text (case-insensitive)
-    const filtered = roleOptions.filter(option => 
+    // Filter from unified label pool (case-insensitive)
+    const filtered = allLabelOptions.filter(option => 
       option.toLowerCase().includes(input.toLowerCase())
     );
     
     setFilteredDetailOptions(filtered);
     setShowDetailSuggestions(filtered.length > 0);
-  }, [roleOptions]);
+  }, [allLabelOptions]);
   
   // Handle detail selection from suggestions
   const handleDetailSelection = useCallback((selectedDetail: string) => {
@@ -502,27 +525,14 @@ export default function CardCreationNewScreen() {
   // Handle detail input submission (Enter key)
   const handleDetailSubmit = useCallback(() => {
     const inputValue = detailInputValue.trim();
-    if (inputValue && roleOptions.includes(inputValue)) {
-      // Select existing detail
+    if (inputValue && allLabelOptions.includes(inputValue)) {
+      // Select existing label
       handleDetailSelection(inputValue);
-    } else if (inputValue && !roleOptions.includes(inputValue)) {
-      // Create new detail if it doesn't exist
+    } else if (inputValue && !allLabelOptions.includes(inputValue)) {
+      // Create new detail if it doesn't exist in any pool
       addNewDetail(inputValue);
     }
-  }, [detailInputValue, roleOptions, handleDetailSelection]);
-  // Default contexts - will be merged with custom ones
-  const defaultContexts = ['TBD', 'Self', 'Family', 'Friendship', 'Therapy', 'Peer', 'Work', 'Art', 'Politics'];
-  
-  // Combined context options (defaults + custom)
-  const contextOptions = useMemo(() => {
-    const allContexts = [...defaultContexts];
-    customContexts.forEach(customContext => {
-      if (!allContexts.includes(customContext)) {
-        allContexts.push(customContext);
-      }
-    });
-    return allContexts;
-  }, [customContexts]);
+  }, [detailInputValue, allLabelOptions, handleDetailSelection]);
 
   // Auto-complete logic for context input
   const handleContextInputChange = useCallback((input: string) => {
@@ -534,14 +544,14 @@ export default function CardCreationNewScreen() {
       return;
     }
     
-    // Filter context options that contain the input text (case-insensitive)
-    const filtered = contextOptions.filter(option => 
+    // Filter from unified label pool (case-insensitive)
+    const filtered = allLabelOptions.filter(option => 
       option.toLowerCase().includes(input.toLowerCase())
     );
     
     setFilteredContextOptions(filtered);
     setShowContextSuggestions(filtered.length > 0);
-  }, [contextOptions]);
+  }, [allLabelOptions]);
   
   // Handle context selection from suggestions
   const handleContextSelection = useCallback((selectedContext: string) => {
@@ -556,14 +566,14 @@ export default function CardCreationNewScreen() {
   // Handle context input submission (Enter key)
   const handleContextSubmit = useCallback(() => {
     const inputValue = contextInputValue.trim();
-    if (inputValue && contextOptions.includes(inputValue)) {
-      // Select existing context
+    if (inputValue && allLabelOptions.includes(inputValue)) {
+      // Select existing label
       handleContextSelection(inputValue);
-    } else if (inputValue && !contextOptions.includes(inputValue)) {
-      // Create new context if it doesn't exist
+    } else if (inputValue && !allLabelOptions.includes(inputValue)) {
+      // Create new context if it doesn't exist in any pool
       addNewContext(inputValue);
     }
-  }, [contextInputValue, contextOptions, handleContextSelection]);
+  }, [contextInputValue, allLabelOptions, handleContextSelection]);
 
   // Default border styles - will be merged with custom ones
   const defaultBorderStyles = ['Classic', 'Modern', 'Vintage', 'Minimal', 'Ornate', 'Rounded', 'Sharp', 'Double'];
@@ -3083,9 +3093,8 @@ export default function CardCreationNewScreen() {
                 placeholder="Start typing to search or create detail..."
                 placeholderTextColor="#666"
                 returnKeyType="done"
-                editable={type !== ''} // Only enable if type is selected
                 onFocus={() => {
-                  if (detailInputValue.trim() && type !== '') {
+                  if (detailInputValue.trim()) {
                     handleDetailInputChange(detailInputValue);
                   }
                 }}
@@ -3113,7 +3122,7 @@ export default function CardCreationNewScreen() {
             </View>
             
             {/* Auto-complete suggestions */}
-            {showDetailSuggestions && type !== '' && (
+            {showDetailSuggestions && (
               <View style={styles.suggestionsContainer}>
                 <ScrollView style={styles.suggestionsScroll} nestedScrollEnabled={true}>
                   {filteredDetailOptions.map((option) => (
