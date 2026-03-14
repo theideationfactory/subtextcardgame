@@ -37,6 +37,7 @@ export const supabase = createClient(
       persistSession: true,
       flowType: 'pkce',
       debug: false, // Disabled logging to reduce console noise
+<<<<<<< HEAD
       storageKey: 'subtext-auth-token', // Explicit storage key for consistency
     },
     global: {
@@ -44,5 +45,11 @@ export const supabase = createClient(
         'X-Client-Info': 'subtext-mobile-app',
       },
     },
+=======
+    },
+    realtime: {
+      enabled: false // Disable Realtime features to avoid WebSocket dependencies
+    }
+>>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
   }
 );

@@ -3,7 +3,10 @@ import { useRouter } from 'expo-router';
 import { useFonts, Inter_400Regular, Inter_700Bold } from '@expo-google-fonts/inter';
 import * as SplashScreen from 'expo-splash-screen';
 import { useCallback, useEffect } from 'react';
+<<<<<<< HEAD
 import { log, logError } from '@/utils/logger';
+=======
+>>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
 
 // Ensure we don't prevent auto-hiding on subsequent renders
 let splashScreenPrevented = false;
@@ -29,7 +32,11 @@ export default function WelcomeScreen() {
           await SplashScreen.hideAsync();
         }
       } catch (e) {
+<<<<<<< HEAD
         logError('Error hiding splash screen:', e);
+=======
+        console.warn('Error hiding splash screen:', e);
+>>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
         // Force hide after a short delay if there's an error
         setTimeout(() => {
           SplashScreen.hideAsync().catch(() => {});

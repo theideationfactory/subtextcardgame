@@ -41,6 +41,7 @@
 		</dict>
 	</array>
 	<key>NSPrivacyCollectedDataTypes</key>
+<<<<<<< HEAD
 	<array>
 		<dict>
 			<key>NSPrivacyCollectedDataType</key>
@@ -91,6 +92,9 @@
 			</array>
 		</dict>
 	</array>
+=======
+	<array/>
+>>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
 	<key>NSPrivacyTracking</key>
 	<false/>
 </dict>

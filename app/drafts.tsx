@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 import { useState, useEffect, useCallback, useRef } from 'react';
+=======
+import { useState, useEffect } from 'react';
+>>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
 import { 
   View, 
   Text, 
@@ -7,6 +11,7 @@ import {
   FlatList,
   ActivityIndicator,
   Platform,
+<<<<<<< HEAD
   Modal,
   Alert,
 } from 'react-native';
@@ -17,6 +22,15 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase } from '@/lib/supabase';
 import { log, logError } from '@/utils/logger';
+=======
+} from 'react-native';
+import { useFonts, Inter_400Regular, Inter_700Bold } from '@expo-google-fonts/inter';
+import { useRouter } from 'expo-router';
+import { createClient } from '@supabase/supabase-js';
+import { ArrowLeft, FileText, Trash2 } from 'lucide-react-native';
+import { useAuth } from '@/contexts/AuthContext';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+>>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
 
 // Define the structure of a draft object
 interface Draft {
@@ -24,6 +38,7 @@ interface Draft {
   name: string;
   last_modified: string;
   color?: string; // Optional: used for icon color
+<<<<<<< HEAD
   draft_data?: any; // Optional: used for draft data
   // Add other properties from your 'spreads' table if needed elsewhere
 }
@@ -35,6 +50,15 @@ interface Friend {
 }
 
 // Use shared Supabase client from lib to avoid multiple auth/session streams
+=======
+  // Add other properties from your 'spreads' table if needed elsewhere
+}
+
+const supabase = createClient(
+  process.env.EXPO_PUBLIC_SUPABASE_URL!,
+  process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY!
+);
+>>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
 
 export default function DraftsScreen() {
   const insets = useSafeAreaInsets();
@@ -45,6 +69,7 @@ export default function DraftsScreen() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [deleting, setDeleting] = useState<string | null>(null);
+<<<<<<< HEAD
   const [showSendModal, setShowSendModal] = useState(false);
   const [currentDraftToSend, setCurrentDraftToSend] = useState<Draft | null>(null);
   const [friends, setFriends] = useState<Friend[]>([]);
@@ -52,11 +77,15 @@ export default function DraftsScreen() {
   const [sending, setSending] = useState(false);
   const [friendsLoading, setFriendsLoading] = useState(false);
 
+=======
+  
+>>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
   const [fontsLoaded] = useFonts({
     'Inter-Regular': Inter_400Regular,
     'Inter-Bold': Inter_700Bold,
   });
 
+<<<<<<< HEAD
   const isFetchingRef = useRef(false);
   const lastFetchAtRef = useRef(0);
   const hasFetchedOnFocusRef = useRef(false);
@@ -91,16 +120,64 @@ export default function DraftsScreen() {
       }
       
       log('Fetching drafts for user:', uid);
+=======
+  useEffect(() => {
+    const checkAuthAndFetchDrafts = async () => {
+      try {
+        // Wait for auth loading to complete
+        if (authLoading) return;
+        
+        // Check if we have a valid user
+        if (!user) {
+          console.error('No authenticated user');
+          setError('Please log in to view your drafts');
+          // Redirect to login screen after a short delay
+          setTimeout(() => {
+            router.replace('/login');
+          }, 2000);
+          return;
+        }
+        
+        // If we have a user, fetch drafts
+        await fetchDrafts();
+      } catch (err) {
+        console.error('Error in auth check:', err);
+        setError('Authentication error. Please log in again.');
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    checkAuthAndFetchDrafts();
+  }, [user, authLoading]);
+
+  const fetchDrafts = async () => {
+    try {
+      setLoading(true);
+      setError('');
+      
+      // Ensure user is available
+      if (!user) {
+        throw new Error('Not authenticated');
+      }
+      
+      console.log('Fetching drafts for user:', user.id);
+>>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
       
       const { data, error: fetchError } = await supabase
         .from('spreads')
         .select('*')
+<<<<<<< HEAD
         .eq('user_id', uid)
         .eq('is_draft', true)
+=======
+        .eq('user_id', user.id)
+>>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
         .order('last_modified', { ascending: false });
 
       if (fetchError) throw fetchError;
       
+<<<<<<< HEAD
       log('[Drafts] fetch success, count:', data?.length || 0);
       setDrafts((prev) => {
         const next = data || [];
@@ -109,6 +186,13 @@ export default function DraftsScreen() {
       
     } catch (err) {
       logError('[Drafts] fetch error:', err);
+=======
+      console.log('Fetched drafts:', data?.length || 0);
+      setDrafts(data || []);
+      
+    } catch (err) {
+      console.error('Error fetching drafts:', err);
+>>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
       const errorMessage = err instanceof Error ? err.message : 'Failed to load drafts';
       setError(errorMessage);
       
@@ -119,6 +203,7 @@ export default function DraftsScreen() {
         }, 2000);
       }
     } finally {
+<<<<<<< HEAD
       log('[Drafts] fetch end');
       if (!initialLoadDoneRef.current) {
         setLoading(false);
@@ -280,12 +365,16 @@ export default function DraftsScreen() {
       setError(errorMessage);
     } finally {
       setSending(false);
+=======
+      setLoading(false);
+>>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
     }
   };
 
   const handleDelete = async (draftId: string) => {
     try {
       setDeleting(draftId);
+<<<<<<< HEAD
 
       // Use RPC that bypasses RLS (SECURITY DEFINER) to safely unlink all cards
       // and delete the spread in one transaction to avoid FK violations
@@ -303,6 +392,18 @@ export default function DraftsScreen() {
       logError('Error deleting draft:', err);
       const msg = (err as any)?.message || 'Failed to delete draft';
       setError(msg);
+=======
+      const { error: deleteError } = await supabase
+        .from('spreads')
+        .delete()
+        .eq('id', draftId);
+
+      if (deleteError) throw deleteError;
+      setDrafts(drafts.filter(draft => draft.id !== draftId));
+    } catch (err) {
+      console.error('Error deleting draft:', err);
+      setError('Failed to delete draft');
+>>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
     } finally {
       setDeleting(null);
     }
@@ -336,12 +437,15 @@ export default function DraftsScreen() {
         </Text>
       </View>
       <TouchableOpacity
+<<<<<<< HEAD
         style={styles.sendButton}
         onPress={() => handleSendPress(item)}
       >
         <Send size={20} color="#6366f1" />
       </TouchableOpacity>
       <TouchableOpacity
+=======
+>>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
         style={[
           styles.deleteButton,
           deleting === item.id && styles.deleteButtonDisabled
@@ -398,6 +502,7 @@ export default function DraftsScreen() {
           contentContainerStyle={styles.listContent}
         />
       )}
+<<<<<<< HEAD
       
       <Modal
         animationType="slide"
@@ -466,6 +571,8 @@ export default function DraftsScreen() {
           </View>
         </View>
       </Modal>
+=======
+>>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
     </View>
   );
 }
@@ -536,12 +643,15 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     backgroundColor: 'rgba(255, 68, 68, 0.1)',
   },
+<<<<<<< HEAD
   sendButton: {
     padding: 8,
     borderRadius: 8,
     backgroundColor: 'rgba(99, 102, 241, 0.1)',
     marginRight: 8,
   },
+=======
+>>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
   deleteButtonDisabled: {
     opacity: 0.5,
   },
@@ -567,6 +677,7 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter-Regular',
     textAlign: 'center',
   },
+<<<<<<< HEAD
   modalOverlay: {
     flex: 1,
     justifyContent: 'center',
@@ -648,4 +759,6 @@ const styles = StyleSheet.create({
     marginTop: 10,
     fontFamily: 'Inter-Regular',
   },
+=======
+>>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
 });
