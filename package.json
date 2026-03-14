@@ -1,13 +1,7 @@
 {
-<<<<<<< HEAD
   "name": "subtext-card-game",
   "main": "expo-router/entry",
   "version": "1.0.1",
-=======
-  "name": "bolt-expo-starter",
-  "main": "expo-router/entry",
-  "version": "1.0.0",
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
   "private": true,
   "browser": {
     "stream": "stream-browserify"
@@ -21,7 +15,6 @@
     "ios": "expo run:ios",
     "web": "expo start --web",
     "build:web": "expo export --platform web",
-<<<<<<< HEAD
     "lint": "expo lint",
     "deploy:amoy": "npx hardhat run scripts/deploy.js --network polygon_amoy",
     "deploy:mainnet": "npx hardhat run scripts/deploy.js --network polygon_mainnet",
@@ -38,39 +31,20 @@
     "@react-navigation/bottom-tabs": "^7.2.0",
     "@react-navigation/native": "^7.0.14",
     "@supabase/supabase-js": "^2.50.5",
-=======
-    "lint": "expo lint"
-  },
-  "dependencies": {
-    "@expo-google-fonts/inter": "^0.2.3",
-    "@expo/vector-icons": "^14.0.2",
-    "@lucide/lab": "^0.1.2",
-    "@react-native-async-storage/async-storage": "1.23.1",
-    "@react-navigation/bottom-tabs": "^7.2.0",
-    "@react-navigation/native": "^7.0.14",
-    "@supabase/supabase-js": "^2.39.3",
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
     "alchemy-sdk": "^3.5.8",
     "axios": "^1.9.0",
     "ethers": "^5.7.2",
     "expo": "~52.0.46",
-<<<<<<< HEAD
     "expo-background-fetch": "~13.0.6",
     "expo-background-task": "~0.1.5",
     "expo-blur": "^14.0.3",
     "expo-camera": "^16.0.18",
     "expo-constants": "^17.0.5",
     "expo-device": "~7.0.3",
-=======
-    "expo-blur": "^14.0.3",
-    "expo-camera": "^16.0.18",
-    "expo-constants": "^17.0.5",
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
     "expo-file-system": "~18.0.12",
     "expo-font": "^13.0.3",
     "expo-haptics": "^14.0.1",
     "expo-image-manipulator": "~13.0.6",
-<<<<<<< HEAD
     "expo-image-picker": "~16.0.6",
     "expo-keep-awake": "~14.0.3",
     "expo-linear-gradient": "^14.0.2",
@@ -79,25 +53,14 @@
     "expo-router": "~4.0.22",
     "expo-secure-store": "~14.0.1",
     "expo-sharing": "~13.0.1",
-=======
-    "expo-linear-gradient": "^14.0.2",
-    "expo-linking": "^7.0.5",
-    "expo-router": "~4.0.21",
-    "expo-secure-store": "~14.0.1",
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
     "expo-splash-screen": "~0.29.24",
     "expo-status-bar": "^2.0.1",
     "expo-symbols": "^0.2.2",
     "expo-system-ui": "~4.0.9",
-<<<<<<< HEAD
     "expo-task-manager": "~12.0.6",
     "expo-web-browser": "^14.0.2",
     "lucide-react-native": "^0.475.0",
     "openai": "^5.8.3",
-=======
-    "expo-web-browser": "^14.0.2",
-    "lucide-react-native": "^0.475.0",
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
     "react": "18.3.1",
     "react-dom": "18.3.1",
     "react-native": "0.76.9",
@@ -107,10 +70,7 @@
     "react-native-screens": "~4.4.0",
     "react-native-svg": "15.8.0",
     "react-native-url-polyfill": "^2.0.0",
-<<<<<<< HEAD
     "react-native-view-shot": "~4.0.3",
-=======
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
     "react-native-web": "^0.19.13",
     "react-native-websocket": "^1.0.2",
     "react-native-webview": "13.12.5",
@@ -118,7 +78,6 @@
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",
-<<<<<<< HEAD
     "@nomiclabs/hardhat-ethers": "^2.2.3",
     "@nomiclabs/hardhat-etherscan": "^3.1.8",
     "@openzeppelin/contracts": "^4.9.6",
@@ -128,11 +87,6 @@
     "dotenv": "^17.2.3",
     "hardhat": "^2.17.0",
     "solc": "^0.8.20",
-=======
-    "@types/lodash": "^4.17.16",
-    "@types/react": "~18.3.12",
-    "@types/react-native": "^0.72.8",
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
     "typescript": "^5.3.3"
   }
 }

@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback } from 'react';
-<<<<<<< HEAD
 import { View, Text, StyleSheet, TextInput, TouchableOpacity, Image, ActivityIndicator, FlatList, Platform, Alert } from 'react-native';
 import { useFonts, Inter_400Regular, Inter_600SemiBold, Inter_700Bold } from '@expo-google-fonts/inter';
 import { UserPlus, UserCheck, UserX, Search, Users, Clock, Check, MessageCircle, Send } from 'lucide-react-native';
@@ -17,19 +16,6 @@ const SECTIONS = {
   CHATS: 'chats',
   REQUESTS: 'requests',
   DISCOVER: 'discover',
-=======
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, Image, ActivityIndicator, FlatList } from 'react-native';
-import { useFonts, Inter_400Regular, Inter_600SemiBold, Inter_700Bold } from '@expo-google-fonts/inter';
-import { UserPlus, UserCheck, UserX, Search, Users, Clock, Check } from 'lucide-react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import { Spacer } from '@/components/Spacer';
-import { supabase } from '@/lib/supabase';
-
-const SECTIONS = {
-  SEARCH: 'search',
-  REQUESTS: 'requests',
-  FRIENDS: 'friends',
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
 } as const;
 
 type Section = typeof SECTIONS[keyof typeof SECTIONS];
@@ -55,34 +41,21 @@ type Friend = {
 };
 
 type UserItemProps = {
-<<<<<<< HEAD
   item: User | FriendRequest | Friend | Conversation;
   type: 'search' | 'request' | 'friend' | 'chat';
-=======
-  item: User | FriendRequest | Friend;
-  type: 'search' | 'request' | 'friend';
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
 };
 
 const DEFAULT_AVATAR = 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150';
 
 export default function FriendsScreen() {
-<<<<<<< HEAD
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState('');
   const [activeSection, setActiveSection] = useState<Section>(SECTIONS.REQUESTS);
-=======
-  const [searchQuery, setSearchQuery] = useState('');
-  const [activeSection, setActiveSection] = useState<Section>(SECTIONS.FRIENDS);
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
   const [loading, setLoading] = useState(false);
   const [searchResults, setSearchResults] = useState<User[]>([]);
   const [friendRequests, setFriendRequests] = useState<FriendRequest[]>([]);
   const [friends, setFriends] = useState<Friend[]>([]);
-<<<<<<< HEAD
   const [conversations, setConversations] = useState<Conversation[]>([]);
-=======
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
   const [error, setError] = useState('');
   const [debouncedQuery, setDebouncedQuery] = useState('');
 
@@ -95,7 +68,6 @@ export default function FriendsScreen() {
   useEffect(() => {
     fetchFriends();
     fetchFriendRequests();
-<<<<<<< HEAD
     fetchConversations();
   }, []);
 
@@ -115,9 +87,6 @@ export default function FriendsScreen() {
       setError('Failed to load conversations');
     }
   };
-=======
-  }, []);
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
   
   // Debounce search query
   useEffect(() => {
@@ -153,11 +122,7 @@ export default function FriendsScreen() {
 
       setFriends(data || []);
     } catch (err) {
-<<<<<<< HEAD
       logError('Error fetching friends:', err);
-=======
-      console.error('Error fetching friends:', err);
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
       setError('Failed to load friends');
     }
   };
@@ -174,11 +139,7 @@ export default function FriendsScreen() {
 
       setFriendRequests(data || []);
     } catch (err) {
-<<<<<<< HEAD
       logError('Error fetching friend requests:', err);
-=======
-      console.error('Error fetching friend requests:', err);
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
       setError('Failed to load friend requests');
     }
   };
@@ -209,11 +170,7 @@ export default function FriendsScreen() {
         return;
       }
     } catch (authError) {
-<<<<<<< HEAD
       logError('Auth check error:', authError);
-=======
-      console.error('Auth check error:', authError);
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
       // Don't return here, try to continue with the search
     }
 
@@ -232,11 +189,7 @@ export default function FriendsScreen() {
         });
     
       if (searchError) {
-<<<<<<< HEAD
         logError('Search error from Supabase:', searchError);
-=======
-        console.error('Search error from Supabase:', searchError);
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
         throw searchError;
       }
 
@@ -271,18 +224,13 @@ export default function FriendsScreen() {
       // Force a re-render by setting activeSection
       setActiveSection(prev => prev);
     } catch (err) {
-<<<<<<< HEAD
       logError('Search error:', err);
-=======
-      console.error('Search error:', err);
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
       setError('Search failed: ' + (err instanceof Error ? err.message : 'Unknown error'));
     } finally {
       setLoading(false);
     }
   }, []);
 
-<<<<<<< HEAD
   const openChat = (friendId: string, friendEmail: string) => {
     if (Platform.OS !== 'web') {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -314,8 +262,6 @@ export default function FriendsScreen() {
     }
   };
 
-=======
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
   const handleSendRequest = async (userId: string) => {
     try {
       setLoading(true);
@@ -338,11 +284,7 @@ export default function FriendsScreen() {
         .or(`sender_id.eq.${userId},receiver_id.eq.${userId}`);
         
       if (checkError) {
-<<<<<<< HEAD
         logError('Error checking existing requests:', checkError);
-=======
-        console.error('Error checking existing requests:', checkError);
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
         throw checkError;
       }
       
@@ -375,11 +317,7 @@ export default function FriendsScreen() {
         });
 
       if (insertError) {
-<<<<<<< HEAD
         logError('Error inserting friend request:', insertError);
-=======
-        console.error('Error inserting friend request:', insertError);
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
         throw insertError;
       }
 
@@ -396,11 +334,7 @@ export default function FriendsScreen() {
       
       setSearchResults(updatedResults as User[]);
     } catch (err) {
-<<<<<<< HEAD
       logError('Error sending friend request:', err);
-=======
-      console.error('Error sending friend request:', err);
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
       setError('Failed to send friend request: ' + (err instanceof Error ? err.message : 'Unknown error'));
     } finally {
       setLoading(false);
@@ -421,11 +355,7 @@ export default function FriendsScreen() {
         fetchFriends()
       ]);
     } catch (err) {
-<<<<<<< HEAD
       logError('Error accepting friend request:', err);
-=======
-      console.error('Error accepting friend request:', err);
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
       setError('Failed to accept friend request');
     }
   };
@@ -441,11 +371,7 @@ export default function FriendsScreen() {
 
       await fetchFriendRequests();
     } catch (err) {
-<<<<<<< HEAD
       logError('Error rejecting friend request:', err);
-=======
-      console.error('Error rejecting friend request:', err);
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
       setError('Failed to reject friend request');
     }
   };
@@ -493,14 +419,10 @@ export default function FriendsScreen() {
 
   const renderSectionSelector = () => (
     <View style={styles.sectionSelector}>
-<<<<<<< HEAD
       {/* HIDDEN: Chats section - only show Requests and Discover */}
       {Object.entries(SECTIONS)
         .filter(([key]) => key !== 'CHATS')
         .map(([key, value]) => (
-=======
-      {Object.entries(SECTIONS).map(([key, value]) => (
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
         <TouchableOpacity
           key={key}
           style={[
@@ -526,7 +448,6 @@ export default function FriendsScreen() {
     const isSearchUser = (item: any): item is User => type === 'search';
     const isRequest = (item: any): item is FriendRequest => type === 'request';
     const isFriend = (item: any): item is Friend => type === 'friend';
-<<<<<<< HEAD
     const isConversation = (item: any): item is Conversation => type === 'chat';
   
     const getDisplayEmail = () => {
@@ -598,19 +519,6 @@ export default function FriendsScreen() {
               {getMessagePreview(item.last_message, item.message_type)}
             </Text>
           )}
-=======
-  
-    return (
-      <View style={styles.userItem}>
-        <Image
-          source={{ uri: DEFAULT_AVATAR }}
-          style={styles.avatar}
-        />
-        <View style={styles.userInfo}>
-          <Text style={styles.userName}>
-            {isRequest(item) ? item.sender_email : item.email}
-          </Text>
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
           {isSearchUser(item) && item.friendship_status !== 'none' && (
             <Text style={[
               styles.statusText,
@@ -637,7 +545,6 @@ export default function FriendsScreen() {
             )}
           </TouchableOpacity>
         )}  
-<<<<<<< HEAD
         {/* HIDDEN: Chat button for search results who are friends
         {isSearchUser(item) && item.friendship_status === 'friend' && (
           <TouchableOpacity
@@ -648,8 +555,6 @@ export default function FriendsScreen() {
           </TouchableOpacity>
         )}
         */}
-=======
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
         {isSearchUser(item) && item.friendship_status === 'request_sent' && (
           <View style={[styles.actionButton, styles.sentIndicator]}>
             <Check size={20} color="#4CAF50" />
@@ -681,7 +586,6 @@ export default function FriendsScreen() {
             </TouchableOpacity>
           </View>
         )}  
-<<<<<<< HEAD
         {/* HIDDEN: Chat button for friends
         {isFriend(item) && (
           <TouchableOpacity
@@ -693,15 +597,11 @@ export default function FriendsScreen() {
         )}
         */}
       </TouchableOpacity>
-=======
-      </View>
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
     );
   };
 
   const renderContent = () => {
     switch (activeSection) {
-<<<<<<< HEAD
       case SECTIONS.CHATS:
         return (
           <FlatList
@@ -723,9 +623,6 @@ export default function FriendsScreen() {
           />
         );
       case SECTIONS.DISCOVER:
-=======
-      case SECTIONS.SEARCH:
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
         return (
           <>
             {renderSearchBar()}
@@ -782,28 +679,8 @@ export default function FriendsScreen() {
             }
           />
         );
-<<<<<<< HEAD
       default:
         return null;
-=======
-      case SECTIONS.FRIENDS:
-        return (
-          <FlatList
-            data={friends}
-            renderItem={({ item }) => renderUserItem({ item, type: 'friend' })}
-            keyExtractor={item => item.friend_id}
-            contentContainerStyle={styles.listContent}
-            ListEmptyComponent={
-              <View style={styles.emptyState}>
-                <Users size={48} color="#666" />
-                <Text style={styles.emptyText}>
-                  Add some friends to get started
-                </Text>
-              </View>
-            }
-          />
-        );
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
     }
   };
 
@@ -821,7 +698,6 @@ export default function FriendsScreen() {
         <Text style={styles.errorText}>{error}</Text>
       ) : null}
       {renderContent()}
-<<<<<<< HEAD
       
       {/* HIDDEN: Floating Action Button for New Chat
       {activeSection === SECTIONS.CHATS && (
@@ -833,8 +709,6 @@ export default function FriendsScreen() {
         </TouchableOpacity>
       )}
       */}
-=======
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
     </LinearGradient>
   );
 }
@@ -903,17 +777,13 @@ const styles = StyleSheet.create({
     padding: 12,
     marginBottom: 8,
   },
-<<<<<<< HEAD
   avatarContainer: {
     position: 'relative',
   },
-=======
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
   avatar: {
     width: 48,
     height: 48,
     borderRadius: 24,
-<<<<<<< HEAD
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -939,27 +809,20 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 11,
     fontFamily: 'Inter-Bold',
-=======
-    backgroundColor: '#2a2a2a',
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
   },
   userInfo: {
     flex: 1,
     marginLeft: 12,
   },
-<<<<<<< HEAD
   userNameRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-=======
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
   userName: {
     color: '#fff',
     fontSize: 16,
     fontFamily: 'Inter-Bold',
-<<<<<<< HEAD
     flex: 1,
   },
   messageTime: {
@@ -976,8 +839,6 @@ const styles = StyleSheet.create({
   unreadMessage: {
     color: '#fff',
     fontFamily: 'Inter-SemiBold',
-=======
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
   },
   statusText: {
     fontSize: 12,
@@ -1003,14 +864,11 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     backgroundColor: 'rgba(99, 102, 241, 0.1)',
   },
-<<<<<<< HEAD
   messageButton: {
     padding: 8,
     borderRadius: 8,
     backgroundColor: 'rgba(34, 197, 94, 0.1)',
   },
-=======
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
   requestActions: {
     flexDirection: 'row',
     gap: 8,
@@ -1067,7 +925,6 @@ const styles = StyleSheet.create({
     margin: 16,
     borderRadius: 8,
   },
-<<<<<<< HEAD
   fab: {
     position: 'absolute',
     bottom: 20,
@@ -1087,6 +944,4 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 4.65,
   },
-=======
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
 });

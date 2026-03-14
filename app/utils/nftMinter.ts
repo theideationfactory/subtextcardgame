@@ -5,11 +5,8 @@ import axios from 'axios';
 import * as FileSystem from 'expo-file-system';
 import { Platform } from 'react-native';
 import * as ImageManipulator from 'expo-image-manipulator';
-<<<<<<< HEAD
 import SubtextNFTABI from '@/app/services/abi/SubtextNFT.json';
 import { log, logError } from '@/utils/logger';
-=======
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
 
 // Types for Subtext cards
 interface SubtextCard {
@@ -38,11 +35,8 @@ interface MintResult {
   success: boolean;
   imageNftTxHash?: string;
   cardNftTxHash?: string;
-<<<<<<< HEAD
   imageTokenId?: number;
   cardTokenId?: number;
-=======
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
   imageIpfsUri?: string;
   imageMetadataUri?: string;
   cardMetadataUri?: string;
@@ -64,17 +58,12 @@ export class SubtextNftMinter {
   
   /**
    * Upload file to IPFS via Pinata
-<<<<<<< HEAD
    * @param fileUri - Local URI or Supabase URL of the file to upload
-=======
-   * @param fileUri - Local URI of the file to upload
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
    * @param fileName - Name of the file
    * @returns IPFS URI (ipfs://...)
    */
   async uploadFileToPinata(fileUri: string, fileName: string): Promise<string> {
     try {
-<<<<<<< HEAD
       log('📤 Uploading to IPFS...');
       log('  File URI:', fileUri);
       
@@ -115,49 +104,23 @@ export class SubtextNftMinter {
       
       log('  Processed image:', uploadUri);
       
-=======
-      // First, ensure we have a file that can be uploaded
-      let uploadUri = fileUri;
-      
-      // For iOS, convert file:// paths to base64
-      if (Platform.OS === 'ios' && fileUri.startsWith('file://')) {
-        // Resize and compress the image to reduce size
-        const manipResult = await ImageManipulator.manipulateAsync(
-          fileUri,
-          [{ resize: { width: 1000 } }], // Resize to reasonable dimensions
-          { compress: 0.8, format: ImageManipulator.SaveFormat.JPEG }
-        );
-        uploadUri = manipResult.uri;
-      }
-      
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
       // Convert image to base64
       const base64 = await FileSystem.readAsStringAsync(uploadUri, {
         encoding: FileSystem.EncodingType.Base64,
       });
       
-<<<<<<< HEAD
       log('  Base64 size:', Math.round(base64.length / 1024), 'KB');
       
-=======
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
       // Create form data for Pinata
       const data = new FormData();
       data.append('file', {
         uri: uploadUri,
         name: fileName,
-<<<<<<< HEAD
         type: 'image/jpeg',
       } as any);
       
       // Upload to Pinata
       log('☁️ Uploading to Pinata...');
-=======
-        type: 'image/jpeg', // Adjust based on your file type
-      } as any);
-      
-      // Upload to Pinata
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
       const response = await axios.post('https://api.pinata.cloud/pinning/pinFileToIPFS', data, {
         maxBodyLength: Infinity,
         headers: {
@@ -167,18 +130,12 @@ export class SubtextNftMinter {
         },
       });
       
-<<<<<<< HEAD
       const ipfsUri = `ipfs://${response.data.IpfsHash}`;
       log('✅ Uploaded to IPFS:', ipfsUri);
       
       return ipfsUri;
     } catch (error) {
       logError('❌ Error uploading file to Pinata:', error);
-=======
-      return `ipfs://${response.data.IpfsHash}`;
-    } catch (error) {
-      console.error('Error uploading file to Pinata:', error);
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
       throw error;
     }
   }
@@ -204,18 +161,13 @@ export class SubtextNftMinter {
       
       return `ipfs://${response.data.IpfsHash}`;
     } catch (error) {
-<<<<<<< HEAD
       logError('Error uploading metadata to Pinata:', error);
-=======
-      console.error('Error uploading metadata to Pinata:', error);
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
       throw error;
     }
   }
   
   /**
    * Mint an NFT
-<<<<<<< HEAD
    * @param signer - Ethers.js signer instance (from wallet or WalletConnect)
    * @param recipientAddress - Wallet address to receive the NFT
    * @param tokenURI - IPFS URI for the NFT metadata
@@ -231,26 +183,12 @@ export class SubtextNftMinter {
       log('  Recipient:', recipientAddress);
       log('  Token URI:', tokenURI);
       
-=======
-   * @param wallet - Ethers.js wallet instance
-   * @param recipientAddress - Wallet address to receive the NFT
-   * @param tokenURI - IPFS URI for the NFT metadata
-   * @returns Transaction hash
-   */
-  async mintNFT(
-    wallet: ethers.Wallet,
-    recipientAddress: string,
-    tokenURI: string
-  ): Promise<string> {
-    try {
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
       // Convert IPFS URI to HTTP gateway URL if needed
       const gatewayTokenURI = tokenURI.replace(
         'ipfs://',
         'https://gateway.pinata.cloud/ipfs/'
       );
       
-<<<<<<< HEAD
       // Connect to the NFT contract using the imported ABI
       const nftContract = new ethers.Contract(
         this.config.contractAddress,
@@ -336,29 +274,6 @@ export class SubtextNftMinter {
       return { txHash: receipt.transactionHash, tokenId };
     } catch (error) {
       logError('❌ Error minting NFT:', error);
-=======
-      // ABI for ERC-721 mintNFT function
-      const CONTRACT_ABI = [
-        "function mintNFT(address recipient, string memory tokenURI) public returns (uint256)",
-      ];
-      
-      // Connect to the NFT contract
-      const nftContract = new ethers.Contract(
-        this.config.contractAddress,
-        CONTRACT_ABI,
-        wallet
-      );
-      
-      // Mint the NFT
-      const transaction = await nftContract.mintNFT(recipientAddress, gatewayTokenURI);
-      
-      // Wait for transaction to be mined
-      const receipt = await transaction.wait();
-      
-      return receipt.transactionHash;
-    } catch (error) {
-      console.error('Error minting NFT:', error);
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
       throw error;
     }
   }
@@ -366,21 +281,13 @@ export class SubtextNftMinter {
   /**
    * Create and mint NFTs for a Subtext card
    * @param card - The Subtext card data
-<<<<<<< HEAD
    * @param signer - Ethers.js signer instance (from wallet or WalletConnect)
-=======
-   * @param wallet - Ethers.js wallet instance
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
    * @param recipientAddress - Wallet address to receive the NFT
    * @returns Result of the minting process
    */
   async mintSubtextCardNFTs(
     card: SubtextCard,
-<<<<<<< HEAD
     signer: ethers.Signer,
-=======
-    wallet: ethers.Wallet,
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
     recipientAddress: string
   ): Promise<MintResult> {
     try {
@@ -391,11 +298,7 @@ export class SubtextNftMinter {
       // 1. Upload card image to IPFS
       const imageFileName = `${card.id}-image.jpg`;
       const imageIpfsUri = await this.uploadFileToPinata(card.imageUri, imageFileName);
-<<<<<<< HEAD
       log(`Card image uploaded to IPFS: ${imageIpfsUri}`);
-=======
-      console.log(`Card image uploaded to IPFS: ${imageIpfsUri}`);
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
       
       // 2. Create and upload metadata for the image NFT
       const imageMetadata = {
@@ -409,11 +312,7 @@ export class SubtextNftMinter {
       };
       
       const imageMetadataUri = await this.uploadMetadataToPinata(imageMetadata);
-<<<<<<< HEAD
       log(`Image metadata uploaded to IPFS: ${imageMetadataUri}`);
-=======
-      console.log(`Image metadata uploaded to IPFS: ${imageMetadataUri}`);
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
       
       // 3. Create and upload metadata for the card data NFT
       const cardMetadata = {
@@ -430,7 +329,6 @@ export class SubtextNftMinter {
       };
       
       const cardMetadataUri = await this.uploadMetadataToPinata(cardMetadata);
-<<<<<<< HEAD
       log(`Card metadata uploaded to IPFS: ${cardMetadataUri}`);
       
       // 4. Mint the image NFT
@@ -447,32 +345,12 @@ export class SubtextNftMinter {
         cardNftTxHash: cardResult.txHash,
         imageTokenId: imageResult.tokenId,
         cardTokenId: cardResult.tokenId,
-=======
-      console.log(`Card metadata uploaded to IPFS: ${cardMetadataUri}`);
-      
-      // 4. Mint the image NFT
-      console.log("Minting image NFT...");
-      const imageNftTxHash = await this.mintNFT(wallet, recipientAddress, imageMetadataUri);
-      
-      // 5. Mint the card data NFT
-      console.log("Minting card data NFT...");
-      const cardNftTxHash = await this.mintNFT(wallet, recipientAddress, cardMetadataUri);
-      
-      return {
-        success: true,
-        imageNftTxHash,
-        cardNftTxHash,
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
         imageIpfsUri,
         imageMetadataUri,
         cardMetadataUri
       };
     } catch (error: any) {
-<<<<<<< HEAD
       logError('Error minting Subtext card NFTs:', error);
-=======
-      console.error('Error minting Subtext card NFTs:', error);
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error occurred'
@@ -535,11 +413,7 @@ const mintCardAsNFT = async (card, privateKey, walletAddress) => {
       Alert.alert('Error', result.error || 'Failed to mint NFTs');
     }
   } catch (error) {
-<<<<<<< HEAD
     logError('Error in mintCardAsNFT:', error);
-=======
-    console.error('Error in mintCardAsNFT:', error);
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
     Alert.alert('Error', 'Failed to mint NFTs: ' + error.message);
   }
 };

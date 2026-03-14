@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 import { View, Text, TextInput, StyleSheet, FlatList, Pressable, Image, Modal, TouchableOpacity, RefreshControl, useWindowDimensions, Platform, PlatformIOSStatic, Dimensions, Alert, Animated, Linking } from 'react-native';
 import { useCallback, useEffect, useState, useRef } from 'react';
 import { useFonts, Inter_400Regular, Inter_700Bold } from '@expo-google-fonts/inter';
@@ -6,21 +5,12 @@ import { Cinzel_400Regular } from '@expo-google-fonts/cinzel';
 import * as SplashScreen from 'expo-splash-screen';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { Settings2, CreditCard as Edit3, Trash2, Swords, Shield, Sparkles, Users, Globe as Globe2, Lock, Wallet, Plus, Share2, Coins, Heart, Globe, Star, Wand2, Zap, Target, User, Briefcase, Palette, Upload, X, Check } from 'lucide-react-native';
-=======
-import { View, Text, StyleSheet, FlatList, Pressable, Image, Modal, TouchableOpacity, RefreshControl, useWindowDimensions, Platform, PlatformIOSStatic, Dimensions, Alert } from 'react-native';
-import { useCallback, useEffect, useState } from 'react';
-import { useFonts, Inter_400Regular, Inter_700Bold } from '@expo-google-fonts/inter';
-import * as SplashScreen from 'expo-splash-screen';
-import { useRouter } from 'expo-router';
-import { Settings2, CreditCard as Edit3, Trash2, Swords, Shield, Sparkles, Users, Globe as Globe2, Lock, Wallet } from 'lucide-react-native';
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import { Spacer } from '@/components/Spacer';
 import { isIPad, isTablet, isIPadMini } from '@/utils/deviceDimensions';
-<<<<<<< HEAD
 import GuestModeBanner from '@/components/GuestModeBanner';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import ViewShot from 'react-native-view-shot';
@@ -29,8 +19,6 @@ import * as ImagePicker from 'expo-image-picker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { log, logError } from '@/utils/logger';
 // NFT minting now handled server-side via Edge Function
-=======
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
 
 const COLLECTION_TYPES = [
   {
@@ -78,21 +66,14 @@ const getCardRoleIcon = (role: string) => {
 };
 
 export default function CollectionScreen() {
-<<<<<<< HEAD
   const { user, isAnonymous } = useAuth();
   const insets = useSafeAreaInsets();
-=======
-  const { user } = useAuth();
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
   // Define Card type to fix TypeScript errors
   type Card = {
     id: string;
     name: string;
     description: string;
-<<<<<<< HEAD
     image_description?: string; // Add image description field
-=======
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
     type: string;
     role?: string;
     context?: string;
@@ -101,7 +82,6 @@ export default function CollectionScreen() {
     frame_color?: string;
     name_color?: string;
     type_color?: string;
-<<<<<<< HEAD
     role_color?: string;
     description_color?: string;
     context_color?: string;
@@ -116,32 +96,11 @@ export default function CollectionScreen() {
     shadow_card_id?: string;
     shadow_card?: Card | Card[] | null;
     isDeck?: boolean; // Add deck flag
-=======
-    description_color?: string;
-    context_color?: string;
-    user_id: string;
-    collection_id?: string;
-    collections?: any;
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
   };
 
   const { width: screenWidth } = useWindowDimensions();
 
-<<<<<<< HEAD
   // Horizontal scrolling doesn't need column management
-=======
-  const getNumColumns = () => {
-    // Always use 1 column for phones, even large ones
-    if (!isTablet()) {
-      return 1;
-    }
-    // Use more columns for larger screens (tablets), but cap at 2
-    const potentialCols = Math.max(1, Math.floor(screenWidth / 200)); // Adjust 200 based on desired min card width
-    return Math.min(potentialCols, 2); // Cap at 2 columns for tablets
-  };
-
-  const [numColumns, setNumColumns] = useState(getNumColumns());
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
   const [cards, setCards] = useState<Card[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -151,7 +110,6 @@ export default function CollectionScreen() {
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [deleteError, setDeleteError] = useState('');
   const [mintingNFT, setMintingNFT] = useState(false);
-<<<<<<< HEAD
   const [selectedType, setSelectedType] = useState<CollectionType>('personal');
   const [showTypeMenu, setShowTypeMenu] = useState(false);
   const [phenomenaTypes, setPhenomenaTypes] = useState<string[]>(['All']);
@@ -195,80 +153,11 @@ export default function CollectionScreen() {
   };
   
   // Horizontal scrolling doesn't need orientation management
-=======
-  const [walletConnected, setWalletConnected] = useState(false);
-  const [walletAddress, setWalletAddress] = useState('');
-  const [selectedType, setSelectedType] = useState<CollectionType>('personal');
-  const { height: screenHeight } = useWindowDimensions();
-  const router = useRouter();
-  
-  // Calculate scaling factor based on number of columns
-  const getScaleFactor = () => {
-    switch (numColumns) {
-      case 1: return 1.0;      // 100% - original size
-      case 2: return 0.7;      // 70% - moderately reduced
-      case 3: return 0.5;      // 50% - half size
-      case 4: return 0.35;     // 35% - very compact
-      default: return 1.0;
-    }
-  };
-  
-  // Function to determine column count based on device and orientation
-  const getColumnCount = useCallback(() => {
-    // Get current dimensions
-    const { width, height } = Dimensions.get('window');
-    
-    // Always use 1 column for phones
-    if (!isTablet()) {
-      return 1;
-    }
-    
-    // For tablets: explicitly check if width > height for landscape orientation
-    const isLandscape = width > height;
-    
-    // Use 3 columns in landscape, 2 in portrait for tablets
-    const columnCount = isLandscape ? 3 : 2;
-    
-    // Log detailed device info for debugging
-    console.log('Device orientation info:', {
-      isTablet: isTablet(),
-      isIPad: isIPad(),
-      isIPadMini: isIPadMini(),
-      screenWidth: width,
-      screenHeight: height,
-      isLandscape: isLandscape,
-      columnCount: columnCount
-    });
-    
-    return columnCount;
-  }, []);
-  
-  // Function to update column count when dimensions change
-  const updateColumnCount = useCallback(() => {
-    const newColumnCount = getColumnCount();
-    setNumColumns(newColumnCount);
-  }, [getColumnCount]);
-  
-  // Set up orientation detection and column adjustment
-  useEffect(() => {
-    // Set initial column count
-    updateColumnCount();
-    
-    // Add event listener for dimension changes
-    const dimensionsSubscription = Dimensions.addEventListener('change', updateColumnCount);
-    
-    // Clean up event listener on unmount
-    return () => dimensionsSubscription.remove();
-  }, [updateColumnCount]);
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
 
   const [fontsLoaded] = useFonts({
     'Inter-Regular': Inter_400Regular,
     'Inter-Bold': Inter_700Bold,
-<<<<<<< HEAD
     'Cinzel-Regular': Cinzel_400Regular,
-=======
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
   });
 
   const fetchCards = useCallback(async (isRefreshing = false) => {
@@ -288,7 +177,6 @@ export default function CollectionScreen() {
           // Use optimized query without expensive joins
           const { data: personalCards, error: personalError } = await supabase
             .from('cards')
-<<<<<<< HEAD
             .select(`
               id, name, description, image_description, type, role, context, image_url, frame_width, frame_color, 
               name_color, type_color, description_color, context_color, format, background_gradient, 
@@ -306,15 +194,6 @@ export default function CollectionScreen() {
           console.log('🔵 DEBUG: Personal cards loaded:', personalCards?.length);
           console.log('🔵 DEBUG: Sample personal card:', personalCards?.[0]);
           setAllCards(personalCards as Card[] ?? []);
-=======
-            .select('id, name, description, type, role, context, image_url, frame_width, frame_color, name_color, type_color, description_color, context_color, user_id, collection_id')
-            .eq('user_id', user.id)
-            .order('created_at', { ascending: false })
-            .limit(50); // Add reasonable limit
-
-          if (personalError) throw personalError;
-          setCards(personalCards as Card[] ?? []);
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
           break;
 
         case 'friends':
@@ -332,26 +211,15 @@ export default function CollectionScreen() {
           );
 
           if (friendIds.length === 0) {
-<<<<<<< HEAD
             setAllCards([]);
-=======
-            setCards([]);
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
             break;
           }
 
           let friendCardsQuery = supabase
             .from('cards')
-<<<<<<< HEAD
             .select('id, name, description, type, role, context, image_url, frame_width, frame_color, name_color, type_color, description_color, context_color, format, background_gradient, is_premium_generation, custom_generation_type_id, is_uploaded_image, user_id, collection_id')
             .in('user_id', friendIds)
             .order('created_at', { ascending: false });
-=======
-            .select('id, name, description, type, role, context, image_url, frame_width, frame_color, name_color, type_color, description_color, context_color, user_id, collection_id')
-            .in('user_id', friendIds)
-            .order('created_at', { ascending: false })
-            .limit(50);
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
 
           // Only show cards that are explicitly shared with friends
           try {
@@ -369,24 +237,16 @@ export default function CollectionScreen() {
             }
           } catch (columnCheckError) {
             // Column doesn't exist, use the basic query
-<<<<<<< HEAD
             log('is_public or is_shared_with_friends column not found, using basic friend filter');
-=======
-            console.log('is_public or is_shared_with_friends column not found, using basic friend filter');
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
           }
 
           const { data: friendCards, error: friendCardsError } = await friendCardsQuery;
 
           if (friendCardsError) throw friendCardsError;
-<<<<<<< HEAD
           console.log('🟢 DEBUG: Friends cards loaded:', friendCards?.length);
           console.log('🟢 DEBUG: Sample friend card:', friendCards?.[0]);
           console.log('🟢 DEBUG: Friend card has is_shared_with_friends?', friendCards?.[0]?.hasOwnProperty('is_shared_with_friends'));
           setAllCards(friendCards as Card[] || []);
-=======
-          setCards(friendCards as Card[] || []);
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
           break;
 
         case 'public':
@@ -394,21 +254,13 @@ export default function CollectionScreen() {
             // First try with is_public column (if migration has been run)
             const { data: publicCards, error: publicError } = await supabase
               .from('cards')
-<<<<<<< HEAD
               .select('id, name, description, type, role, context, image_url, frame_width, frame_color, name_color, type_color, description_color, context_color, format, background_gradient, is_premium_generation, custom_generation_type_id, is_uploaded_image, user_id, collection_id')
               .eq('is_public', true)
               .order('created_at', { ascending: false });
-=======
-              .select('id, name, description, type, role, context, image_url, frame_width, frame_color, name_color, type_color, description_color, context_color, user_id, collection_id')
-              .eq('is_public', true)
-              .order('created_at', { ascending: false })
-              .limit(50);
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
 
             if (publicError) {
               // If is_public column doesn't exist (error code 42703), fall back to showing cards from other users
               if (publicError.code === '42703' || publicError.message?.includes('is_public') && publicError.message?.includes('does not exist')) {
-<<<<<<< HEAD
                 log('is_public column not found, falling back to showing other users\' cards');
                 const { data: fallbackCards, error: fallbackError } = await supabase
                   .from('cards')
@@ -418,36 +270,19 @@ export default function CollectionScreen() {
 
                 if (fallbackError) throw fallbackError;
                 setAllCards(fallbackCards as Card[] ?? []);
-=======
-                console.log('is_public column not found, falling back to showing other users\' cards');
-                const { data: fallbackCards, error: fallbackError } = await supabase
-                  .from('cards')
-                  .select('id, name, description, type, role, context, image_url, frame_width, frame_color, name_color, type_color, description_color, context_color, user_id, collection_id')
-                  .neq('user_id', user.id)
-                  .order('created_at', { ascending: false })
-                  .limit(50);
-
-                if (fallbackError) throw fallbackError;
-                setCards(fallbackCards as Card[] ?? []);
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
                 break; // Important: break here to avoid throwing the error
               } else {
                 throw publicError;
               }
             } else {
-<<<<<<< HEAD
               console.log('🟡 DEBUG: Public cards loaded:', publicCards?.length);
               console.log('🟡 DEBUG: Sample public card:', publicCards?.[0]);
               console.log('🟡 DEBUG: Public card has is_public?', publicCards?.[0]?.hasOwnProperty('is_public'));
               setAllCards(publicCards as Card[] ?? []);
-=======
-              setCards(publicCards as Card[] ?? []);
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
             }
           } catch (publicErr: any) {
             // Check if this is the column not found error one more time
             if (publicErr.code === '42703' || (publicErr.message?.includes('is_public') && publicErr.message?.includes('does not exist'))) {
-<<<<<<< HEAD
               log('Caught is_public column error in catch block, using fallback');
               const { data: fallbackCards, error: fallbackError } = await supabase
                 .from('cards')
@@ -461,31 +296,13 @@ export default function CollectionScreen() {
               setAllCards(fallbackCards as Card[] ?? []);
             } else {
               logError('Public cards query error:', publicErr);
-=======
-              console.log('Caught is_public column error in catch block, using fallback');
-              const { data: fallbackCards, error: fallbackError } = await supabase
-                .from('cards')
-                .select('id, name, description, type, role, context, image_url, frame_width, frame_color, name_color, type_color, description_color, context_color, user_id, collection_id')
-                .neq('user_id', user.id)
-                .order('created_at', { ascending: false })
-                .limit(50);
-
-              if (fallbackError) throw fallbackError;
-              setCards(fallbackCards as Card[] ?? []);
-            } else {
-              console.error('Public cards query error:', publicErr);
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
               throw publicErr;
             }
           }
           break;
       }
     } catch (err) {
-<<<<<<< HEAD
       logError('Error in fetchCards:', err instanceof Error ? err.message : 'Unknown error');
-=======
-      console.error('Error in fetchCards:', err instanceof Error ? err.message : 'Unknown error');
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
       setError('Failed to load cards');
     } finally {
       setLoading(false);
@@ -498,7 +315,6 @@ export default function CollectionScreen() {
       fetchCards(false);
     }
   }, [user, fetchCards]);
-<<<<<<< HEAD
 
   // Refresh cards when tab is focused (e.g., after creating a card from inbox)
   useFocusEffect(
@@ -514,15 +330,12 @@ export default function CollectionScreen() {
     loadPhenomenaTypes();
     loadCustomDeckImages();
   }, []);
-=======
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
   
   const onRefresh = useCallback(() => {
     setRefreshing(true);
     fetchCards(true);
   }, [fetchCards]);
 
-<<<<<<< HEAD
   // Load phenomena types from database, fallback to AsyncStorage
   const loadPhenomenaTypes = async () => {
     try {
@@ -915,27 +728,21 @@ export default function CollectionScreen() {
     }
   }, [viewMode, selectedPhenomena, searchQuery, allCards, phenomenaTypes, customDeckImages, filterItems, generateDecks]);
 
-=======
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
   const handleDelete = async (cardId: string) => {
     if (!cardId) {
       setDeleteError('Invalid card selected');
       return;
     }
 
-<<<<<<< HEAD
     if (!user?.id) {
       setDeleteError('User not authenticated');
       return;
     }
 
-=======
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
     setDeleteLoading(true);
     setDeleteError('');
 
     try {
-<<<<<<< HEAD
       log('🗑️ Attempting to delete card:', cardId, 'for user:', user.id);
       
       // First, check if this card is being used as a shadow card by other cards
@@ -990,32 +797,14 @@ export default function CollectionScreen() {
 
       log('✅ Card deleted successfully:', data);
       setAllCards(prevCards => prevCards.filter(card => card.id !== cardId));
-=======
-      const { error: deleteError } = await supabase
-        .from('cards')
-        .delete()
-        .eq('id', cardId)
-        .eq('user_id', user?.id || '');
-
-      if (deleteError) {
-        throw deleteError;
-      }
-
-      setCards(prevCards => prevCards.filter(card => card.id !== cardId));
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
       setShowActions(false);
       setSelectedCard(null);
       
     } catch (err) {
-<<<<<<< HEAD
       logError('Delete error details:', err);
       const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred';
       logError('Final error message:', errorMessage);
       setDeleteError(errorMessage);
-=======
-      console.error('Delete error:', err instanceof Error ? err.message : 'Unknown error');
-      setDeleteError(err instanceof Error ? err.message : 'Failed to delete card');
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
     } finally {
       setDeleteLoading(false);
     }
@@ -1025,26 +814,17 @@ export default function CollectionScreen() {
     // Close modal
     setShowActions(false);
     
-<<<<<<< HEAD
     log('📝 handleEdit called with card:', card.name, card.id);
     log('📝 Current selectedCard state:', selectedCard?.name, selectedCard?.id);
     
     // Navigate to Edit page
     router.push({
       pathname: '/card-creation-new',
-=======
-    // Navigate to Edit page
-    router.push({
-      pathname: '/create',
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
       params: {
         id: card.id,
         name: card.name,
         description: card.description,
-<<<<<<< HEAD
         image_description: card.image_description || '', // Include image description for editing
-=======
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
         type: card.type,
         role: card.role || '',
         context: card.context || '',
@@ -1054,28 +834,19 @@ export default function CollectionScreen() {
         type_color: card.type_color || '',
         description_color: card.description_color || '',
         context_color: card.context_color || '',
-<<<<<<< HEAD
         edit_mode: 'true',
         returnTo: 'cards'
-=======
-        edit_mode: 'true'
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
       }
     });
   };
 
-<<<<<<< HEAD
   const handleMintNFT = async (card: Card) => {
-=======
-  const handleMintNFT = (card: Card) => {
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
     // Close the settings modal
     setShowActions(false);
     
     // Provide haptic feedback
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     
-<<<<<<< HEAD
     // Check if user is logged in
     if (!user) {
       Alert.alert('Sign In Required', 'Please sign in to mint NFTs.');
@@ -1240,67 +1011,6 @@ export default function CollectionScreen() {
     if (Platform.OS !== 'web') {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     }
-=======
-    // Check if wallet is connected
-    if (!walletConnected) {
-      // Prompt to connect wallet
-      Alert.alert(
-        'Wallet Not Connected',
-        'You need to connect a wallet to mint this card as an NFT.',
-        [
-          { text: 'Cancel', style: 'cancel' },
-          { 
-            text: 'Connect Wallet', 
-            onPress: () => {
-              // Simulate wallet connection for demo
-              setMintingNFT(true);
-              
-              setTimeout(() => {
-                const mockWalletAddress = '0x' + Math.random().toString(16).substring(2, 42);
-                setWalletAddress(mockWalletAddress);
-                setWalletConnected(true);
-                setMintingNFT(false);
-                
-                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-                Alert.alert(
-                  'Wallet Connected',
-                  `Connected to wallet: ${mockWalletAddress.substring(0, 6)}...${mockWalletAddress.substring(38)}`,
-                  [
-                    { text: 'Cancel', style: 'cancel' },
-                    { 
-                      text: 'Mint NFT', 
-                      onPress: () => mintCardAsNFT(card) 
-                    }
-                  ]
-                );
-              }, 1500);
-            }
-          }
-        ]
-      );
-      return;
-    }
-    
-    // If wallet is already connected, proceed with minting
-    mintCardAsNFT(card);
-  };
-
-  const mintCardAsNFT = (card: Card) => {
-    setMintingNFT(true);
-    
-    // This is a simulation of the minting process
-    // In a production app, you would call your NFT minting function here
-    setTimeout(() => {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      setMintingNFT(false);
-      
-      Alert.alert(
-        'NFT Minted Successfully!',
-        `Your card "${card.name}" has been minted as an NFT and will soon appear in your wallet.`,
-        [{ text: 'OK' }]
-      );
-    }, 3000);
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
   };
 
   const onLayoutRootView = useCallback(async () => {
@@ -1313,7 +1023,6 @@ export default function CollectionScreen() {
     return null;
   }
 
-<<<<<<< HEAD
   // Calculate scaling factor based on number of columns
   const scaleFactor = getScaleFactor();
   
@@ -1492,23 +1201,11 @@ export default function CollectionScreen() {
     
     // Get card dimensions based on the 2.5:3.5 ratio
     const { cardWidth, cardHeight, imageHeight } = getCardDimensions();
-=======
-  // Calculate the current scale factor based on number of columns
-  const scaleFactor = getScaleFactor();
-  
-  const renderCard = ({ item }: { item: Card }) => {
-    const cardColors = getCardTypeColor(item.type);
-    
-    // Calculate image height based on number of columns - progressively smaller as columns increase
-    // Following the scaling system from previous implementations (280px → 180px → 120px) for multi-column layouts
-    const imageHeight = numColumns === 1 ? 280 : numColumns === 2 ? 180 : 120; // Scale down height as columns increase
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
     
     // Calculate border width based on scale factor
     const borderWidth = Math.max(1, 3 * scaleFactor); // Min 1px, max 3px
     
     // Calculate font sizes based on scale factor
-<<<<<<< HEAD
     const nameFontSize = Math.max(12, Math.round(24 * scaleFactor));
     const typeFontSize = Math.max(10, Math.round(16 * scaleFactor));
     const baseFontSize = Math.max(9, Math.round(16 * scaleFactor));
@@ -2699,115 +2396,6 @@ export default function CollectionScreen() {
         </Animated.View>
       </View>
     );
-=======
-    const nameSize = Math.max(16, 24 * scaleFactor); // Min 16px
-    const typeSize = Math.max(12, 16 * scaleFactor); // Min 12px
-    const descSize = Math.max(12, 16 * scaleFactor); // Min 12px
-    const contextSize = Math.max(10, 14 * scaleFactor); // Min 10px
-    
-    return (
-      <Pressable 
-        style={[
-          styles.card,
-          { 
-            flex: 1 // Allow card to grow within its column
-          }
-        ]}>
-        <LinearGradient
-          colors={cardColors}
-          style={[
-            styles.cardFrame,
-            {
-              borderWidth: borderWidth,
-              borderColor: '#808080', // Always use gray
-              borderRadius: 16 * scaleFactor // Scale border radius
-            }
-          ]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-        >
-          <View style={styles.cardContent}>
-            <View style={styles.cardNameContainer}>
-              <Text style={[
-                styles.cardName, 
-                { 
-                  color: item.name_color || '#FFFFFF',
-                  fontSize: nameSize,
-                  padding: 8 * scaleFactor
-                }
-              ]}>
-                {item.name}
-              </Text>
-            </View>
-
-            <View style={[styles.artContainer, { height: imageHeight }]}>
-              <Image 
-                source={{ uri: item.image_url }}
-                style={styles.cardArt}
-                resizeMode="cover"
-              />
-            </View>
-
-            <View style={styles.typeLine}>
-              <View style={styles.typeContainer}>
-                <Text style={[
-                  styles.typeText, 
-                  { 
-                    color: item.type_color || '#FFFFFF',
-                    fontSize: typeSize
-                  }
-                ]}>
-                  {item.type || 'Card'}
-                </Text>
-              </View>
-              {item.role && (
-                <View style={styles.roleContainer}>
-                  {getCardRoleIcon(item.role)}
-                  <Text style={[styles.roleText, { color: item.type_color || '#FFFFFF' }]}>
-                    {item.role}
-                  </Text>
-                </View>
-              )}
-            </View>
-
-            <View style={[
-              styles.textBox
-            ]}>
-              <Text style={[
-                styles.cardDescription, 
-                { 
-                  color: item.description_color || '#FFFFFF',
-                  fontSize: descSize,
-                  lineHeight: Math.max(18, 24 * scaleFactor)
-                }
-              ]}>
-                {item.description}
-              </Text>
-            </View>
-
-            {item.context && (
-              <View style={styles.contextContainer}>
-                <Text style={[styles.contextText, { color: item.context_color || '#CCCCCC' }]}>
-                  {item.context}
-                </Text>
-              </View>
-            )}
-
-            <TouchableOpacity
-              style={styles.settingsButton}
-              onPress={() => {
-                setSelectedCard(item);
-                setShowActions(true);
-                setDeleteError('');
-              }}
-            >
-              <Settings2 size={20} color="#fff" />
-            </TouchableOpacity>
-          </View>
-        </LinearGradient>
-      </Pressable>
-    );
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
   };
 
   const renderCollectionTypeSelector = () => (
@@ -2846,11 +2434,7 @@ export default function CollectionScreen() {
   if (loading) {
     return (
       <LinearGradient
-<<<<<<< HEAD
         colors={['#090909', '#090909']}
-=======
-        colors={['#1a1a1a', '#2a2a2a']}
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
         style={[styles.container, styles.centerContent]}>
         <Text style={styles.loadingText}>Loading your collection...</Text>
       </LinearGradient>
@@ -2860,11 +2444,7 @@ export default function CollectionScreen() {
   if (error) {
     return (
       <LinearGradient
-<<<<<<< HEAD
         colors={['#090909', '#090909']}
-=======
-        colors={['#1a1a1a', '#2a2a2a']}
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
         style={[styles.container, styles.centerContent]}>
         <Text style={styles.errorText}>{error}</Text>
       </LinearGradient>
@@ -2876,7 +2456,6 @@ export default function CollectionScreen() {
 
   return (
     <LinearGradient
-<<<<<<< HEAD
       colors={['#090909', '#090909']}
       style={styles.container}
       onLayout={onLayoutRootView}>
@@ -3052,26 +2631,6 @@ export default function CollectionScreen() {
             progressViewOffset={insets.top + 8}
             enabled={true}
           />
-=======
-      colors={['#1a1a1a', '#2a2a2a']}
-      style={styles.container}
-      onLayout={onLayoutRootView}>
-      {/* Experiment: Removed Spacer to reduce top padding */}
-      {renderCollectionTypeSelector()}
-      
-      {/* No column selector UI - automatically set based on device type */}
-      
-      <FlatList
-        data={cards}
-        renderItem={renderCard}
-        keyExtractor={(item) => item.id}
-        numColumns={numColumns} // Use state variable here
-        key={numColumns} // Force re-render when numColumns changes
-        contentContainerStyle={styles.listContent}
-        columnWrapperStyle={numColumns > 1 ? styles.columnWrapper : null} // Add spacing between columns
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#fff" />
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
         }
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
@@ -3085,7 +2644,6 @@ export default function CollectionScreen() {
             {selectedType === 'personal' && (
               <TouchableOpacity 
                 style={styles.createButton}
-<<<<<<< HEAD
                 onPress={() => {
                   // Navigate directly to card creation with pre-selected phenomena
                   if (selectedPhenomena === 'All') {
@@ -3106,21 +2664,12 @@ export default function CollectionScreen() {
                     : `Create Your First ${selectedPhenomena} Card`
                   }
                 </Text>
-=======
-                onPress={() => router.push('/create')}
-              >
-                <Text style={styles.createButtonText}>Create Your First Card</Text>
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
               </TouchableOpacity>
             )}
           </View>
         }
-<<<<<<< HEAD
         />
       </View>
-=======
-      />
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
 
       <Modal
         visible={showActions}
@@ -3142,11 +2691,8 @@ export default function CollectionScreen() {
             {deleteError ? (
               <Text style={styles.modalErrorText}>{deleteError}</Text>
             ) : null}
-<<<<<<< HEAD
             
             {/* Personal cards: Full edit controls */}
-=======
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
             {selectedType === 'personal' && (
               <>
                 <TouchableOpacity
@@ -3174,7 +2720,6 @@ export default function CollectionScreen() {
                   <Text style={styles.modalButtonText}>Edit Card</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-<<<<<<< HEAD
                   style={[styles.modalButton, styles.shareButton]}
                   onPress={() => selectedCard && handleShareCard(selectedCard)}
                   disabled={sharingCard}
@@ -3191,8 +2736,6 @@ export default function CollectionScreen() {
                   )}
                 </TouchableOpacity>
                 <TouchableOpacity
-=======
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
                   style={[
                     styles.modalButton,
                     styles.deleteButton,
@@ -3216,7 +2759,6 @@ export default function CollectionScreen() {
                 </TouchableOpacity>
               </>
             )}
-<<<<<<< HEAD
             
             {/* Friends and Public cards: Share, Hide, Favorite */}
             {(selectedType === 'friends' || selectedType === 'public') && selectedCard && (
@@ -3499,11 +3041,6 @@ export default function CollectionScreen() {
         </Pressable>
       </Modal>
 
-=======
-          </View>
-        </Pressable>
-      </Modal>
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
     </LinearGradient>
   );
 }
@@ -3511,15 +3048,10 @@ export default function CollectionScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-<<<<<<< HEAD
     backgroundColor: '#090909',
     paddingHorizontal: Platform.OS === 'web' ? 16 : 8,
     paddingBottom: Platform.OS === 'web' ? 16 : 8,
     paddingTop: Platform.OS === 'web' ? 16 : 2,
-=======
-    backgroundColor: '#121212',
-    padding: Platform.OS === 'web' ? 16 : 8,
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
   },
   // Column selector styles
   columnSelectorContainer: {
@@ -3597,10 +3129,6 @@ const styles = StyleSheet.create({
     flexGrow: 1,
   },
   card: {
-<<<<<<< HEAD
-=======
-    marginBottom: 24,
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
     borderRadius: 16,
     overflow: 'hidden',
     elevation: 10,
@@ -3612,11 +3140,7 @@ const styles = StyleSheet.create({
   cardFrame: {
     borderRadius: 16,
     borderWidth: 8,
-<<<<<<< HEAD
     borderColor: '#C0C0C0',
-=======
-    borderColor: '#FFD700',
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
   },
   cardContent: {
     backgroundColor: 'rgba(0, 0, 0, 0.85)',
@@ -3755,7 +3279,6 @@ const styles = StyleSheet.create({
   nftButton: {
     backgroundColor: 'rgba(130, 71, 229, 0.2)', // Polygon/Matic purple with transparency
   },
-<<<<<<< HEAD
   shareButton: {
     backgroundColor: 'rgba(16, 185, 129, 0.2)', // Green with transparency
   },
@@ -3765,8 +3288,6 @@ const styles = StyleSheet.create({
   hideButton: {
     backgroundColor: 'rgba(107, 114, 128, 0.2)', // Gray with transparency
   },
-=======
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
   errorText: {
     color: '#ff4444',
     fontFamily: 'Inter-Regular',
@@ -3806,7 +3327,6 @@ const styles = StyleSheet.create({
   buttonDisabled: {
     opacity: 0.5,
   },
-<<<<<<< HEAD
 
   /* --- New top bar styles --- */
   topBarContainer: {
@@ -4174,6 +3694,4 @@ const styles = StyleSheet.create({
     fontSize: 16,
     marginBottom: 20,
   },
-=======
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
 });

@@ -1,15 +1,9 @@
 {
   "expo": {
     "name": "Subtext",
-<<<<<<< HEAD
     "slug": "subtext-card-game",
     "version": "1.0.1",
     "orientation": "default",
-=======
-    "slug": "bolt-expo-nativewind",
-    "version": "1.0.0",
-    "orientation": "portrait",
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
     "icon": "./assets/images/icon.png",
     "scheme": "myapp",
     "userInterfaceStyle": "automatic",
@@ -22,7 +16,6 @@
       "**/*"
     ],
     "ios": {
-<<<<<<< HEAD
       "buildNumber": "4",
       "supportsTablet": true,
       "bundleIdentifier": "com.adamkretz.subtext",
@@ -49,20 +42,10 @@
     },
     "android": {
       "versionCode": 1,
-=======
-      "supportsTablet": true,
-      "bundleIdentifier": "com.adamkretz.subtext",
-      "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
-      }
-    },
-    "android": {
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/icon.png",
         "backgroundColor": "#ffffff"
       },
-<<<<<<< HEAD
       "package": "com.adamkretz.subtext",
       "permissions": [
         "CAMERA",
@@ -70,9 +53,6 @@
         "WRITE_EXTERNAL_STORAGE",
         "RECORD_AUDIO"
       ]
-=======
-      "package": "com.adamkretz.subtext"
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
     },
     "web": {
       "bundler": "metro",
@@ -86,14 +66,10 @@
         {
           "faceIDPermission": "Allow $(PRODUCT_NAME) to access your Face ID biometric data."
         }
-<<<<<<< HEAD
       ],
       "expo-background-fetch",
       "expo-task-manager",
       "expo-background-task"
-=======
-      ]
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
     ],
     "experiments": {
       "typedRoutes": true,
@@ -104,16 +80,10 @@
         "origin": false
       },
       "eas": {
-<<<<<<< HEAD
         "projectId": "36a2ea6f-78db-430d-acf1-4605e47047ea"
       }
     },
     "owner": "arkretz44",
     "newArchEnabled": true
-=======
-        "projectId": "bc236e6d-0090-4c00-82ed-ba3981318bf5"
-      }
-    }
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
   }
 }

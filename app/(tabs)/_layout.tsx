@@ -1,5 +1,4 @@
 import { Tabs } from 'expo-router';
-<<<<<<< HEAD
 import { Plus, Layers, Settings, LayoutGrid as Layout, Users } from 'lucide-react-native';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
@@ -9,34 +8,20 @@ import { Platform, Dimensions } from 'react-native';
 import { SafeAreaWrapper } from '@/components/SafeAreaWrapper';
 import { TouchableOpacity } from 'react-native';
 import { useFonts, Cinzel_400Regular } from '@expo-google-fonts/cinzel';
-=======
-import { Plus, Car as Cards, Settings, LayoutGrid as Layout, Users } from 'lucide-react-native';
-import { router } from 'expo-router';
-import { useEffect } from 'react';
-import { useAuth } from '@/contexts/AuthContext';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Platform } from 'react-native';
-import { SafeAreaWrapper } from '@/components/SafeAreaWrapper';
-import { TouchableOpacity } from 'react-native';
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
 
 export default function TabLayout() {
   const { fetchCards } = useAuth();
   const insets = useSafeAreaInsets();
-<<<<<<< HEAD
   const [isLandscape, setIsLandscape] = useState(false);
 
   const [fontsLoaded] = useFonts({
     'Cinzel-Regular': Cinzel_400Regular,
   });
-=======
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
 
   useEffect(() => {
     fetchCards();
   }, [fetchCards]);
 
-<<<<<<< HEAD
   useEffect(() => {
     const updateOrientation = () => {
       const { width, height } = Dimensions.get('window');
@@ -76,31 +61,12 @@ export default function TabLayout() {
             marginHorizontal: 20,
             bottom: 20,
             position: 'absolute',
-=======
-  return (
-    <SafeAreaWrapper>
-      <Tabs
-        screenOptions={{
-          headerShown: false,
-          tabBarStyle: {
-            backgroundColor: '#1a1a1a',
-            borderTopWidth: 0,
-            elevation: 0,
-            shadowOpacity: 0,
-            height: Platform.OS === 'ios' ? 80 : 70,
-            paddingBottom: Platform.OS === 'ios' ? insets.bottom : 12,
-            paddingTop: 8,
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
           },
           tabBarLabelStyle: {
             fontSize: 12,
             marginBottom: 4,
-<<<<<<< HEAD
             fontFamily: fontsLoaded ? 'Cinzel-Regular' : 'Inter-Regular',
             letterSpacing: 1,
-=======
-            fontFamily: 'Inter-Regular',
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
           },
           tabBarItemStyle: {
             paddingVertical: 4,
@@ -112,11 +78,7 @@ export default function TabLayout() {
           name="index"
           options={{
             title: 'Cards',
-<<<<<<< HEAD
             tabBarIcon: ({ size, color }) => <Layers size={size} color={color} />,
-=======
-            tabBarIcon: ({ size, color }) => <Cards size={size} color={color} />,
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
           }}
         />
         <Tabs.Screen
@@ -164,7 +126,6 @@ export default function TabLayout() {
             tabBarIcon: ({ size, color }) => <Settings size={size} color={color} />,
           }}
         />
-<<<<<<< HEAD
         <Tabs.Screen
           name="ai-card-flow"
           options={{
@@ -242,8 +203,6 @@ export default function TabLayout() {
             headerShown: false, // Hide header for this screen
           }}
         />
-=======
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
       </Tabs>
     </SafeAreaWrapper>
   );

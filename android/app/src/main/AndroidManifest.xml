@@ -1,8 +1,4 @@
-<<<<<<< HEAD
 <manifest xmlns:android="http://schemas.android.com/apk/res/android" xmlns:tools="http://schemas.android.com/tools">
-=======
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
   <uses-permission android:name="android.permission.CAMERA"/>
   <uses-permission android:name="android.permission.INTERNET"/>
   <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"/>

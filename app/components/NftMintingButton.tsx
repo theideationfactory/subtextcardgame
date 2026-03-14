@@ -4,10 +4,7 @@ import { Network } from 'alchemy-sdk';
 import { Text, TouchableOpacity } from 'react-native';
 import { SubtextNftMinter } from '@/app/utils/nftMinter';
 import * as Haptics from 'expo-haptics';
-<<<<<<< HEAD
 import { log, logError } from '@/utils/logger';
-=======
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
 
 interface NftMintingButtonProps {
   card: {
@@ -83,11 +80,7 @@ export default function NftMintingButton({ card, walletAddress }: NftMintingButt
             text: 'OK', 
             onPress: () => {
               // In a real implementation, this would trigger the actual minting process
-<<<<<<< HEAD
               log('NFT minting would start here with card:', card);
-=======
-              console.log('NFT minting would start here with card:', card);
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
             } 
           }
         ]
@@ -106,11 +99,7 @@ export default function NftMintingButton({ card, walletAddress }: NftMintingButt
       }, 2000);
 
     } catch (error) {
-<<<<<<< HEAD
       logError('Error in mintCardAsNFT:', error);
-=======
-      console.error('Error in mintCardAsNFT:', error);
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
       
       // Provide error haptic feedback
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);

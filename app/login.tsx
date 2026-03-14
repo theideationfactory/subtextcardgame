@@ -1,46 +1,30 @@
-<<<<<<< HEAD
 import { useState, useEffect, useRef } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, Platform, Modal, ScrollView, Linking } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-=======
-import { useState, useEffect } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, Platform } from 'react-native';
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
 import { useRouter } from 'expo-router';
 import { useFonts, Inter_400Regular, Inter_700Bold } from '@expo-google-fonts/inter';
 import * as SplashScreen from 'expo-splash-screen';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
-<<<<<<< HEAD
 import { log, logError } from '@/utils/logger';
-=======
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
 import 'react-native-url-polyfill/auto';
 
 SplashScreen.preventAutoHideAsync();
 
-<<<<<<< HEAD
 const TOS_ACCEPTED_KEY = 'subtext_tos_accepted';
 const TOS_VERSION = '2026-01-10'; // Update this when ToS changes
 
-=======
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
 export default function LoginScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-<<<<<<< HEAD
   const [showTosModal, setShowTosModal] = useState(false);
   const [tosChecking, setTosChecking] = useState(true);
   const [hasScrolledToBottom, setHasScrolledToBottom] = useState(false);
   const scrollViewRef = useRef<ScrollView>(null);
   const router = useRouter();
   const { refreshSession, signInAnonymously } = useAuth();
-=======
-  const router = useRouter();
-  const { refreshSession } = useAuth();
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
 
   const [fontsLoaded] = useFonts({
     'Inter-Regular': Inter_400Regular,
@@ -53,7 +37,6 @@ export default function LoginScreen() {
     }
   }, [fontsLoaded]);
 
-<<<<<<< HEAD
   // Check if user has accepted ToS
   useEffect(() => {
     const checkTosAcceptance = async () => {
@@ -94,8 +77,6 @@ export default function LoginScreen() {
     Linking.openURL('https://openai.com/policies/usage-policies/');
   };
 
-=======
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
   const handleLogin = async () => {
     if (!email || !password) {
       setError('Please fill in all fields');
@@ -113,11 +94,7 @@ export default function LoginScreen() {
       });
 
       if (signInError) {
-<<<<<<< HEAD
         logError('Sign in error:', signInError);
-=======
-        console.error('Sign in error:', signInError);
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
         throw signInError;
       }
 
@@ -137,11 +114,7 @@ export default function LoginScreen() {
         throw new Error('No session returned after login');
       }
     } catch (err: any) {
-<<<<<<< HEAD
       logError('Login error:', err);
-=======
-      console.error('Login error:', err);
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
       setError(err.message || 'Failed to sign in');
       setPassword('');
     } finally {
@@ -155,7 +128,6 @@ export default function LoginScreen() {
       return;
     }
 
-<<<<<<< HEAD
     // Password strength validation
     if (password.length < 8) {
       setError('Password must be at least 8 characters long');
@@ -169,8 +141,6 @@ export default function LoginScreen() {
       return;
     }
 
-=======
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
     setLoading(true);
     setError('');
 
@@ -187,11 +157,7 @@ export default function LoginScreen() {
       });
 
       if (signUpError) {
-<<<<<<< HEAD
         logError('Sign up error:', signUpError);
-=======
-        console.error('Sign up error:', signUpError);
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
         throw signUpError;
       }
 
@@ -205,11 +171,7 @@ export default function LoginScreen() {
         throw new Error('No user data returned after signup');
       }
     } catch (err: any) {
-<<<<<<< HEAD
       logError('Signup error:', err);
-=======
-      console.error('Signup error:', err);
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
       setError(err.message || 'Failed to sign up');
       setPassword('');
     } finally {
@@ -217,7 +179,6 @@ export default function LoginScreen() {
     }
   };
 
-<<<<<<< HEAD
   const handleGuestMode = async () => {
     setLoading(true);
     setError('');
@@ -249,15 +210,10 @@ export default function LoginScreen() {
 
   if (!fontsLoaded || tosChecking) {
     return <View style={{ flex: 1, backgroundColor: '#121212' }} />;
-=======
-  if (!fontsLoaded) {
-    return null;
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
   }
 
   return (
     <View style={styles.container}>
-<<<<<<< HEAD
       {/* Terms of Service Modal */}
       <Modal
         visible={showTosModal}
@@ -367,8 +323,6 @@ export default function LoginScreen() {
         </View>
       </Modal>
 
-=======
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
       <View style={styles.formContainer}>
         <Text style={styles.title}>Welcome Back</Text>
         <Text style={styles.subtitle}>Sign in to continue creating cards</Text>
@@ -432,7 +386,6 @@ export default function LoginScreen() {
           >
             <Text style={styles.buttonText}>Create Account</Text>
           </TouchableOpacity>
-<<<<<<< HEAD
 
           <View style={styles.divider}>
             <View style={styles.dividerLine} />
@@ -447,8 +400,6 @@ export default function LoginScreen() {
           >
             <Text style={styles.guestButtonText}>Continue as Guest</Text>
           </TouchableOpacity>
-=======
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
         </View>
       </View>
     </View>
@@ -544,7 +495,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: 'Inter-Regular',
   },
-<<<<<<< HEAD
   guestButton: {
     backgroundColor: 'transparent',
     borderRadius: 12,
@@ -653,6 +603,4 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontFamily: 'Inter-Bold',
   },
-=======
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
 });

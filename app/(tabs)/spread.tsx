@@ -13,15 +13,9 @@ import {
   TextInput,
   Platform,
   SafeAreaView,
-<<<<<<< HEAD
   Pressable,
 } from 'react-native';
 import { useFonts, Inter_400Regular, Inter_700Bold } from '@expo-google-fonts/inter';
-=======
-} from 'react-native';
-import { useFonts, Inter_400Regular, Inter_700Bold } from '@expo-google-fonts/inter';
-import { createClient } from '@supabase/supabase-js';
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
 import { LinearGradient } from 'expo-linear-gradient';
 import { 
   Target, 
@@ -44,7 +38,6 @@ import {
   Grid,
   Eye,
   EyeOff,
-<<<<<<< HEAD
   Mail, // Added for Inbox button
   Send, // Added for Send button
 } from 'lucide-react-native';
@@ -97,18 +90,6 @@ interface CustomSpread {
 }
 
 // Use shared authenticated Supabase client from lib to ensure RLS uses the active session
-=======
-} from 'lucide-react-native';
-import { useRouter, useLocalSearchParams } from 'expo-router';
-import { useAuth } from '@/contexts/AuthContext';
-import { Spacer } from '@/components/Spacer';
-import { hasDynamicIsland } from '@/utils/deviceDimensions';
-
-const supabase = createClient(
-  process.env.EXPO_PUBLIC_SUPABASE_URL!,
-  process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY!
-);
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -134,7 +115,6 @@ const SPREADS: Record<SpreadType, {
     icon: RotateCcw,
     zones: [
       {
-<<<<<<< HEAD
         name: 'context',
         title: 'Context',
         color: '#FF9800',
@@ -142,8 +122,6 @@ const SPREADS: Record<SpreadType, {
         description: 'Events and circumstances that inform your perspective',
       },
       {
-=======
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
         name: 'their_moves',
         title: 'Their Moves',
         color: '#FF9800',
@@ -276,33 +254,26 @@ export default function SpreadScreen() {
   const [expandedCardId, setExpandedCardId] = useState<string | null>(null);
   const [galleryLoading, setGalleryLoading] = useState(false);
   const [gallerySearchQuery, setGallerySearchQuery] = useState('');
-<<<<<<< HEAD
   const [phenomenaTypes, setPhenomenaTypes] = useState<string[]>(['All']);
   const [selectedPhenomena, setSelectedPhenomena] = useState<string>('All');
   const [showPhenomenaMenu, setShowPhenomenaMenu] = useState(false);
   const [activeScope, setActiveScope] = useState('Personal');
-=======
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
   const [filteredCards, setFilteredCards] = useState<any[]>([]);
   const [showFullCardView, setShowFullCardView] = useState(false);
   const [selectedCardForFullView, setSelectedCardForFullView] = useState<any>(null);
   const [successMessage, setSuccessMessage] = useState('');
-<<<<<<< HEAD
   const [cardToRemove, setCardToRemove] = useState<{card: any, zone: string} | null>(null);
   const [autoAddCardData, setAutoAddCardData] = useState<string | null>(null);
   const [autoAddZone, setAutoAddZone] = useState<string | null>(null);
   const [wordsRemembered, setWordsRemembered] = useState<Record<string, string>>({});
   const [customSpread, setCustomSpread] = useState<CustomSpread | null>(null);
   const [savedCustomSpreads, setSavedCustomSpreads] = useState<any[]>([]);
-=======
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
 
   const [fontsLoaded] = useFonts({
     'Inter-Regular': Inter_400Regular,
     'Inter-Bold': Inter_700Bold,
   });
 
-<<<<<<< HEAD
   // Handle auto-adding a card when returning from create screen
   // This effect handles the auto-add card data passed from the creation screen
   useEffect(() => {
@@ -400,24 +371,16 @@ export default function SpreadScreen() {
     }
   };
 
-=======
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
   useEffect(() => {
     const initializeScreen = async () => {
       try {
         setLoading(true);
-<<<<<<< HEAD
         // Fetch all cards initially to populate the base `cards` state
         await fetchCards();
         // Load saved custom spreads
         await loadSavedCustomSpreads();
       } catch (err) {
         logError('Error initializing screen:', err);
-=======
-        await fetchCards();
-      } catch (err) {
-        console.error('Error initializing screen:', err);
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
         setError('Failed to initialize screen');
       } finally {
         setLoading(false);
@@ -425,7 +388,6 @@ export default function SpreadScreen() {
     };
 
     initializeScreen();
-<<<<<<< HEAD
   }, [user]); // Run only once on mount
 
   // This effect reacts to gallery visibility and scope changes to fetch the correct cards.
@@ -473,39 +435,20 @@ export default function SpreadScreen() {
       }
     }, [params.autoAddCard, params.autoAddZone, fetchCards])
   );
-=======
-  }, []);
-
-  useEffect(() => {
-    if (showGallery) {
-      fetchCards();
-    }
-  }, [showGallery, fetchCards]);
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
 
   useEffect(() => {
     const loadDraftIfNeeded = async () => {
       if (params.draftId) {
         const draftIdToLoad = Array.isArray(params.draftId) ? params.draftId[0] : params.draftId;
-<<<<<<< HEAD
         if (draftIdToLoad && draftIdToLoad !== currentSpreadId) { // Only load if it's a different draft
           try {
             // Ensure all cards are available before loading a draft
-=======
-        if (draftIdToLoad) { // Ensure we have a valid ID after potential array access
-          try {
-            // Ensure cards are loaded first
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
             if (!cards || cards.length === 0) {
               await fetchCards();
             }
             await loadDraft(draftIdToLoad);
           } catch (err) {
-<<<<<<< HEAD
             logError('Error loading draft:', err);
-=======
-            console.error('Error loading draft:', err);
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
             setError('Failed to load draft. Please try again.');
           }
         }
@@ -513,16 +456,11 @@ export default function SpreadScreen() {
     };
 
     loadDraftIfNeeded();
-<<<<<<< HEAD
   }, [params.draftId, currentSpreadId]); // Corrected dependencies
-=======
-  }, [params.draftId, cards.length]); // Only depend on cards.length, not the entire cards array
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
 
   const handleShowGallery = useCallback((zoneName: string) => {
     setActiveZone(zoneName);
     setShowGallery(true);
-<<<<<<< HEAD
     setGallerySearchQuery(''); // Reset search query
   }, []);
 
@@ -553,20 +491,6 @@ export default function SpreadScreen() {
     }
   }, [selectedPhenomena]);
 
-=======
-    // Initialize filteredCards with all cards when opening the gallery
-    setFilteredCards(cards);
-    setGallerySearchQuery(''); // Reset search query
-  }, [cards]);
-
-  // Initialize filteredCards when cards change
-  useEffect(() => {
-    if (showGallery) {
-      setFilteredCards(cards);
-    }
-  }, [cards, showGallery]);
-
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
   const toggleFullscreen = (zoneName: string) => {
     if (fullscreenZone === zoneName) {
       setFullscreenZone(null);
@@ -623,18 +547,13 @@ export default function SpreadScreen() {
         setSpreadName(SPREADS[spreadType as keyof typeof SPREADS].name);
       }
     } catch (err) {
-<<<<<<< HEAD
       logError('Error checking for existing draft:', err);
-=======
-      console.error('Error checking for existing draft:', err);
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
       setError('Failed to check for existing draft');
     }
   };
 
   const loadDraft = async (draftId: string) => {
     try {
-<<<<<<< HEAD
       log('Loading draft with ID:', draftId);
       
       // Ensure cards are loaded first
@@ -642,11 +561,6 @@ export default function SpreadScreen() {
       if (!currentCards || currentCards.length === 0) {
         log('Cards not loaded, fetching cards first...');
         currentCards = await fetchCards(0, 1000, false); // Capture the returned cards, ensure no cache, fetch a larger limit
-=======
-      // Ensure cards are loaded first
-      if (!cards || cards.length === 0) {
-        await fetchCards();
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
       }
 
       const { data: draft, error: draftError } = await supabase
@@ -655,7 +569,6 @@ export default function SpreadScreen() {
         .eq('id', draftId)
         .single();
 
-<<<<<<< HEAD
       if (draftError) {
         logError('Error fetching draft:', draftError);
         throw draftError;
@@ -715,25 +628,10 @@ export default function SpreadScreen() {
           });
         }
         log('Available card IDs in cardMap:', Object.keys(cardsById));
-=======
-      if (draftError) throw draftError;
-
-      if (draft?.draft_data?.type && draft?.draft_data?.zoneCards) {
-        setSelectedSpread(draft.draft_data.type);
-        setSpreadName(draft.name || SPREADS[draft.draft_data.type as SpreadType].name);
-        setCurrentSpreadId(draft.id);
-
-        // Create a fresh cardsById map with the latest cards
-        const cardsById: Record<string, any> = {};
-        cards.forEach(card => {
-          cardsById[card.id] = card;
-        });
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
         setCardMap(cardsById);
 
         const restoredZoneCards: Record<string, any[]> = {};
         Object.entries(draft.draft_data.zoneCards).forEach(([zoneName, cardIds]: [string, any]) => {
-<<<<<<< HEAD
           log(`Processing zone ${zoneName} with card IDs:`, cardIds);
           
           const zoneCards = (cardIds as string[]).map((id: string) => {
@@ -758,28 +656,12 @@ export default function SpreadScreen() {
       logError('Error loading draft:', err);
       const errorMessage = err instanceof Error ? err.message : 'Failed to load draft. Please try again.';
       setError(errorMessage);
-=======
-          restoredZoneCards[zoneName] = (cardIds as string[])
-            .map((id: string) => cardsById[id])
-            .filter(Boolean);
-        });
-        setZoneCards(restoredZoneCards);
-      }
-    } catch (err) {
-      console.error('Error loading draft:', err);
-      setError('Failed to load draft. Please try again.');
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
     }
   };
 
   const saveDraft = async (name?: string) => {
-<<<<<<< HEAD
     if (!selectedSpread && !customSpread) {
       logError('No spread selected');
-=======
-    if (!selectedSpread) {
-      console.error('No spread selected');
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
       return false;
     }
 
@@ -788,7 +670,6 @@ export default function SpreadScreen() {
       
       // Check if user is authenticated using AuthContext
       if (!user || !user.id) {
-<<<<<<< HEAD
         logError('No authenticated user from AuthContext');
         const error = new Error('No authenticated user');
         logError('Auth error details:', { user, hasId: user?.id ? 'yes' : 'no' });
@@ -796,21 +677,6 @@ export default function SpreadScreen() {
       }
       
       log('Saving draft for user:', user.id);
-=======
-        console.error('No authenticated user from AuthContext');
-        const error = new Error('No authenticated user');
-        console.error('Auth error details:', { user, hasId: user?.id ? 'yes' : 'no' });
-        throw error;
-      }
-      
-      console.log('Saving draft for user:', user.id);
-      
-      // Log authentication state
-      const { data: { session } } = await supabase.auth.getSession();
-      console.log('Current session:', session ? 'exists' : 'null');
-      console.log('Session user ID:', session?.user?.id);
-      console.log('AuthContext user ID:', user.id);
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
       
       // Prepare zone cards data
       const zoneCardIds: Record<string, string[]> = {};
@@ -819,7 +685,6 @@ export default function SpreadScreen() {
       });
 
       const draftData = {
-<<<<<<< HEAD
         type: selectedSpread || 'custom',
         zoneCards: zoneCardIds,
         wordsRemembered,
@@ -829,15 +694,6 @@ export default function SpreadScreen() {
       log('Prepared draft data:', JSON.stringify(draftData, null, 2));
 
       const spreadNameToUse = (name && name.trim()) || spreadName || (selectedSpread ? SPREADS[selectedSpread].name : customSpread?.name || 'Untitled Spread');
-=======
-        type: selectedSpread,
-        zoneCards: zoneCardIds,
-      };
-
-      console.log('Prepared draft data:', JSON.stringify(draftData, null, 2));
-
-      const spreadNameToUse = (name && name.trim()) || spreadName || (selectedSpread ? SPREADS[selectedSpread].name : 'Untitled Spread');
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
       const iconName = (selectedSpread && SPREADS[selectedSpread]?.icon?.name) || 'Sparkles';
       const currentTimestamp = new Date().toISOString();
       const spreadZones = selectedSpread ? 
@@ -846,27 +702,19 @@ export default function SpreadScreen() {
           title: zone.title, 
           color: zone.color, 
           description: zone.description 
-<<<<<<< HEAD
         })) : 
         customSpread ? customSpread.zones.map(zone => ({
           name: zone.name,
           title: zone.title,
           color: zone.color,
           description: zone.description
-=======
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
         })) : [];
 
       // Prepare the data to save
       const dataToSave = {
         name: spreadNameToUse,
-<<<<<<< HEAD
         description: selectedSpread ? SPREADS[selectedSpread].description : (customSpread?.description || ''),
         color: selectedSpread ? SPREADS[selectedSpread].color : (customSpread?.color || '#000000'),
-=======
-        description: selectedSpread ? SPREADS[selectedSpread].description : '',
-        color: selectedSpread ? SPREADS[selectedSpread].color : '#000000',
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
         icon: iconName,
         user_id: user.id, // Explicitly set user_id
         zones: spreadZones,
@@ -875,41 +723,14 @@ export default function SpreadScreen() {
         last_modified: currentTimestamp
       };
       
-<<<<<<< HEAD
       log('Data being saved to database:', JSON.stringify(dataToSave, null, 2));
       
       let result: Spread | null = null;
-=======
-      console.log('Data being saved to database:', JSON.stringify(dataToSave, null, 2));
-      
-      // Log the current RLS context
-      const { data: rlsContext } = await supabase.rpc('current_setting', { name: 'role' });
-      console.log('Current RLS role:', rlsContext);
-      
-      // Test RLS with a direct query
-      try {
-        const { data: testData, error: testError } = await supabase
-          .from('spreads')
-          .select('id')
-          .eq('user_id', user.id)
-          .limit(1);
-          
-        console.log('RLS test query result:', { testData, testError });
-      } catch (testErr) {
-        console.error('RLS test query failed:', testErr);
-      }
-
-      let result;
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
       
       try {
         if (currentSpreadId) {
           // Update existing spread
-<<<<<<< HEAD
           log('Updating existing spread with ID:', currentSpreadId);
-=======
-          console.log('Updating existing spread with ID:', currentSpreadId);
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
           const updateData = {
             name: spreadNameToUse,
             draft_data: draftData,
@@ -917,11 +738,7 @@ export default function SpreadScreen() {
             last_modified: currentTimestamp,
           };
           
-<<<<<<< HEAD
           log('Update data:', JSON.stringify(updateData, null, 2));
-=======
-          console.log('Update data:', JSON.stringify(updateData, null, 2));
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
           
           const { data, error: updateError } = await supabase
             .from('spreads')
@@ -931,7 +748,6 @@ export default function SpreadScreen() {
             .single();
 
           if (updateError) {
-<<<<<<< HEAD
             logError('Update error details:', updateError);
             throw updateError;
           }
@@ -941,17 +757,6 @@ export default function SpreadScreen() {
         } else {
           // Create new spread
           log('Creating new spread');
-=======
-            console.error('Update error details:', updateError);
-            throw updateError;
-          }
-          
-          console.log('Successfully updated spread:', data);
-          result = data;
-        } else {
-          // Create new spread
-          console.log('Creating new spread');
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
           
           const insertData = {
             name: spreadNameToUse,
@@ -965,11 +770,7 @@ export default function SpreadScreen() {
             last_modified: currentTimestamp
           };
           
-<<<<<<< HEAD
           log('Insert data:', JSON.stringify(insertData, null, 2));
-=======
-          console.log('Insert data:', JSON.stringify(insertData, null, 2));
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
           
           // Try a direct SQL insert as a fallback
           try {
@@ -980,17 +781,10 @@ export default function SpreadScreen() {
               .single();
 
             if (insertError) {
-<<<<<<< HEAD
               logError('Insert error details:', insertError);
               
               // Try with RPC function as fallback
               log('Trying with RPC function as fallback...');
-=======
-              console.error('Insert error details:', insertError);
-              
-              // Try with RPC function as fallback
-              console.log('Trying with RPC function as fallback...');
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
               const { data: rpcResult, error: rpcError } = await supabase.rpc('create_spread', {
                 p_name: insertData.name,
                 p_description: insertData.description,
@@ -1003,35 +797,22 @@ export default function SpreadScreen() {
               
               if (rpcError) throw rpcError;
               
-<<<<<<< HEAD
               log('Successfully created spread via RPC:', rpcResult);
-=======
-              console.log('Successfully created spread via RPC:', rpcResult);
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
               setCurrentSpreadId(rpcResult.id);
               result = rpcResult;
             } else {
               if (!newDraft) throw new Error('No data returned when creating spread');
               
-<<<<<<< HEAD
               log('Successfully created new spread:', newDraft);
-=======
-              console.log('Successfully created new spread:', newDraft);
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
               setCurrentSpreadId(newDraft.id);
               result = newDraft;
             }
           } catch (insertErr) {
-<<<<<<< HEAD
             logError('Error during spread creation:', insertErr);
-=======
-            console.error('Error during spread creation:', insertErr);
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
             throw insertErr;
           }
         }
 
-<<<<<<< HEAD
         // Update spread_id for all cards in the spread after successful save
         if (result) {
           const spreadId = result.id;
@@ -1058,8 +839,6 @@ export default function SpreadScreen() {
           }
         }
 
-=======
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
         if (name && name.trim()) {
           setSpreadName(name.trim());
         }
@@ -1071,11 +850,7 @@ export default function SpreadScreen() {
         return true;
         
       } catch (dbError: any) {
-<<<<<<< HEAD
         logError('Database error details:', {
-=======
-        console.error('Database error details:', {
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
           code: dbError.code,
           message: dbError.message,
           details: dbError.details,
@@ -1089,13 +864,8 @@ export default function SpreadScreen() {
           const hint = dbError.hint ? `\n\nHint: ${dbError.hint}` : '';
           setError(errorMessage + 'Please contact support or check the console for details.' + hint);
           
-<<<<<<< HEAD
           logError('RLS Policy Error:', dbError.message);
           logError('Current RLS policies:');
-=======
-          console.error('RLS Policy Error:', dbError.message);
-          console.error('Current RLS policies:');
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
           
           // Log current RLS policies
           const { data: policies } = await supabase
@@ -1105,7 +875,6 @@ export default function SpreadScreen() {
           console.table(policies);
           
           // Log current user and role
-<<<<<<< HEAD
           log('Current auth user:', user.id);
           
           // Log RLS context
@@ -1117,20 +886,6 @@ export default function SpreadScreen() {
           log('1. Check if RLS is enabled on the spreads table');
           log('2. Verify the user has the authenticated role');
           log('3. Check for any BEFORE INSERT triggers that might be modifying the data');
-=======
-          const { data: userData } = await supabase.auth.getUser();
-          console.log('Current auth user:', userData.user?.id);
-          
-          // Log RLS context
-          const { data: rlsContext } = await supabase.rpc('current_setting', { name: 'role' });
-          console.log('Current RLS role:', rlsContext);
-          
-          // Suggest next steps
-          console.log('\nNext steps to debug:');
-          console.log('1. Check if RLS is enabled on the spreads table');
-          console.log('2. Verify the user has the authenticated role');
-          console.log('3. Check for any BEFORE INSERT triggers that might be modifying the data');
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
           
         } else {
           throw dbError;
@@ -1138,11 +893,7 @@ export default function SpreadScreen() {
       }
       
     } catch (err) {
-<<<<<<< HEAD
       logError('Error in saveDraft:', err);
-=======
-      console.error('Error in saveDraft:', err);
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
       const errorMessage = err instanceof Error ? err.message : 'Unknown error';
       setError(`Failed to save draft: ${errorMessage}`);
       return false;
@@ -1152,7 +903,6 @@ export default function SpreadScreen() {
     }
   };
 
-<<<<<<< HEAD
   const resetSpreadTitle = () => {
     if (!selectedSpread) return;
     
@@ -1169,43 +919,11 @@ export default function SpreadScreen() {
     if (!activeZone) return;
     
     // Update local state first
-=======
-  const resetSpreadTitle = async () => {
-    if (!selectedSpread) return;
-    
-    try {
-      setSavingDraft(true);
-      const defaultName = SPREADS[selectedSpread].name;
-      setSpreadName(defaultName);
-
-      if (currentSpreadId) {
-        const { error: updateError } = await supabase
-          .from('spreads')
-          .update({
-            name: defaultName,
-          })
-          .eq('id', currentSpreadId);
-
-        if (updateError) throw updateError;
-      }
-    } catch (err) {
-      console.error('Error resetting spread name:', err);
-      setError('Failed to reset spread name');
-    } finally {
-      setSavingDraft(false);
-    }
-  };
-
-  const handleAddCard = (card: any) => {
-    if (!activeZone) return;
-    
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
     setZoneCards(prev => ({
       ...prev,
       [activeZone]: [...(prev[activeZone] || []), card],
     }));
     
-<<<<<<< HEAD
     // Use the new RPC to link the card to the spread
     if (currentSpreadId) {
       const { error } = await supabase.rpc('link_card_to_spread', {
@@ -1219,14 +937,11 @@ export default function SpreadScreen() {
       }
     }
     
-=======
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
     setShowGallery(false);
     setActiveZone(null);
   };
 
   const handleCreateCard = () => {
-<<<<<<< HEAD
     const currentZone = activeZone;
     setShowGallery(false);
     router.push({
@@ -1290,11 +1005,6 @@ export default function SpreadScreen() {
         }
       }
     }
-=======
-    setShowGallery(false);
-    setActiveZone(null);
-    router.push('/create');
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
   };
 
   const renderSpreadOption = (spreadKey: SpreadType) => {
@@ -1322,7 +1032,6 @@ export default function SpreadScreen() {
     );
   };
 
-<<<<<<< HEAD
   const handleCustomSpreadSelect = (customSpreadTemplate: any) => {
     // Convert template to CustomSpread format
     const customSpreadData: CustomSpread = {
@@ -1373,8 +1082,6 @@ export default function SpreadScreen() {
     );
   };
 
-=======
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
   const renderGalleryItem = ({ item }: { item: any }) => (
     <TouchableOpacity 
       style={styles.galleryItem}
@@ -1383,7 +1090,6 @@ export default function SpreadScreen() {
       <Image
         source={{ uri: item.image_url }}
         style={styles.galleryImage}
-<<<<<<< HEAD
         resizeMode={item.is_premium_generation ? "contain" : "cover"}
       />
       {/* Hide name overlay for premium generation cards */}
@@ -1397,28 +1103,13 @@ export default function SpreadScreen() {
           </Text>
         </LinearGradient>
       )}
-=======
-        resizeMode="cover"
-      />
-      <LinearGradient
-        colors={['transparent', 'rgba(0,0,0,0.8)']}
-        style={styles.galleryItemOverlay}
-      >
-        <Text style={styles.galleryItemName} numberOfLines={2}>
-          {item.name}
-        </Text>
-      </LinearGradient>
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
     </TouchableOpacity>
   );
 
   const renderGalleryContent = () => {
-<<<<<<< HEAD
     // This will be used later to filter cards based on the active tab
     const cardsForScope = filteredCards; // For now, just use all filtered cards
 
-=======
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
     if (galleryLoading) {
       return (
         <View style={styles.galleryLoadingContainer}>
@@ -1494,17 +1185,12 @@ export default function SpreadScreen() {
 
           <TouchableOpacity 
             style={styles.createCardButton}
-<<<<<<< HEAD
             onPress={handleCreateCardFromGallery}
-=======
-            onPress={handleCreateCard}
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
           >
             <PlusCircle size={20} color="#fff" style={styles.createCardIcon} />
             <Text style={styles.createCardText}>Create New Card</Text>
           </TouchableOpacity>
           
-<<<<<<< HEAD
           <View style={{ paddingHorizontal: 16, paddingTop: 16 }}>
             <View style={styles.tabContainer}>
               <TouchableOpacity
@@ -1577,27 +1263,12 @@ export default function SpreadScreen() {
             />
           </View>
 
-=======
-          <TextInput
-            style={styles.gallerySearchInput}
-            placeholder="Search cards"
-            placeholderTextColor="#666"
-            value={gallerySearchQuery}
-            onChangeText={(text) => {
-              setGallerySearchQuery(text);
-              const filtered = cards.filter((card) => card.name.toLowerCase().includes(text.toLowerCase()));
-              setFilteredCards(filtered);
-            }}
-          />
-          
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
           {renderGalleryContent()}
         </View>
       </View>
     </Modal>
   );
 
-<<<<<<< HEAD
   // Icon mapping for custom spreads
   const getIconComponent = (iconName: string) => {
     const iconMap: Record<string, any> = {
@@ -1615,10 +1286,6 @@ export default function SpreadScreen() {
 
   const renderDropZone = (zone: any) => {
     const Icon = typeof zone.icon === 'string' ? getIconComponent(zone.icon) : zone.icon;
-=======
-  const renderDropZone = (zone: any) => {
-    const Icon = zone.icon;
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
     const cards = zoneCards[zone.name] || [];
     const isFullscreen = fullscreenZone === zone.name;
 
@@ -1635,12 +1302,9 @@ export default function SpreadScreen() {
             <View style={styles.headerLeft}>
               <Icon size={16} color={zone.color} />
               <Text style={styles.dropZoneTitle}>{zone.title}</Text>
-<<<<<<< HEAD
               <Pressable style={styles.addButton} onPress={() => handleAddCard(zone.id)}>
                 <Plus size={16} color={zone.color} />
               </Pressable>
-=======
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
             </View>
             <View style={styles.headerRight}>
               {isFullscreen && (
@@ -1713,7 +1377,6 @@ export default function SpreadScreen() {
                       padding: numColumns === 1 ? 4 : numColumns === 2 ? 3 : numColumns === 3 ? 2 : 1
                     }
                   ]}
-<<<<<<< HEAD
                   onPress={() => handleCardPress(card, zone.name)}
                 >
                   {showFullCardView ? (
@@ -1724,34 +1387,6 @@ export default function SpreadScreen() {
                         backgroundColor: card.is_premium_generation ? '#000000' : '#1a1a1a'
                       }
                     ]}>
-=======
-                  onPress={() => {
-                    if (showFullCardView) {
-                      // In full card view, single tap selects the card
-                      setSelectedCardForFullView(card);
-                    } else {
-                      // Handle double tap with timeout
-                      const now = Date.now();
-                      const DOUBLE_TAP_DELAY = 300;
-                      
-                      if (card.lastTap && (now - card.lastTap) < DOUBLE_TAP_DELAY) {
-                        // Double tap detected
-                        if (expandedCardId === card.id) {
-                          setExpandedCardId(null);
-                        } else {
-                          setExpandedCardId(card.id);
-                        }
-                        card.lastTap = 0; // Reset to prevent triple tap issues
-                      } else {
-                        // First tap
-                        card.lastTap = now;
-                      }
-                    }
-                  }}
-                >
-                  {showFullCardView ? (
-                    <View style={[styles.fullCardInner, { borderColor: card.color || '#6366f1' }]}>
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
                       <Image
                         source={{ uri: card.image_url }}
                         style={[
@@ -1760,7 +1395,6 @@ export default function SpreadScreen() {
                             height: numColumns === 1 ? 200 : numColumns === 2 ? 150 : numColumns === 3 ? 100 : 70
                           }
                         ]}
-<<<<<<< HEAD
                         resizeMode={card.is_premium_generation ? "contain" : "cover"}
                       />
                       {/* Hide text content for premium generation cards */}
@@ -1841,79 +1475,6 @@ export default function SpreadScreen() {
                           )}
                         </LinearGradient>
                       )}
-=======
-                        resizeMode="cover"
-                      />
-                      <View style={[
-                        styles.fullCardContent,
-                        {
-                          padding: numColumns === 1 ? 12 : numColumns === 2 ? 8 : numColumns === 3 ? 6 : 4
-                        }
-                      ]}>
-                        <Text style={[
-                          styles.fullCardName,
-                          {
-                            fontSize: numColumns === 1 ? 16 : numColumns === 2 ? 13 : numColumns === 3 ? 11 : 9
-                          }
-                        ]}>
-                          {card.name}
-                        </Text>
-                        <Text style={[
-                          styles.fullCardType,
-                          {
-                            fontSize: numColumns === 1 ? 14 : numColumns === 2 ? 11 : numColumns === 3 ? 9 : 8,
-                            marginBottom: numColumns === 1 ? 8 : numColumns === 2 ? 5 : numColumns === 3 ? 3 : 2
-                          }
-                        ]}>
-                          {card.card_type || 'Card'}
-                        </Text>
-                        <Text style={[
-                          styles.fullCardDescription,
-                          {
-                            fontSize: numColumns === 1 ? 14 : numColumns === 2 ? 11 : numColumns === 3 ? 9 : 8,
-                            lineHeight: numColumns === 1 ? 20 : numColumns === 2 ? 15 : numColumns === 3 ? 12 : 10,
-                            marginTop: numColumns === 1 ? 4 : numColumns === 2 ? 3 : numColumns === 3 ? 2 : 1
-                          }
-                        ]}>
-                          {card.description || 'No description available'}
-                        </Text>
-                      </View>
-                    </View>
-                  ) : (
-                    <View style={styles.gridCardInner}>
-                      <Image
-                        source={{ uri: card.image_url }}
-                        style={styles.gridCardImage}
-                        resizeMode="cover"
-                      />
-                      <LinearGradient
-                        colors={['transparent', 'rgba(0,0,0,0.8)']}
-                        style={[styles.gridCardOverlay, expandedCardId === card.id && styles.expandedCardOverlay]}
-                      >
-                        <Text 
-                          style={[
-                            styles.gridCardName, 
-                            {
-                              fontSize: numColumns === 1 ? 14 : numColumns === 2 ? 12 : numColumns === 3 ? 10 : 9
-                            }
-                          ]} 
-                          numberOfLines={expandedCardId === card.id ? undefined : 1}
-                        >
-                          {card.name}
-                        </Text>
-                        
-                        {expandedCardId === card.id && (
-                          <View style={styles.cardDetails}>
-                            <Text style={styles.cardType}>
-                              {card.card_type || 'Card'}
-                            </Text>
-                            <Text style={styles.cardDescription} numberOfLines={4}>
-                              {card.description || 'No description available'}
-                            </Text>
-                          </View>
-                        )}
-                      </LinearGradient>
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
                     </View>
                   )}
                 </TouchableOpacity>
@@ -1941,7 +1502,6 @@ export default function SpreadScreen() {
               contentContainerStyle={styles.cardScrollContent}
             >
               {cards.map((card, index) => (
-<<<<<<< HEAD
                 <TouchableOpacity 
                   key={`${card.id}-${index}`} 
                   style={[
@@ -1980,26 +1540,6 @@ export default function SpreadScreen() {
               multiline
             />
           </View>
-=======
-                <View key={`${card.id}-${index}`} style={styles.miniCard}>
-                  <Image
-                    source={{ uri: card.image_url }}
-                    style={styles.miniCardImage}
-                    resizeMode="cover"
-                  />
-                  <LinearGradient
-                    colors={['transparent', 'rgba(0,0,0,0.8)']}
-                    style={styles.miniCardOverlay}
-                  >
-                    <Text style={styles.miniCardName} numberOfLines={1}>
-                      {card.name}
-                    </Text>
-                  </LinearGradient>
-                </View>
-              ))}
-            </ScrollView>
-          )}
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
         </LinearGradient>
       </View>
     );
@@ -2030,17 +1570,12 @@ export default function SpreadScreen() {
     );
   }
 
-<<<<<<< HEAD
   if (!selectedSpread && !customSpread) {
-=======
-  if (!selectedSpread) {
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
     return (
       <View style={styles.container}>
         {/* Spacer removed for consistent padding across tabs */}
         <View style={styles.header}>
           <Text style={styles.pageTitle}>Choose a Spread</Text>
-<<<<<<< HEAD
           <TouchableOpacity
             style={styles.draftsButton} 
             onPress={() => router.push('/drafts')}
@@ -2051,21 +1586,12 @@ export default function SpreadScreen() {
           <TouchableOpacity onPress={() => router.push('/inbox')} style={styles.draftsButton}> 
             <Mail size={24} color="#fff" />
             <Text style={styles.draftsButtonText}>Inbox</Text> 
-=======
-          <TouchableOpacity 
-            style={styles.draftsButton}
-            onPress={() => router.push('/drafts')}
-          >
-            <FileText size={20} color="#6366f1" />
-            <Text style={styles.draftsButtonText}>Drafts</Text>
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
           </TouchableOpacity>
         </View>
         <ScrollView 
           style={styles.spreadSelector}
           contentContainerStyle={styles.spreadSelectorContent}
         >
-<<<<<<< HEAD
           {/* Default Spreads */}
           {Object.keys(SPREADS).map((key) => renderSpreadOption(key as SpreadType))}
           
@@ -2095,9 +1621,6 @@ export default function SpreadScreen() {
               </Text>
             </LinearGradient>
           </TouchableOpacity>
-=======
-          {Object.keys(SPREADS).map((key) => renderSpreadOption(key as SpreadType))}
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
         </ScrollView>
       </View>
     );
@@ -2116,7 +1639,6 @@ export default function SpreadScreen() {
             </TouchableOpacity>
             <View style={styles.titleContainer}>
               <Text style={styles.spreadTitle}>
-<<<<<<< HEAD
                 {customSpread ? 
                   customSpread.zones.find(z => z.name === fullscreenZone)?.title || '' :
                   SPREADS[selectedSpread!].zones.find(z => z.name === fullscreenZone)?.title || ''
@@ -2129,20 +1651,12 @@ export default function SpreadScreen() {
               customSpread.zones.find(z => z.name === fullscreenZone)! :
               SPREADS[selectedSpread!].zones.find(z => z.name === fullscreenZone)!
           )}
-=======
-                {SPREADS[selectedSpread!].zones.find(z => z.name === fullscreenZone)?.title || ''}
-              </Text>
-            </View>
-          </View>
-          {renderDropZone(SPREADS[selectedSpread!].zones.find(z => z.name === fullscreenZone)!)}
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
         </SafeAreaView>
       ) : (
         <>
           <View style={styles.header}>
             <TouchableOpacity 
               style={styles.backButton}
-<<<<<<< HEAD
               onPress={() => {
                 setSelectedSpread(null);
                 setCustomSpread(null);
@@ -2153,19 +1667,12 @@ export default function SpreadScreen() {
                 // Navigate to spread screen without draftId parameter to clear URL state
                 router.replace('/(tabs)/spread');
               }}
-=======
-              onPress={() => setSelectedSpread(null)}
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
             >
               <ArrowLeft size={24} color="#fff" />
             </TouchableOpacity>
             <View style={styles.titleContainer}>
               <Text style={styles.spreadTitle}>
-<<<<<<< HEAD
                 {spreadName || (selectedSpread ? SPREADS[selectedSpread].name : customSpread?.name || 'Custom Spread')}
-=======
-                {spreadName || SPREADS[selectedSpread!].name}
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
               </Text>
               <TouchableOpacity
                 style={styles.resetButton}
@@ -2174,7 +1681,6 @@ export default function SpreadScreen() {
                 <RotateCcw size={16} color="#666" />
               </TouchableOpacity>
             </View>
-<<<<<<< HEAD
             <View style={styles.headerActions}>
               {savingDraft && (
                 <ActivityIndicator size="small" color="#6366f1" style={styles.savingIndicator} />
@@ -2195,29 +1701,14 @@ export default function SpreadScreen() {
                 <Send size={24} color="#6366f1" />
               </TouchableOpacity>
             </View>
-=======
-            {savingDraft && (
-              <ActivityIndicator size="small" color="#6366f1" style={styles.savingIndicator} />
-            )}
-            <TouchableOpacity
-              style={styles.saveAsButton}
-              onPress={() => setShowSaveAs(true)}
-            >
-              <Save size={20} color="#6366f1" />
-            </TouchableOpacity>
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
           </View>
 
           <ScrollView style={styles.dropZonesScroll} contentContainerStyle={styles.dropZonesScrollContent}>
             <View style={styles.dropZonesContainer}>
-<<<<<<< HEAD
               {customSpread ? 
                 customSpread.zones.map((zone) => renderDropZone(zone)) :
                 SPREADS[selectedSpread!].zones.map((zone) => renderDropZone(zone))
               }
-=======
-              {SPREADS[selectedSpread!].zones.map((zone) => renderDropZone(zone))}
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
             </View>
           </ScrollView>
         </>
@@ -2225,7 +1716,6 @@ export default function SpreadScreen() {
 
       {renderGalleryModal()}
 
-<<<<<<< HEAD
       {/* Simple Remove Card Confirmation */}
       <Modal
         visible={!!cardToRemove}
@@ -2259,8 +1749,6 @@ export default function SpreadScreen() {
         </TouchableOpacity>
       </Modal>
 
-=======
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
       <Modal
         visible={showSaveAs}
         animationType="fade"
@@ -2292,11 +1780,7 @@ export default function SpreadScreen() {
                       setShowSaveAs(false);
                     }
                   } catch (err) {
-<<<<<<< HEAD
                     logError('Error in save handler:', err);
-=======
-                    console.error('Error in save handler:', err);
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
                     setError(`Failed to save: ${err instanceof Error ? err.message : 'Unknown error'}`);
                   }
                 }}
@@ -2417,7 +1901,6 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 5,
   },
-<<<<<<< HEAD
   // Simple Remove Confirmation Styles
   simpleModalOverlay: {
     flex: 1,
@@ -2477,8 +1960,6 @@ const styles = StyleSheet.create({
     width: 1,
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
   },
-=======
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
   fullCardImage: {
     width: '100%',
     height: 200, // This is overridden by inline styles for different column counts
@@ -2535,11 +2016,7 @@ const styles = StyleSheet.create({
   },
   container: {
     flex: 1,
-<<<<<<< HEAD
     backgroundColor: '#090909',
-=======
-    backgroundColor: '#121212',
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
     padding: Platform.OS === 'web' ? 16 : 8,
   },
   centerContent: {
@@ -2550,7 +2027,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 8,
-<<<<<<< HEAD
     paddingHorizontal: 4,
     marginBottom: 8,
     borderBottomWidth: 1,
@@ -2563,33 +2039,16 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter-Bold',
     flex: 1,
     marginRight: 8,
-=======
-    marginBottom: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.1)',
-  },
-  pageTitle: {
-    color: '#fff',
-    fontSize: 24,
-    fontFamily: 'Inter-Bold',
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
   },
   draftsButton: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: 'rgba(99, 102, 241, 0.1)',
-<<<<<<< HEAD
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 20,
     gap: 6,
     marginLeft: 8,
-=======
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    gap: 8,
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
   },
   draftsButtonText: {
     color: '#6366f1',
@@ -2628,7 +2087,6 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter-Regular',
     textAlign: 'center',
   },
-<<<<<<< HEAD
   customSpreadOption: {
     borderRadius: 16,
     overflow: 'hidden',
@@ -2699,8 +2157,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 4,
   },
-=======
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
   backButton: {
     padding: 6,
     borderRadius: 6,
@@ -2727,19 +2183,15 @@ const styles = StyleSheet.create({
   savingIndicator: {
     marginLeft: 16,
   },
-<<<<<<< HEAD
   headerActions: {
     flexDirection: 'row',
     alignItems: 'center',
     marginLeft: 10,
   },
-=======
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
   saveAsButton: {
     padding: 6,
     borderRadius: 6,
     backgroundColor: 'rgba(99, 102, 241, 0.1)',
-<<<<<<< HEAD
     marginLeft: 8,
   },
   sendButton: {
@@ -2747,9 +2199,6 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     backgroundColor: 'rgba(99, 102, 241, 0.1)',
     marginLeft: 8,
-=======
-    marginLeft: 10,
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
   },
   dropZonesScroll: {
     flex: 1,
@@ -2859,13 +2308,8 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
   },
   miniCard: {
-<<<<<<< HEAD
     width: 100,
     height: 140,
-=======
-    width: 120,
-    height: 168,
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
     borderRadius: 8,
     overflow: 'hidden',
     backgroundColor: '#2a2a2a',
@@ -3058,7 +2502,6 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     marginTop: 16,
   },
-<<<<<<< HEAD
   dropdownButton: {
     backgroundColor: 'rgba(255,255,255,0.05)',
     borderRadius: 8,
@@ -3090,8 +2533,6 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter-Regular',
     fontSize: 14,
   },
-=======
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
   gallerySearchInput: {
     backgroundColor: '#2a2a2a',
     borderRadius: 8,
@@ -3099,7 +2540,6 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontFamily: 'Inter-Regular',
     fontSize: 16,
-<<<<<<< HEAD
     marginTop: 16,
     width: '100%',
   },
@@ -3127,9 +2567,4 @@ const styles = StyleSheet.create({
   activeTabText: {
     color: '#fff',
   },
-=======
-    marginBottom: 20,
-    width: '100%',
-  },
->>>>>>> 8334cd6520d7fc014c1767411dbb9bc181ef497e
 });
