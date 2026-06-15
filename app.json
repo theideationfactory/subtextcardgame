@@ -10,8 +10,10 @@
     "splash": {
       "image": "./assets/images/icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#121212",
+      "userInterfaceStyle": "dark"
     },
+    "backgroundColor": "#121212",
     "assetBundlePatterns": [
       "**/*"
     ],
@@ -44,7 +46,7 @@
       "versionCode": 1,
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/icon.png",
-        "backgroundColor": "#ffffff"
+        "backgroundColor": "#121212"
       },
       "package": "com.adamkretz.subtext",
       "permissions": [

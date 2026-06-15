@@ -10,7 +10,7 @@ import { TouchableOpacity } from 'react-native';
 import { useFonts, Cinzel_400Regular } from '@expo-google-fonts/cinzel';
 
 export default function TabLayout() {
-  const { fetchCards } = useAuth();
+  const { fetchCards, user } = useAuth();
   const insets = useSafeAreaInsets();
   const [isLandscape, setIsLandscape] = useState(false);
 
@@ -18,9 +18,21 @@ export default function TabLayout() {
     'Cinzel-Regular': Cinzel_400Regular,
   });
 
+  // Defer card fetching until after initial render and auth is ready
   useEffect(() => {
-    fetchCards();
-  }, [fetchCards]);
+    if (!user) return; // Only fetch when user is authenticated
+    
+    // Use requestIdleCallback pattern for non-critical data loading
+    const fetchData = () => {
+      fetchCards().catch(() => {
+        // Cards will retry on next focus - don't block UI
+      });
+    };
+    
+    // Defer by one frame to let UI render first
+    const timer = setTimeout(fetchData, 100);
+    return () => clearTimeout(timer);
+  }, [fetchCards, user]);
 
   useEffect(() => {
     const updateOrientation = () => {

@@ -203,26 +203,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     let mounted = true;
     
-    // Initial session check
+    // Initial session check - optimized for fast startup
     const initAuth = async () => {
       try {
-        log('🔄 Initializing authentication...');
-        
-        // Get current session from storage
+        // Get current session from storage immediately
         const { data: { session }, error } = await supabase.auth.getSession();
         
         if (!mounted) return;
         
         if (error) {
-          logError('❌ Error getting session:', error);
+          logError('Error getting session:', error);
           setLoading(false);
           return;
         }
         
         if (session?.user) {
-          // If it's an anonymous session, sign out and show login screen
+          // If it's an anonymous session, sign out immediately
           if (session.user.is_anonymous) {
-            log('⚠️ Found existing anonymous session, signing out...');
             await supabase.auth.signOut();
             if (!mounted) return;
             setUser(null);
@@ -231,66 +228,41 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             return;
           }
           
-          log('✅ Found existing session for user:', session.user.email || 'anonymous');
+          // Set user immediately - don't wait for validation
           setUser(session.user);
           setIsAnonymous(session.user.is_anonymous || false);
           
-          // Validate session with a lightweight query
-          try {
-            const { error: testError } = await supabase
-              .from('users')
-              .select('id')
-              .limit(1)
-              .single();
-            
+          // Clear loading state immediately for fast UI
+          setLoading(false);
+          
+          // Defer session validation to background - don't block startup
+          // Supabase's autoRefreshToken handles token refresh automatically
+          setTimeout(async () => {
             if (!mounted) return;
-            
-            if (testError && testError.code === 'PGRST301') {
-              // Session expired, attempt refresh
-              log('⚠️ Session expired, attempting refresh...');
-              const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
+            try {
+              const { error: pingError } = await supabase
+                .from('users')
+                .select('id')
+                .limit(1)
+                .maybeSingle();
               
-              if (!mounted) return;
-              
-              if (refreshError || !refreshData.session) {
-                log('❌ Session refresh failed, user needs to sign in again');
-                setUser(null);
-                setIsAnonymous(false);
-              } else {
-                log('✅ Session refreshed successfully');
-                setUser(refreshData.session.user);
-                setIsAnonymous(refreshData.session.user.is_anonymous || false);
+              if (pingError?.code === 'PGRST301') {
+                // Token expired, Supabase will auto-refresh on next request
+                log('Session ping: token may need refresh');
               }
-            } else {
-              log('✅ Session is valid');
+            } catch (e) {
+              // Non-critical: validation happens on next API call
             }
-          } catch (sessionError) {
-            logError('⚠️ Session validation error:', sessionError);
-            if (!mounted) return;
-            
-            // Try to refresh on any error
-            const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
-            
-            if (!mounted) return;
-            
-            if (refreshError || !refreshData.session) {
-              log('❌ Session refresh failed');
-              setUser(null);
-              setIsAnonymous(false);
-            } else {
-              log('✅ Session refreshed after error');
-              setUser(refreshData.session.user);
-              setIsAnonymous(refreshData.session.user.is_anonymous || false);
-            }
-          }
+          }, 2000); // Defer by 2 seconds after UI is ready
+          
+          return; // Already cleared loading above
         } else {
-          log('ℹ️ No existing session found');
-          // Don't auto-create anonymous session - let user choose via "Continue as Guest" button
+          // No session found - stay on login screen
           setUser(null);
           setIsAnonymous(false);
         }
       } catch (error) {
-        logError('❌ Auth initialization error:', error);
+        logError('Auth initialization error:', error);
         if (mounted) {
           setUser(null);
         }

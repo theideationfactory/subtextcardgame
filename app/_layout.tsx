@@ -86,54 +86,48 @@ function RootLayoutNav() {
   );
 }
 
+// Prevent splash screen from auto-hiding until we're ready
+SplashScreen.preventAutoHideAsync().catch(() => {
+  // Ignore errors - splash screen might already be handled
+});
+
 export default function RootLayout() {
   useFrameworkReady();
-  const [ready, setReady] = useState(false);
+  const [isReady, setIsReady] = useState(false);
 
   useEffect(() => {
-    // Ensure splash screen is hidden when the app is ready
-    const hideSplash = async () => {
+    // Hide splash screen immediately when JS bundle is ready
+    // Auth state will be handled by AuthProvider without blocking UI
+    const prepareApp = async () => {
       try {
-        await SplashScreen.hideAsync();
+        // Set up deep linking handler for mobile platforms
+        if (Platform.OS !== 'web') {
+          const subscription = Linking.addEventListener('url', ({ url }) => {
+            if (url) {
+              log('Deep link URL:', url);
+            }
+          });
+
+          // Small delay to ensure native render is complete
+          await new Promise(resolve => setTimeout(resolve, 100));
+          
+          return () => subscription.remove();
+        }
       } catch (e) {
-        logError('Error hiding splash screen in RootLayout:', e);
+        logError('Error during app preparation:', e);
+      } finally {
+        // Hide splash screen as early as possible
+        await SplashScreen.hideAsync().catch(() => {
+          // Ignore errors - splash screen might already be hidden
+        });
+        setIsReady(true);
       }
     };
 
-    // Set up deep linking handler for mobile platforms
-    if (Platform.OS !== 'web') {
-      const subscription = Linking.addEventListener('url', ({ url }) => {
-        if (url) {
-          // Handle the deep link URL
-          log('Deep link URL:', url);
-        }
-      });
-
-      // Hide splash screen after a short delay as a fallback
-      const timeout = setTimeout(() => {
-        hideSplash();
-      }, 3000);
-
-      return () => {
-        subscription.remove();
-        clearTimeout(timeout);
-      };
-    } else {
-      // For web, just hide the splash screen
-      hideSplash();
-    }
+    prepareApp();
   }, []);
 
-  useEffect(() => {
-    // Set ready state after a short delay to ensure everything is initialized
-    const timer = setTimeout(() => {
-      setReady(true);
-    }, 500);
-    
-    return () => clearTimeout(timer);
-  }, []);
-
-  if (!ready) {
+  if (!isReady) {
     return <View style={{ flex: 1, backgroundColor: '#121212' }} />;
   }
 
