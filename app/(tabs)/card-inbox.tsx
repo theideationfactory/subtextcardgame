@@ -98,8 +98,41 @@ export default function CardInboxScreen() {
         logError('Error fetching generation jobs:', error);
         return;
       }
-      
-      setGenerationJobs(data || []);
+
+      let jobs = (data || []) as GenerationJob[];
+
+      // Detect jobs stuck in 'queued'/'processing' (e.g. the edge function timed
+      // out or crashed before marking them failed) and time them out so they
+      // don't stay stuck forever. gpt-image-1 can take up to ~2 min, so we use a
+      // conservative 5 minute threshold.
+      const STALE_THRESHOLD_MS = 5 * 60 * 1000;
+      const now = Date.now();
+      const staleJobs = jobs.filter((j) => {
+        if (j.status !== 'queued' && j.status !== 'processing') return false;
+        const lastUpdate = new Date(j.updated_at || j.created_at).getTime();
+        return now - lastUpdate > STALE_THRESHOLD_MS;
+      });
+
+      if (staleJobs.length > 0) {
+        const staleIds = staleJobs.map((j) => j.id);
+        const timeoutMessage = 'Generation timed out. Tap to try again.';
+        const { error: updateError } = await supabase
+          .from('image_generation_queue')
+          .update({ status: 'failed', error_message: timeoutMessage })
+          .in('id', staleIds);
+
+        if (updateError) {
+          logError('Error timing out stale jobs:', updateError);
+        } else {
+          jobs = jobs.map((j) =>
+            staleIds.includes(j.id)
+              ? { ...j, status: 'failed', error_message: timeoutMessage }
+              : j
+          );
+        }
+      }
+
+      setGenerationJobs(jobs);
     } catch (err) {
       logError('Error fetching generation jobs:', err);
     } finally {
@@ -224,10 +257,13 @@ export default function CardInboxScreen() {
       // Navigate to Cards tab
       router.push('/(tabs)');
     } else if (job.status === 'failed') {
-      // Failed job - allow user to retry by going to card creation
+      // Failed job - allow user to retry by going to card creation with the
+      // image description focused so they can rewrite it.
+      const failureInfo = getFailureInfo(job.error_message);
       router.push({
         pathname: '/(tabs)/card-creation-new',
         params: {
+          generation_job_id: job.id.toString(),
           name: job.card_data.name || '',
           description: job.card_data.description || '',
           image_description: job.card_data.imageDescription || '',
@@ -238,6 +274,8 @@ export default function CardInboxScreen() {
           border_color: job.card_data.borderColor || '',
           generation_type: job.card_data.generationType || '',
           custom_generation_type_id: job.card_data.customGenerationTypeId || '',
+          focus_image_description: 'true',
+          image_rejection_reason: failureInfo.detail,
         },
       });
     }
@@ -318,6 +356,53 @@ export default function CardInboxScreen() {
     );
   };
 
+  // Parse a raw error_message into a user-friendly explanation
+  const getFailureInfo = (errorMessage: string | null) => {
+    if (!errorMessage) {
+      return {
+        title: 'Generation failed',
+        detail: 'Something went wrong. Tap to edit the description and try again.',
+        isSafety: false,
+      };
+    }
+
+    const lower = errorMessage.toLowerCase();
+    const isSafety =
+      lower.includes('safety system') ||
+      lower.includes('safety_violations') ||
+      lower.includes('rejected by the safety') ||
+      lower.includes('content policy') ||
+      lower.includes('moderation');
+
+    if (isSafety) {
+      const match = errorMessage.match(/safety_violations=\[([^\]]*)\]/i);
+      const categories = (match?.[1] || '')
+        .split(',')
+        .map((c) => c.trim())
+        .filter(Boolean);
+      const categoryText = categories.length ? ` (flagged: ${categories.join(', ')})` : '';
+      return {
+        title: 'Image rejected by safety system',
+        detail: `Your image description was flagged${categoryText}. Tap to rewrite the description and try again.`,
+        isSafety: true,
+      };
+    }
+
+    if (lower.includes('timed out') || lower.includes('timeout')) {
+      return {
+        title: 'Generation timed out',
+        detail: 'This took too long to generate. Tap to try again.',
+        isSafety: false,
+      };
+    }
+
+    return {
+      title: 'Generation failed',
+      detail: 'Tap to edit the description and try again.',
+      isSafety: false,
+    };
+  };
+
   // Get status icon and color
   const getStatusInfo = (status: GenerationJob['status']) => {
     switch (status) {
@@ -366,7 +451,8 @@ export default function CardInboxScreen() {
   const renderJob = ({ item: job }: { item: GenerationJob }) => {
     const statusInfo = getStatusInfo(job.status);
     const StatusIcon = statusInfo.icon;
-    
+    const failureInfo = job.status === 'failed' ? getFailureInfo(job.error_message) : null;
+
     return (
       <Pressable
         style={[
@@ -390,20 +476,21 @@ export default function CardInboxScreen() {
               {job.card_data.name || 'Untitled Card'}
             </Text>
             <Text style={styles.jobDescription} numberOfLines={1}>
-              {statusInfo.description}
+              {failureInfo ? failureInfo.title : statusInfo.description}
             </Text>
             <View style={styles.jobMeta}>
               <View style={[styles.statusBadge, { backgroundColor: statusInfo.color + '20' }]}>
                 <Text style={[styles.statusText, { color: statusInfo.color }]}>
-                  {statusInfo.label}
+                  {failureInfo?.isSafety ? 'Rejected' : statusInfo.label}
                 </Text>
               </View>
               <Text style={styles.jobTime}>{formatTimeAgo(job.created_at)}</Text>
             </View>
-            {job.error_message && (
-              <Text style={styles.errorText} numberOfLines={2}>
-                {job.error_message}
-              </Text>
+            {failureInfo && (
+              <View style={styles.failureBox}>
+                <Text style={styles.failureDetail}>{failureInfo.detail}</Text>
+                <Text style={styles.rewriteCta}>Tap to rewrite image description →</Text>
+              </View>
             )}
           </View>
           
@@ -715,6 +802,26 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter-Regular',
     fontSize: 13,
     color: '#ef4444',
+    marginTop: 8,
+  },
+  failureBox: {
+    marginTop: 10,
+    padding: 10,
+    borderRadius: 8,
+    backgroundColor: '#ef444412',
+    borderWidth: 1,
+    borderColor: '#ef444433',
+  },
+  failureDetail: {
+    fontFamily: 'Inter-Regular',
+    fontSize: 13,
+    color: '#f87171',
+    lineHeight: 18,
+  },
+  rewriteCta: {
+    fontFamily: 'Inter-Bold',
+    fontSize: 13,
+    color: '#6366f1',
     marginTop: 8,
   },
   deleteButton: {

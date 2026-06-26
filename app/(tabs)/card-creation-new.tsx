@@ -84,6 +84,12 @@ export default function CardCreationNewScreen() {
   // Store the original draft data for comparison when saving
   const loadedDraftDataRef = useRef<any>(null);
 
+  // Refs/state for handling a rejected generation that needs the image description rewritten
+  const scrollViewRef = useRef<ScrollView>(null);
+  const imageDescriptionRef = useRef<TextInput>(null);
+  const imageDescriptionLayoutY = useRef(0);
+  const [imageRejectionReason, setImageRejectionReason] = useState<string>('');
+
   // Load draft data if draftId is provided - use useFocusEffect to reload on every screen focus
   useFocusEffect(
     useCallback(() => {
@@ -1041,6 +1047,20 @@ export default function CardCreationNewScreen() {
     }
   }, [inboxJobId, params.id]);
 
+  // When arriving from a rejected generation, surface the reason and focus the
+  // image description field so the user can rewrite it.
+  useEffect(() => {
+    if (params.focus_image_description === 'true') {
+      setImageRejectionReason(params.image_rejection_reason?.toString() || '');
+      // Defer focus/scroll until the form has rendered and prefilled.
+      const timer = setTimeout(() => {
+        scrollViewRef.current?.scrollTo({ y: imageDescriptionLayoutY.current, animated: true });
+        imageDescriptionRef.current?.focus();
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [params.focus_image_description, params.image_rejection_reason]);
+
   // Check auth status on component mount
   useEffect(() => {
     const checkAuthStatus = async () => {
@@ -1178,14 +1198,7 @@ export default function CardCreationNewScreen() {
       setGenerationJobId(data.jobId);
       setIsPremiumGeneration(isPremium || isClassic || isModernParchment);
 
-      Alert.alert(
-        'Card Generation Started!',
-        'Your card is being created in the background. Once the image is generated, your card will automatically appear in your Cards collection. Check the Card Inbox for progress.',
-        [
-          { text: 'View Inbox', onPress: () => router.push('/(tabs)/card-inbox') },
-          { text: 'OK' }
-        ]
-      );
+      router.push('/(tabs)/card-inbox');
 
     } catch (err) {
       logError('❌ Error queueing image generation:', err);
@@ -2415,6 +2428,7 @@ export default function CardCreationNewScreen() {
       </View>
       
       <ScrollView 
+        ref={scrollViewRef}
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
       >
@@ -3509,10 +3523,20 @@ export default function CardCreationNewScreen() {
             </Pressable>
           </View>
           
-          <View style={styles.inputGroup}>
+          <View
+            style={styles.inputGroup}
+            onLayout={(e) => { imageDescriptionLayoutY.current = e.nativeEvent.layout.y; }}
+          >
             <Text style={styles.label}>Image Description <Text style={styles.required}>*</Text></Text>
+            {imageRejectionReason ? (
+              <View style={styles.rejectionBanner}>
+                <Text style={styles.rejectionBannerTitle}>Previous image was rejected</Text>
+                <Text style={styles.rejectionBannerText}>{imageRejectionReason}</Text>
+              </View>
+            ) : null}
             <View style={styles.inputWithIcon}>
               <TextInput
+                ref={imageDescriptionRef}
                 style={[styles.input, styles.textArea, styles.textAreaWithIcon]}
                 placeholder="Describe the image you want to generate"
                 placeholderTextColor="#666"
@@ -4011,6 +4035,26 @@ const styles = StyleSheet.create({
   },
   inputGroup: {
     marginBottom: 20,
+  },
+  rejectionBanner: {
+    backgroundColor: '#ef444412',
+    borderWidth: 1,
+    borderColor: '#ef444433',
+    borderRadius: 8,
+    padding: 10,
+    marginBottom: 10,
+  },
+  rejectionBannerTitle: {
+    fontFamily: 'Inter-Bold',
+    fontSize: 13,
+    color: '#f87171',
+    marginBottom: 4,
+  },
+  rejectionBannerText: {
+    fontFamily: 'Inter-Regular',
+    fontSize: 13,
+    color: '#f87171',
+    lineHeight: 18,
   },
   label: {
     color: '#ccc',

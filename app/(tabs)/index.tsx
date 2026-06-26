@@ -1,10 +1,11 @@
-import { View, Text, TextInput, StyleSheet, FlatList, Pressable, Image, Modal, TouchableOpacity, RefreshControl, useWindowDimensions, Platform, PlatformIOSStatic, Dimensions, Alert, Animated, Linking } from 'react-native';
-import { useCallback, useEffect, useState, useRef } from 'react';
+import { View, Text, TextInput, StyleSheet, FlatList, Pressable, Modal, TouchableOpacity, RefreshControl, useWindowDimensions, Platform, PlatformIOSStatic, Dimensions, Alert, Animated, Linking } from 'react-native';
+import { Image } from 'expo-image';
+import { useCallback, useEffect, useState, useRef, useMemo } from 'react';
 import { useFonts, Inter_400Regular, Inter_700Bold } from '@expo-google-fonts/inter';
 import { Cinzel_400Regular } from '@expo-google-fonts/cinzel';
 import * as SplashScreen from 'expo-splash-screen';
 import { useRouter, useFocusEffect } from 'expo-router';
-import { Settings2, CreditCard as Edit3, Trash2, Swords, Shield, Sparkles, Users, Globe as Globe2, Lock, Wallet, Plus, Share2, Coins, Heart, Globe, Star, Wand2, Zap, Target, User, Briefcase, Palette, Upload, X, Check } from 'lucide-react-native';
+import { Settings2, CreditCard as Edit3, Trash2, Swords, Shield, Sparkles, Users, Globe as Globe2, Lock, Wallet, Plus, Share2, Coins, Heart, Globe, Star, Wand2, Zap, Target, User, Briefcase, Palette, Upload, X, Check, LayoutGrid, Square } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { supabase } from '@/lib/supabase';
@@ -122,11 +123,45 @@ export default function CollectionScreen() {
   const [flipAnimations, setFlipAnimations] = useState<Map<string, Animated.Value>>(new Map());
   const [sharingCard, setSharingCard] = useState(false);
   const viewShotRefs = useRef<Map<string, ViewShot | null>>(new Map());
+  const lastFetchTimeRef = useRef<number>(0);
+  const singleListRef = useRef<FlatList<Card>>(null);
   const { height: screenHeight } = useWindowDimensions();
   const router = useRouter();
   const [hiddenCards, setHiddenCards] = useState<Set<string>>(new Set());
   const [favoritedCards, setFavoritedCards] = useState<Set<string>>(new Set());
   
+  // Grid (multi-card gallery) view toggle
+  const [gridView, setGridView] = useState(false);
+  // When a grid card is tapped, we store its index and scroll the single list to it once visible
+  const [singleViewIndex, setSingleViewIndex] = useState<number | null>(null);
+  // Keep the grid FlatList mounted after first use so toggling back to it doesn't remount
+  const [gridListInitialized, setGridListInitialized] = useState(false);
+  // Pre-mount the grid list once cards are available so the first toggle is instant.
+  // Defer one frame so the initial single-card view can render first and avoid jank.
+  useEffect(() => {
+    if (cards.length === 0 || gridListInitialized) return;
+    const id = requestAnimationFrame(() => {
+      setGridListInitialized(true);
+    });
+    return () => cancelAnimationFrame(id);
+  }, [cards.length, gridListInitialized]);
+
+  // When a grid card is tapped, switch to single view and scroll to that card.
+  useEffect(() => {
+    if (singleViewIndex === null) return;
+    if (gridView) {
+      setSingleViewIndex(null);
+      return;
+    }
+    singleListRef.current?.scrollToIndex({ index: singleViewIndex, animated: true });
+    setSingleViewIndex(null);
+  }, [gridView, singleViewIndex]);
+  // More columns in landscape so cards stay short enough to stack into rows
+  const isLandscapeLayout = screenWidth > screenHeight;
+  const gridColumns = isTablet()
+    ? (isLandscapeLayout ? 6 : 4)
+    : (isLandscapeLayout ? 4 : 3);
+
   // New deck viewing state
   const [viewMode, setViewMode] = useState<'cards' | 'decks'>('cards');
   const [customDeckImages, setCustomDeckImages] = useState<Record<string, string>>({});
@@ -141,13 +176,19 @@ export default function CollectionScreen() {
   const [imagePrompt, setImagePrompt] = useState('');
   const [showAddDeck, setShowAddDeck] = useState(false);
   const [newDeckName, setNewDeckName] = useState('');
+  const [listContainerHeight, setListContainerHeight] = useState(0);
+  const [listContainerWidth, setListContainerWidth] = useState(0);
   
   // Double tap timing ref
   const lastTapRef = useRef<number>(0);
   
   
   // Calculate scaling factor for horizontal scrolling based on device
-  const getScaleFactor = () => {
+  const getScaleFactor = (forGrid: boolean) => {
+    // In multi-card grid mode, shrink text/elements to match the smaller cards
+    if (forGrid) {
+      return isTablet() ? 0.5 : 0.42;
+    }
     // For horizontal scrolling, use consistent scaling based on device type
     // Tablets can handle larger text, phones need slightly smaller
     return isTablet() ? 1.0 : 0.85;
@@ -161,13 +202,25 @@ export default function CollectionScreen() {
     'Cinzel-Regular': Cinzel_400Regular,
   });
 
-  const fetchCards = useCallback(async (isRefreshing = false) => {
+  // Only replace the cards array if the server response is actually different.
+  // Keeping the same reference prevents the filter effect and FlatList from
+  // re-rendering (and re-loading images) when nothing has changed.
+  const setAllCardsIfChanged = (newCards: Card[]) => {
+    const same =
+      allCards.length === newCards.length &&
+      JSON.stringify(allCards) === JSON.stringify(newCards);
+    if (!same) {
+      setAllCards(newCards);
+    }
+  };
+
+  const fetchCards = useCallback(async (isRefreshing = false, background = false) => {
     if (!user) {
       return;
     }
 
     try {
-      if (!isRefreshing) {
+      if (!isRefreshing && !background) {
         setLoading(true);
       }
       setError('');
@@ -194,7 +247,7 @@ export default function CollectionScreen() {
           if (personalError) throw personalError;
           console.log('🔵 DEBUG: Personal cards loaded:', personalCards?.length);
           console.log('🔵 DEBUG: Sample personal card:', personalCards?.[0]);
-          setAllCards(personalCards as Card[] ?? []);
+          setAllCardsIfChanged(personalCards as Card[] ?? []);
           break;
 
         case 'friends':
@@ -212,7 +265,7 @@ export default function CollectionScreen() {
           );
 
           if (friendIds.length === 0) {
-            setAllCards([]);
+            setAllCardsIfChanged([]);
             break;
           }
 
@@ -247,7 +300,7 @@ export default function CollectionScreen() {
           console.log('🟢 DEBUG: Friends cards loaded:', friendCards?.length);
           console.log('🟢 DEBUG: Sample friend card:', friendCards?.[0]);
           console.log('🟢 DEBUG: Friend card has is_shared_with_friends?', friendCards?.[0]?.hasOwnProperty('is_shared_with_friends'));
-          setAllCards(friendCards as Card[] || []);
+          setAllCardsIfChanged(friendCards as Card[] || []);
           break;
 
         case 'public':
@@ -270,7 +323,7 @@ export default function CollectionScreen() {
                   .order('created_at', { ascending: false });
 
                 if (fallbackError) throw fallbackError;
-                setAllCards(fallbackCards as Card[] ?? []);
+                setAllCardsIfChanged(fallbackCards as Card[] ?? []);
                 break; // Important: break here to avoid throwing the error
               } else {
                 throw publicError;
@@ -279,7 +332,7 @@ export default function CollectionScreen() {
               console.log('🟡 DEBUG: Public cards loaded:', publicCards?.length);
               console.log('🟡 DEBUG: Sample public card:', publicCards?.[0]);
               console.log('🟡 DEBUG: Public card has is_public?', publicCards?.[0]?.hasOwnProperty('is_public'));
-              setAllCards(publicCards as Card[] ?? []);
+              setAllCardsIfChanged(publicCards as Card[] ?? []);
             }
           } catch (publicErr: any) {
             // Check if this is the column not found error one more time
@@ -294,7 +347,7 @@ export default function CollectionScreen() {
               if (fallbackError) throw fallbackError;
               console.log('🟡 DEBUG: Public fallback cards loaded:', fallbackCards?.length);
               console.log('🟡 DEBUG: Sample fallback card:', fallbackCards?.[0]);
-              setAllCards(fallbackCards as Card[] ?? []);
+              setAllCardsIfChanged(fallbackCards as Card[] ?? []);
             } else {
               logError('Public cards query error:', publicErr);
               throw publicErr;
@@ -308,6 +361,7 @@ export default function CollectionScreen() {
     } finally {
       setLoading(false);
       setRefreshing(false);
+      lastFetchTimeRef.current = Date.now();
     }
   }, [user, selectedType]);
 
@@ -317,11 +371,16 @@ export default function CollectionScreen() {
     }
   }, [user, fetchCards]);
 
-  // Refresh cards when tab is focused (e.g., after creating a card from inbox)
+  // Refresh cards when tab is focused, but only if we haven't fetched recently.
+  // This stops images from reloading on every tab switch while still catching
+  // newly created cards after a few seconds away.
   useFocusEffect(
     useCallback(() => {
-      if (user) {
-        fetchCards(false);
+      if (!user) return;
+      const staleThreshold = 30000; // 30 seconds
+      const now = Date.now();
+      if (now - lastFetchTimeRef.current > staleThreshold) {
+        fetchCards(false, true);
       }
     }, [user, fetchCards])
   );
@@ -729,6 +788,20 @@ export default function CollectionScreen() {
     }
   }, [viewMode, selectedPhenomena, searchQuery, allCards, phenomenaTypes, customDeckImages, filterItems, generateDecks]);
 
+  // Prefetch upcoming card images so they don't flash/reload on scroll.
+  // Grid view needs many thumbnails ready, so prefetch a larger batch even while
+  // the single-card view is still visible.
+  useEffect(() => {
+    if (!cards.length) return;
+    const urls = cards
+      .slice(0, gridView ? 36 : 12)
+      .map(c => c.image_url)
+      .filter(Boolean) as string[];
+    if (urls.length && Image.prefetch) {
+      Image.prefetch(urls, 'memory-disk');
+    }
+  }, [cards, gridView]);
+
   const handleDelete = async (cardId: string) => {
     if (!cardId) {
       setDeleteError('Invalid card selected');
@@ -797,7 +870,7 @@ export default function CollectionScreen() {
       }
 
       log('✅ Card deleted successfully:', data);
-      setAllCards(prevCards => prevCards.filter(card => card.id !== cardId));
+      setAllCards(prevCards => prevCards.filter((card: Card) => card.id !== cardId));
       setShowActions(false);
       setSelectedCard(null);
       
@@ -1022,50 +1095,94 @@ export default function CollectionScreen() {
     }
   }, [fontsLoaded]);
 
+  // Vertical space reserved for the floating tab bar that overlaps the list.
+  // The tab bar is hidden in landscape, so no space is reserved there.
+  const getBottomReserve = useCallback(() => {
+    const isLandscapeNow = screenWidth > screenHeight;
+    return isLandscapeNow ? 0 : 100;
+  }, [screenWidth, screenHeight]);
+
+  // The height actually usable for a card: the measured FlatList container
+  // minus the area covered by the floating tab bar (portrait only).
+  const getUsableCardAreaHeight = useCallback(() => {
+    const containerHeight = listContainerHeight > 0 ? listContainerHeight : screenHeight - 100;
+    return Math.max(0, containerHeight - getBottomReserve());
+  }, [listContainerHeight, screenHeight, getBottomReserve]);
+
+  // Calculate card dimensions for either view mode. Keeping two memoized values
+  // lets the hidden grid FlatList maintain its correct layout while inactive,
+  // so toggling to it doesn't require a full re-layout.
+  const computeCardDimensions = useCallback((forGrid: boolean) => {
+    const cardRatioGrid = 2.3 / 3.6;
+
+    if (forGrid) {
+      const columnGap = 8;
+      const containerPad = (Platform.OS === 'web' ? 16 : 8) * 2;
+      const listContentPad = 12 * 2;
+      const sideInsets = insets.left + insets.right;
+      const usableWidth =
+        screenWidth - containerPad - listContentPad - sideInsets - columnGap * (gridColumns - 1);
+      const cardWidth = Math.floor(usableWidth / gridColumns);
+      const cardHeight = Math.round(cardWidth / cardRatioGrid);
+      const imageHeight = cardHeight * 0.5;
+      return { cardWidth, cardHeight, imageHeight };
+    }
+
+    const availableHeight = getUsableCardAreaHeight();
+    const horizontalPadding = 24;
+    const availableWidth = screenWidth - horizontalPadding;
+    const cardRatio = 2.3 / 3.6;
+    const maxCardHeight = availableHeight * 0.98;
+    const maxCardWidth = availableWidth * 0.98;
+
+    let cardHeight = maxCardHeight;
+    let cardWidth = cardHeight * cardRatio;
+
+    if (cardWidth > maxCardWidth) {
+      cardWidth = maxCardWidth;
+      cardHeight = cardWidth / cardRatio;
+    }
+
+    const minCardHeight = 510;
+    if (cardHeight < minCardHeight) {
+      cardHeight = minCardHeight;
+      cardWidth = cardHeight * cardRatio;
+    }
+
+    if (cardHeight > maxCardHeight) {
+      cardHeight = maxCardHeight;
+      cardWidth = cardHeight * cardRatio;
+    }
+    if (cardWidth > maxCardWidth) {
+      cardWidth = maxCardWidth;
+      cardHeight = cardWidth / cardRatio;
+    }
+
+    const imageHeight = cardHeight * 0.5;
+    return { cardWidth, cardHeight, imageHeight };
+  }, [gridColumns, screenWidth, insets.left, insets.right, getUsableCardAreaHeight]);
+
+  const singleCardDimensions = useMemo(() => computeCardDimensions(false), [computeCardDimensions]);
+  const gridCardDimensions = useMemo(() => computeCardDimensions(true), [computeCardDimensions]);
+
+  // Calculate scaling factor based on number of columns
+  const singleScaleFactor = useMemo(() => getScaleFactor(false), []);
+  const gridScaleFactor = useMemo(() => getScaleFactor(true), []);
+
+  // Width of the single-card FlatList item wrapper. Match the measured container
+  // width so the card is centered exactly within the page; fall back to the
+  // known root container padding before the onLayout measurement arrives.
+  const containerHorizontalPadding = (Platform.OS === 'web' ? 16 : 8) * 2;
+  const singleWrapperWidth = listContainerWidth > 0
+    ? listContainerWidth
+    : screenWidth - containerHorizontalPadding;
+
   if (!fontsLoaded) {
     return null;
   }
 
-  // Calculate scaling factor based on number of columns
-  const scaleFactor = getScaleFactor();
-  
-  // Calculate card dimensions to fit completely on screen with larger size
-  const getCardDimensions = () => {
-    // Calculate available height (subtract space for top controls and floating tab bar overlay)
-    // Top controls: collection type buttons + search (~60px) + padding
-    // Floating tab bar overlaps content, so only reserve space for top controls
-    const reservedHeight = 100;
-    const availableHeight = screenHeight - reservedHeight;
-    
-    // Calculate available width (subtract horizontal padding)
-    const horizontalPadding = 24; // Reduced from 32 to 24 for larger cards
-    const availableWidth = screenWidth - horizontalPadding;
-    
-    // Calculate card dimensions based on 2.3:3.6 aspect ratio (slightly taller and narrower for premium cards)
-    // Try height-constrained first
-    let cardHeight = availableHeight;
-    let cardWidth = cardHeight * (2.3 / 3.6);
-    
-    // If width exceeds available space, constrain by width instead
-    if (cardWidth > availableWidth) {
-      cardWidth = availableWidth;
-      cardHeight = cardWidth * (3.6 / 2.3);
-    }
-    
-    // Increased minimum readable size for better visibility
-    const minCardHeight = 510; // Sweet spot between 500 and 520
-    const minCardWidth = minCardHeight * (2.3 / 3.6);
-    
-    cardHeight = Math.max(minCardHeight, cardHeight);
-    cardWidth = Math.max(minCardWidth, cardWidth);
-    
-    // Image should take up approximately half the card height
-    const imageHeight = cardHeight * 0.5;
-    
-    return { cardWidth, cardHeight, imageHeight };
-  };
-
-  const renderCard = ({ item }: { item: Card }) => {
+  const renderCard = ({ item, index, isGrid, dimensions }: { item: Card; index: number; isGrid: boolean; dimensions: { cardWidth: number; cardHeight: number; imageHeight: number } }) => {
+    const scaleFactor = isGrid ? gridScaleFactor : singleScaleFactor;
     // Frame colors are always based on card type
     const cardColors = getCardTypeColor(item.type);
     
@@ -1137,7 +1254,11 @@ export default function CollectionScreen() {
           }
         }
       } else {
-        // Single tap - reserved for future interactions
+        // Single tap in grid view opens the selected card by itself.
+        if (isGrid) {
+          setGridView(false);
+          setSingleViewIndex(index);
+        }
         if (Platform.OS !== 'web') {
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         }
@@ -1203,7 +1324,7 @@ export default function CollectionScreen() {
     const textBackgroundColor = isBlackCard ? undefined : 'transparent';
     
     // Get card dimensions based on the 2.5:3.5 ratio
-    const { cardWidth, cardHeight, imageHeight } = getCardDimensions();
+    const { cardWidth, cardHeight, imageHeight } = dimensions;
     
     // Calculate border width based on scale factor
     const borderWidth = Math.max(1, 3 * scaleFactor); // Min 1px, max 3px
@@ -1333,7 +1454,9 @@ export default function CollectionScreen() {
                 height: '100%',
                 borderRadius: 12,
               }} 
-              resizeMode="cover" // Use cover to fill entire container
+              contentFit="cover"
+              cachePolicy="memory-disk"
+              transition={300}
             />
           </Pressable>
         );
@@ -1352,7 +1475,7 @@ export default function CollectionScreen() {
           >
             {item.image_url ? (
               // Show custom deck image
-              <Image source={{ uri: item.image_url }} style={styles.fullBleedImage} resizeMode="cover" />
+              <Image source={{ uri: item.image_url }} style={styles.fullBleedImage} contentFit="cover" cachePolicy="memory-disk" transition={300} />
             ) : (
               // Show gradient background for decks without custom images
               <LinearGradient
@@ -1394,7 +1517,7 @@ export default function CollectionScreen() {
           onPress={() => handleDoubleTapCard()}
           onLongPress={handleLongPress}
         >
-          <Image source={{ uri: item.image_url }} style={styles.fullBleedImage} resizeMode="cover" />
+          <Image source={{ uri: item.image_url }} style={styles.fullBleedImage} contentFit="cover" cachePolicy="memory-disk" transition={300} />
 
           {/* Gradient overlay removed - no longer needed since text overlays are hidden */}
 
@@ -1596,7 +1719,9 @@ export default function CollectionScreen() {
                 <Image
                   source={{ uri: item.image_url }}
                   style={styles.cardArt}
-                  resizeMode="cover"
+                  contentFit="cover"
+                  cachePolicy="memory-disk"
+                  transition={300}
                 />
               </View>
 
@@ -1732,7 +1857,9 @@ export default function CollectionScreen() {
                 <Image
                   source={{ uri: item.image_url }}
                   style={styles.cardArt}
-                  resizeMode="cover"
+                  contentFit="cover"
+                  cachePolicy="memory-disk"
+                  transition={300}
                 />
               </View>
 
@@ -1824,19 +1951,30 @@ export default function CollectionScreen() {
     }; // Close renderCardFront
     
     // Return animated card container
+    // In grid mode the wrapper hugs the card so rows stack vertically. In
+    // single-card mode it fills the usable area to vertically center the card.
+    // In single-card mode the wrapper is the full page width, so offset the
+    // absolutely positioned card by half the leftover space to center it.
+    const leftOffset = isGrid ? 0 : (singleWrapperWidth - cardWidth) / 2;
+
     return (
-      <View style={{ 
-        width: cardWidth + 32, 
-        height: cardHeight,
+      <View style={{
+        width: isGrid ? cardWidth : singleWrapperWidth,
+        height: isGrid
+          ? cardHeight
+          : (getUsableCardAreaHeight() > 0 ? getUsableCardAreaHeight() : cardHeight),
         justifyContent: 'center',
         alignItems: 'center',
       }}>
         <Animated.View
           style={[
-            { 
+            {
               position: 'absolute',
-              width: cardWidth, 
+              top: '50%',
+              left: leftOffset,
+              width: cardWidth,
               height: cardHeight,
+              marginTop: -cardHeight / 2,
               transform: [{ rotateY: frontRotateY }],
               backfaceVisibility: 'hidden',
             }
@@ -1861,10 +1999,13 @@ export default function CollectionScreen() {
         </Animated.View>
         <Animated.View
           style={[
-            { 
+            {
               position: 'absolute',
-              width: cardWidth, 
+              top: '50%',
+              left: leftOffset,
+              width: cardWidth,
               height: cardHeight,
+              marginTop: -cardHeight / 2,
               transform: [{ rotateY: backRotateY }],
               backfaceVisibility: 'hidden',
             }
@@ -1911,14 +2052,14 @@ export default function CollectionScreen() {
                   // For premium generation shadow cards, show pure image without overlays
                   if (shadowItem.is_premium_generation) {
                     return (
-                      <Image source={{ uri: shadowItem.image_url }} style={styles.fullBleedImage} resizeMode="cover" />
+                      <Image source={{ uri: shadowItem.image_url }} style={styles.fullBleedImage} contentFit="cover" cachePolicy="memory-disk" transition={300} />
                     );
                   }
                   
                   // Render shadow card as full bleed with same layout as normal full bleed
                   return (
                     <>
-                      <Image source={{ uri: shadowItem.image_url }} style={styles.fullBleedImage} resizeMode="cover" />
+                      <Image source={{ uri: shadowItem.image_url }} style={styles.fullBleedImage} contentFit="cover" cachePolicy="memory-disk" transition={300} />
 
                       {/* Gradient overlay removed - no longer needed since text overlays are hidden */}
 
@@ -2057,7 +2198,9 @@ export default function CollectionScreen() {
                         <Image
                           source={{ uri: shadowItem.image_url }}
                           style={{ width: '100%', height: '100%' }}
-                          resizeMode="cover"
+                          contentFit="cover"
+                          cachePolicy="memory-disk"
+                          transition={300}
                         />
                       </View>
                     );
@@ -2126,7 +2269,9 @@ export default function CollectionScreen() {
                             <Image
                               source={{ uri: shadowItem.image_url }}
                               style={styles.cardArt}
-                              resizeMode="cover"
+                              contentFit="cover"
+                              cachePolicy="memory-disk"
+                              transition={300}
                             />
                           </View>
 
@@ -2261,7 +2406,9 @@ export default function CollectionScreen() {
                             <Image
                               source={{ uri: shadowItem.image_url }}
                               style={styles.cardArt}
-                              resizeMode="cover"
+                              contentFit="cover"
+                              cachePolicy="memory-disk"
+                              transition={300}
                             />
                           </View>
 
@@ -2401,6 +2548,124 @@ export default function CollectionScreen() {
     );
   };
 
+  // Render a FlatList for either the single-card or grid view. Keeping both
+  // lists mounted and toggling opacity avoids the expensive remount that
+  // happens when numColumns/horizontal changes on a single FlatList.
+  const renderCardList = (isGrid: boolean, active: boolean) => {
+    const dimensions = isGrid ? gridCardDimensions : singleCardDimensions;
+    return (
+    <FlatList
+      key={isGrid ? `grid-${gridColumns}` : 'single'}
+      ref={isGrid ? undefined : singleListRef}
+      data={cards}
+      renderItem={({ item, index }) => renderCard({ item, index, isGrid, dimensions })}
+      keyExtractor={(item) => item.id}
+      horizontal={!isGrid}
+      numColumns={isGrid ? gridColumns : 1}
+      columnWrapperStyle={isGrid ? styles.gridColumnWrapper : undefined}
+      getItemLayout={(_data, index) => {
+        if (isGrid) {
+          const { cardHeight } = dimensions;
+          const row = Math.floor(index / gridColumns);
+          return {
+            length: cardHeight + 8,
+            offset: row * (cardHeight + 8),
+            index,
+          };
+        }
+        return {
+          length: singleWrapperWidth,
+          offset: index * singleWrapperWidth,
+          index,
+        };
+      }}
+      initialNumToRender={isGrid ? 4 : 3}
+      maxToRenderPerBatch={isGrid ? 4 : 3}
+      windowSize={isGrid ? 7 : 3}
+      showsHorizontalScrollIndicator={false}
+      showsVerticalScrollIndicator={false}
+      scrollEnabled={true}
+      pagingEnabled={false}
+      contentContainerStyle={
+        isGrid
+          ? styles.gridListContent
+          : [
+              styles.horizontalListContent,
+              isLandscape && { paddingBottom: 0, paddingTop: 0 }
+            ]
+      }
+      style={[styles.horizontalList, active ? styles.listActive : styles.listHidden]}
+      extraData={`${listContainerHeight}-${listContainerWidth}-${gridView}`}
+      contentInsetAdjustmentBehavior="never"
+      scrollsToTop={false}
+      bounces={true}
+      alwaysBounceVertical={true}
+      alwaysBounceHorizontal={false}
+      bouncesZoom={false}
+      directionalLockEnabled={true}
+      disableIntervalMomentum={!isGrid}
+      snapToInterval={isGrid ? undefined : singleWrapperWidth}
+      snapToAlignment="center"
+      decelerationRate={isGrid ? 'normal' : 'fast'}
+      overScrollMode="never"
+      nestedScrollEnabled={false}
+      scrollEventThrottle={16}
+      onScrollBeginDrag={() => {
+        if (showPhenomenaMenu) setShowPhenomenaMenu(false);
+        if (showTypeMenu) setShowTypeMenu(false);
+      }}
+      keyboardShouldPersistTaps="handled"
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={onRefresh}
+          tintColor="#6366f1"
+          colors={["#6366f1"]}
+          progressBackgroundColor="#1f2937"
+          progressViewOffset={insets.top + 8}
+          enabled={true}
+        />
+      }
+      ListEmptyComponent={
+        <View style={styles.emptyContainer}>
+          <Text style={styles.emptyText}>
+            {selectedType === 'personal'
+              ? 'No cards in your collection yet.'
+              : selectedType === 'friends'
+              ? 'No shared cards available.'
+              : 'No public cards available.'}
+          </Text>
+          {selectedType === 'personal' && (
+            <TouchableOpacity 
+              style={styles.createButton}
+              onPress={() => {
+                // Navigate directly to card creation with pre-selected phenomena
+                if (selectedPhenomena === 'All') {
+                  router.push('/create');
+                } else {
+                  router.push({
+                    pathname: '/card-creation-new',
+                    params: {
+                      preselected_type: selectedPhenomena
+                    }
+                  });
+                }
+              }}
+            >
+              <Text style={styles.createButtonText}>
+                {selectedPhenomena === 'All' 
+                  ? 'Create Your First Card' 
+                  : `Create Your First ${selectedPhenomena} Card`
+                }
+              </Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      }
+    />
+  );
+  };
+
   const renderCollectionTypeSelector = () => (
     <View style={styles.collectionTypeContainer}>
       {COLLECTION_TYPES.map((type) => {
@@ -2465,6 +2730,28 @@ export default function CollectionScreen() {
       {/* Experiment: Removed Spacer to reduce top padding */}
       {/* Top action bar */}
       <View style={styles.topBarContainer}>
+        {/* Grid / single view toggle */}
+        <TouchableOpacity
+          style={[styles.viewToggleButton, gridView && styles.viewToggleButtonActive]}
+          onPress={() => {
+            setGridView(prev => {
+              const next = !prev;
+              if (next) setGridListInitialized(true);
+              return next;
+            });
+            if (Platform.OS !== 'web') {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            }
+          }}
+          accessibilityLabel={gridView ? 'Show one card at a time' : 'Show multiple cards at once'}
+        >
+          {gridView ? (
+            <Square size={18} color="#fff" />
+          ) : (
+            <LayoutGrid size={18} color="#fff" />
+          )}
+        </TouchableOpacity>
+
         {/* Collection type dropdown */}
         <View style={styles.dropdownButtonContainer}>
           <TouchableOpacity
@@ -2593,85 +2880,12 @@ export default function CollectionScreen() {
 
       {/* No column selector UI - automatically set based on device type */}
       
-      <View style={{ flex: 1 }}>
-        <FlatList
-        data={cards}
-        renderItem={renderCard}
-        keyExtractor={(item) => item.id}
-        horizontal={true}
-        showsHorizontalScrollIndicator={false}
-        showsVerticalScrollIndicator={false}
-        scrollEnabled={true}
-        pagingEnabled={false}
-        contentContainerStyle={styles.horizontalListContent}
-        style={styles.horizontalList}
-        contentInsetAdjustmentBehavior="never"
-        scrollsToTop={false}
-        bounces={true}
-        alwaysBounceVertical={true}
-        alwaysBounceHorizontal={false}
-        bouncesZoom={false}
-        directionalLockEnabled={true}
-        disableIntervalMomentum={true}
-        snapToInterval={getCardDimensions().cardWidth + 32}
-        snapToAlignment="center"
-        decelerationRate="fast"
-        overScrollMode="never"
-        nestedScrollEnabled={false}
-        scrollEventThrottle={16}
-        onScrollBeginDrag={() => {
-          if (showPhenomenaMenu) setShowPhenomenaMenu(false);
-          if (showTypeMenu) setShowTypeMenu(false);
-        }}
-        keyboardShouldPersistTaps="handled"
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            tintColor="#6366f1"
-            colors={["#6366f1"]}
-            progressBackgroundColor="#1f2937"
-            progressViewOffset={insets.top + 8}
-            enabled={true}
-          />
-        }
-        ListEmptyComponent={
-          <View style={styles.emptyContainer}>
-            <Text style={styles.emptyText}>
-              {selectedType === 'personal'
-                ? 'No cards in your collection yet.'
-                : selectedType === 'friends'
-                ? 'No shared cards available.'
-                : 'No public cards available.'}
-            </Text>
-            {selectedType === 'personal' && (
-              <TouchableOpacity 
-                style={styles.createButton}
-                onPress={() => {
-                  // Navigate directly to card creation with pre-selected phenomena
-                  if (selectedPhenomena === 'All') {
-                    router.push('/create');
-                  } else {
-                    router.push({
-                      pathname: '/card-creation-new',
-                      params: {
-                        preselected_type: selectedPhenomena
-                      }
-                    });
-                  }
-                }}
-              >
-                <Text style={styles.createButtonText}>
-                  {selectedPhenomena === 'All' 
-                    ? 'Create Your First Card' 
-                    : `Create Your First ${selectedPhenomena} Card`
-                  }
-                </Text>
-              </TouchableOpacity>
-            )}
-          </View>
-        }
-        />
+      <View style={{ flex: 1 }} onLayout={(e) => {
+        setListContainerHeight(e.nativeEvent.layout.height);
+        setListContainerWidth(e.nativeEvent.layout.width);
+      }}>
+        {renderCardList(false, !gridView)}
+        {gridListInitialized && renderCardList(true, gridView)}
       </View>
 
       <Modal
@@ -2924,7 +3138,9 @@ export default function CollectionScreen() {
                 <Image 
                   source={{ uri: customDeckImages[selectedDeckForImage] }} 
                   style={styles.previewImage}
-                  resizeMode="cover"
+                  contentFit="cover"
+                  cachePolicy="memory-disk"
+                  transition={300}
                 />
               </View>
             )}
@@ -3169,6 +3385,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     borderWidth: 2,
     borderColor: 'rgba(255, 255, 255, 0.3)',
+    backgroundColor: '#1a1a1a',
   },
   cardArt: {
     width: '100%',
@@ -3357,6 +3574,17 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     backgroundColor: 'rgba(255,255,255,0.08)',
   },
+  viewToggleButton: {
+    width: 36,
+    height: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 18,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+  },
+  viewToggleButtonActive: {
+    backgroundColor: '#6366f1',
+  },
   topBarButtonText: {
     color: '#fff',
     fontFamily: 'Cinzel-Regular',
@@ -3502,8 +3730,28 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingBottom: 100,
   },
+  gridListContent: {
+    paddingHorizontal: 12,
+    paddingTop: 4,
+    paddingBottom: 120,
+  },
+  gridColumnWrapper: {
+    justifyContent: 'flex-start',
+    gap: 8,
+    marginBottom: 8,
+  },
   horizontalList: {
     flex: 1,
+  },
+  listActive: {
+    ...StyleSheet.absoluteFillObject,
+    opacity: 1,
+    pointerEvents: 'auto',
+  },
+  listHidden: {
+    ...StyleSheet.absoluteFillObject,
+    opacity: 0,
+    pointerEvents: 'none',
   },
   cardBack: {
     borderRadius: 16,
